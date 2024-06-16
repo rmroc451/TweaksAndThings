@@ -17,7 +17,7 @@ This mod requires Railloader by Zamu.
     2. Drag the zip file onto Railloader.exe and have Railloader install the mod.
         * as with option 1, this will put a `RMROC451.TweaksAndThings` folder into the Mods folder created in step 1
     * If you DO NOT have the `RMROC451.TweaksAndThings` folder in the Mods folder after completing ONE of the above steps, you didn't complete the step successfully.
-3. Run the game and enjoy all of you interchange tracks being used.
+3. Run the game and enjoy all of the tweaks and things!
 
 ## Notes
 1. This mod currently supports Railroader verison 2024.4.4. This mod may break in future updates. I will do my best to continue to update this mod.
