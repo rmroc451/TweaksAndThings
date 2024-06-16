@@ -1,5 +1,5 @@
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/) [![Buymeacoffee](https://badgen.net/badge/icon/buymeacoffee?icon=buymeacoffee&label)](https://ko-fi.com/rmroc451)
-# RMROC451's Tweaks and Thinks
+# RMROC451's Tweaks and Things
 Please Read this **ENTIRE** README before continuing.
 
 This is a mod for Railroader which is available on Steam.
