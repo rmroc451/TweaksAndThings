@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "id": "RMROC451.TweaksAndThings",
+  "name": "RMROC451's Tweaks and Things",
+  "version": "$(AssemblyVersion)",
+  "requires": [
+    {
+      "id": "railloader",
+      "notBefore": "1.8.1"
+    }
+  ],
+  "assemblies": [ "RMROC451.TweaksAndThings" ]
+}
