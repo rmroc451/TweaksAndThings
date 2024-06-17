@@ -46,17 +46,24 @@ public class CarInspector_PopulateCarPanel_Patch
 
         builder.HStack(delegate (UIPanelBuilder hstack)
         {
-            hstack.AddButtonCompact("Handbrakes", delegate
+            var consist = __instance._car.EnumerateCoupled(LogicalEnd.A);
+
+            var buttonName = $"{(consist.Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} {TextSprites.HandbrakeWheel}";
+            hstack.AddButtonCompact(buttonName, delegate
             {
                 MrocConsistHelper(__instance._car, MrocHelperType.Handbrake);
-            }).Tooltip("Release Consist Handbrakes", "Iterates over each car in this consist and releases handbrakes.");
-            if (StateManager.IsHost || true)
+                hstack.Rebuild();
+            }).Tooltip(buttonName, $"Iterates over cars in this consist and {(consist.Any(c => c.HandbrakeApplied()) ? "releases" : "sets")} {TextSprites.HandbrakeWheel}.");
+
+            if (consist.Any(c => c.EndAirSystemIssue()))
             {
-                hstack.AddButtonCompact("Air Lines", delegate
+                hstack.AddButtonCompact("Connect Air Lines", delegate
                 {
                     MrocConsistHelper(__instance._car, MrocHelperType.GladhandAndAnglecock);
+                    hstack.Rebuild();
                 }).Tooltip("Connect Consist Air Lines", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
             }
+            hstack.RebuildOnInterval(1f);
         });
 
         return true;
@@ -70,7 +77,14 @@ public class CarInspector_PopulateCarPanel_Patch
         switch (mrocHelperType)
         {
             case MrocHelperType.Handbrake:
-                consist.Do(c => c.SetHandbrake(false));
+                if (consist.Any(c => c.HandbrakeApplied()))
+                {
+                    consist.Do(c => c.SetHandbrake(false));
+                } else
+                {
+                    TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
+                    tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
+                }
                 break;
 
             case MrocHelperType.GladhandAndAnglecock:
