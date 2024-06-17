@@ -46,27 +46,4 @@ Yes, these are client side mods. Host doesn't need to have them.
 ### What version of Railroader does this mod work with?
 2024.4.4
 
-### RMROC451 TaDo
-- ![Work In Progress](https://img.shields.io/badge/Status%3F-Work%20In%20Progress-green.svg)
-    - [ ] WebhookNotifier
-        - [X] Move base webclient calling to new WebhookNotifier
-            - [X] Extend WebhookNotifier in DiscordNotifier, to do formating of payload only.
-        - [X] Add Settings UI Elements for webhook url
-        - [ ] create thread per host || save game name || nearest city || locomotive??
-        - [X] store in a settings file per host & save game name?
-    - [ ] inspector button(s)
-        - [X] auto connect glad hands/angle cocks
-        - [X] release/set car brake?    
-        - [ ] Cost Ideas
-            - [ ] $$$ based on usage per day? or flat $5 per use?
-            - [ ] Caboose only?
-                - [ ] detect car having a nearby caboose to use? `UpdateCarsNearbyPlayer` but for car.
-                - [ ] add crew to caboose (similar to engine service), $25/day to fill up, must have crew to use and caboose near cars.
-                - [ ] crew number modifier for how many cars away from caboose it can effectively work?
-                - [ ] crew need to refill at a station?
-- ![Pending](https://img.shields.io/badge/Status%3F-Pending-yellow.svg)
-    - [ ] Camera offset to coupler
-        - [ ] shift + 9/0
-    - [ ] finance exporter/discord report at end of day for Game.State.Ledger
-
 *Special thanks and credit to Zamu for creating Railloader and for help with making the mod a bit more robust.*
