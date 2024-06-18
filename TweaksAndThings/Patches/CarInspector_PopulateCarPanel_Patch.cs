@@ -1,27 +1,16 @@
-﻿using GalaSoft.MvvmLight.Messaging;
-using Game;
-using Game.Events;
-using Game.Messages;
+﻿using Game.Messages;
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
-using Network;
-using Network.Messages;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Railloader;
 using Serilog;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Remoting.Messaging;
 using TweaksAndThings.Enums;
 using UI.Builder;
 using UI.CarInspector;
-using WorldStreamer2;
 using static Model.Car;
-using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
 
 namespace TweaksAndThings.Patches;
 
@@ -44,10 +33,11 @@ public class CarInspector_PopulateCarPanel_Patch
         TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
         if (!tweaksAndThings.IsEnabled) return true;
 
+        var consist = __instance._car.EnumerateCoupled(LogicalEnd.A);
+        builder = AddCarConsistRebuildObservers(builder, consist);
+
         builder.HStack(delegate (UIPanelBuilder hstack)
         {
-            var consist = __instance._car.EnumerateCoupled(LogicalEnd.A);
-
             var buttonName = $"{(consist.Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} {TextSprites.HandbrakeWheel}";
             hstack.AddButtonCompact(buttonName, delegate
             {
@@ -63,10 +53,25 @@ public class CarInspector_PopulateCarPanel_Patch
                     hstack.Rebuild();
                 }).Tooltip("Connect Consist Air Lines", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
             }
-            hstack.RebuildOnInterval(1f);
         });
 
         return true;
+    }
+
+    private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist)
+    {
+        foreach (Model.Car car in consist)
+        {
+            builder.AddObserver(car.KeyValueObject.Observe(PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), delegate (Value value) { builder.Rebuild(); }, false));
+            foreach (LogicalEnd logicalEnd in ends)
+            {
+                builder.AddObserver(car.KeyValueObject.Observe(KeyValueKeyFor(EndGearStateKey.IsCoupled, car.LogicalToEnd(logicalEnd)), delegate (Value value) { builder.Rebuild(); }, false));
+                builder.AddObserver(car.KeyValueObject.Observe(KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)), delegate (Value value) { builder.Rebuild(); }, false));
+                builder.AddObserver(car.KeyValueObject.Observe(KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)), delegate (Value value) { builder.Rebuild(); }, false));
+            }
+        }
+
+        return builder;
     }
 
     public static void MrocConsistHelper(Model.Car car, MrocHelperType mrocHelperType)
