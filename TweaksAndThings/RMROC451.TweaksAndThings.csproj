@@ -27,10 +27,4 @@
   <ItemGroup>
     <Publicize Include="Assembly-CSharp" />
   </ItemGroup>
-  
-  <ItemGroup>
-    <Reference Include="ForYourConvenience">
-      <HintPath>D:\SteamLibrary\steamapps\common\Railroader\Mods\ForYourConvenience\ForYourConvenience.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 </Project>
