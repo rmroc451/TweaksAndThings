@@ -1,67 +1,58 @@
 ﻿using HarmonyLib;
-using JetBrains.Annotations;
 using Model;
-using Model.AI;
 using Model.OpsNew;
 using Railloader;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
-using Track;
-using TweaksAndThings;
 using UI;
-using UI.Builder;
-using UI.CarInspector;
 using UI.Tags;
 using UnityEngine;
-using static Model.Car;
-using tat = TweaksAndThings.TweaksAndThings;
 
 namespace TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(TagController))]
 [HarmonyPatch(nameof(TagController.UpdateTag), typeof(Car), typeof(TagCallout), typeof(OpsController))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
-public class TagConroller_UpdateTag_Patch
+public class TagController_UpdateTag_Patch
 {
+    private const string tagTitleAndIconDelimeter = "\n<width=100%><align=\"right\">";
+    private const string tagTitleFormat = "<align=left><margin-right={0}.5em>{1}</margin><line-height=0>";
+
     private static void Postfix(Car car, TagCallout tagCallout)
     {
         TagController tagController = UnityEngine.Object.FindObjectOfType<TagController>();
         TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
-        tagCallout.callout.Title = $"<align=left>{car.DisplayName}<line-height=0>";
 
         if (!tweaksAndThings.IsEnabled || !tweaksAndThings.settings.HandBrakeAndAirTagModifiers)
         {
             return;
         }
 
-        tagCallout.gameObject.SetActive(
-            tagCallout.gameObject.activeSelf && 
-            (!GameInput.IsShiftDown || (GameInput.IsShiftDown && car.CarOrEndGearIssue()))
-        );
-        if (tagCallout.gameObject.activeSelf && GameInput.IsShiftDown && car.CarOrEndGearIssue()) {
+        ProceedWithPostFix(car, tagCallout, tagController);
 
+        return;
+    }
+
+    private static void ProceedWithPostFix(Car car, TagCallout tagCallout, TagController tagController)
+    {
+        bool isAltDownWithCarIssue = GameInput.IsAltDown && car.CarOrEndGearIssue();
+        tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", car.DisplayName);
+        tagCallout.gameObject.SetActive(
+            tagCallout.gameObject.activeSelf &&
+            (!GameInput.IsAltDown || isAltDownWithCarIssue)
+        );
+
+        if (tagCallout.gameObject.activeSelf && isAltDownWithCarIssue)
+        {
             tagController.ApplyImageColor(tagCallout, Color.black);
         }
 
-        if (car.CarAndEndGearIssue())
-        {
-            tagCallout.callout.Title =
-                    $"{tagCallout.callout.Title}\n<align=\"right\">{TextSprites.CycleWaybills}{TextSprites.HandbrakeWheel}";
-        }
-        else if (car.EndAirSystemIssue())
-                tagCallout.callout.Title =
-                    $"{tagCallout.callout.Title}\n<align=\"right\">{TextSprites.CycleWaybills}";
-        else if (car.HandbrakeApplied())
-                tagCallout.callout.Title =
-                    $"{tagCallout.callout.Title}\n<align=\"right\">{TextSprites.HandbrakeWheel}";
-            
-
-        return;
+        tagCallout.callout.Title =
+            (car.CarAndEndGearIssue(), car.EndAirSystemIssue(), car.HandbrakeApplied()) switch
+            {
+                (true, _, _) => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{TextSprites.CycleWaybills}{TextSprites.HandbrakeWheel}".Replace("{0}", "2"),
+                (_, true, _) => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{TextSprites.CycleWaybills}".Replace("{0}", "1"),
+                (_, _, true) => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{TextSprites.HandbrakeWheel}".Replace("{0}", "1"),
+                _ => car.DisplayName
+            };
     }
 }
 
@@ -80,6 +71,7 @@ public static class ModelCarExtensions
 
     public static bool CarOrEndGearIssue(this Model.Car car) =>
         car.EndAirSystemIssue() || car.HandbrakeApplied();
+
     public static bool CarAndEndGearIssue(this Model.Car car) =>
         car.EndAirSystemIssue() && car.HandbrakeApplied();
 }

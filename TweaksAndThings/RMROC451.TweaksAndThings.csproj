@@ -13,6 +13,8 @@
     <GameAssembly Include="Definition" />
 
     <GameAssembly Include="UnityEngine.CoreModule" />
+    <GameAssembly Include="UnityEngine.UI" />
+    <GameAssembly Include="Unity.TextMeshPro" />
 
     <GameAssembly Include="System.Net.Http" />
   </ItemGroup>

@@ -62,14 +62,30 @@ public class CarInspector_PopulateCarPanel_Patch
     {
         foreach (Model.Car car in consist)
         {
-            builder.AddObserver(car.KeyValueObject.Observe(PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), delegate (Value value) { builder.Rebuild(); }, false));
+            builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake));
             foreach (LogicalEnd logicalEnd in ends)
             {
-                builder.AddObserver(car.KeyValueObject.Observe(KeyValueKeyFor(EndGearStateKey.IsCoupled, car.LogicalToEnd(logicalEnd)), delegate (Value value) { builder.Rebuild(); }, false));
-                builder.AddObserver(car.KeyValueObject.Observe(KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)), delegate (Value value) { builder.Rebuild(); }, false));
-                builder.AddObserver(car.KeyValueObject.Observe(KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)), delegate (Value value) { builder.Rebuild(); }, false));
+                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsCoupled, car.LogicalToEnd(logicalEnd)));
+                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)));
+                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)));
             }
         }
+
+        return builder;
+    }
+
+    private static UIPanelBuilder AddObserver(UIPanelBuilder builder, Model.Car car, string key)
+    {
+        builder.AddObserver(
+            car.KeyValueObject.Observe(
+                key,
+                delegate (Value value)
+                {
+                    builder.Rebuild();
+                },
+                false
+            )
+        );
 
         return builder;
     }

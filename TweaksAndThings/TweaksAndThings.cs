@@ -94,7 +94,7 @@ namespace TweaksAndThings
                             builder.Rebuild();
                         }
                     )
-                ).Tooltip("Enable Tag Updates", $"Will add {TextSprites.CycleWaybills} to the car tag title having Air System issues. Also prepends {TextSprites.HandbrakeWheel} if there is a handbrake set.\n\nHolding Shift while tags are displayed only shows tag titles that have issues.");
+                ).Tooltip("Enable Tag Updates", $"Will add {TextSprites.CycleWaybills} to the car tag title having Air System issues. Also prepends {TextSprites.HandbrakeWheel} if there is a handbrake set.\n\nHolding Left Alt while tags are displayed only shows tag titles that have issues.");
             });
         }
 
