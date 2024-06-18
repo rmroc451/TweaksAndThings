@@ -13,6 +13,8 @@
     <GameAssembly Include="Definition" />
 
     <GameAssembly Include="UnityEngine.CoreModule" />
+    <GameAssembly Include="UnityEngine.UI" />
+    <GameAssembly Include="Unity.TextMeshPro" />
 
     <GameAssembly Include="System.Net.Http" />
   </ItemGroup>
@@ -26,11 +28,5 @@
   
   <ItemGroup>
     <Publicize Include="Assembly-CSharp" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Reference Include="ForYourConvenience">
-      <HintPath>D:\SteamLibrary\steamapps\common\Railroader\Mods\ForYourConvenience\ForYourConvenience.dll</HintPath>
-    </Reference>
   </ItemGroup>
 </Project>

@@ -1,48 +1,35 @@
 ﻿using HarmonyLib;
-using JetBrains.Annotations;
 using Model;
-using Model.AI;
 using Model.OpsNew;
 using Railloader;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
-using Track;
-using TweaksAndThings;
 using UI;
-using UI.Builder;
-using UI.CarInspector;
 using UI.Tags;
 using UnityEngine;
-using static Model.Car;
-using tat = TweaksAndThings.TweaksAndThings;
 
 namespace TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(TagController))]
 [HarmonyPatch(nameof(TagController.UpdateTag), typeof(Car), typeof(TagCallout), typeof(OpsController))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
-public class TagConroller_UpdateTag_Patch
+public class TagController_UpdateTag_Patch
 {
     private static void Postfix(Car car, TagCallout tagCallout)
     {
         TagController tagController = UnityEngine.Object.FindObjectOfType<TagController>();
         TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
-        tagCallout.callout.Title = $"<align=left>{car.DisplayName}<line-height=0>";
+        bool concatOnly = car.DisplayName.Length > 6;
+        string delimiter = concatOnly ? " " : "\n<align=\"right\">";
 
         if (!tweaksAndThings.IsEnabled || !tweaksAndThings.settings.HandBrakeAndAirTagModifiers)
         {
             return;
         }
-
+        tagCallout.callout.Title = concatOnly ? $"<align=left>{car.DisplayName} <space=.5em> " : $"<align=left>{car.DisplayName}<line-height=0>";
         tagCallout.gameObject.SetActive(
             tagCallout.gameObject.activeSelf && 
             (!GameInput.IsShiftDown || (GameInput.IsShiftDown && car.CarOrEndGearIssue()))
         );
+
         if (tagCallout.gameObject.activeSelf && GameInput.IsShiftDown && car.CarOrEndGearIssue()) {
 
             tagController.ApplyImageColor(tagCallout, Color.black);
@@ -50,17 +37,17 @@ public class TagConroller_UpdateTag_Patch
 
         if (car.CarAndEndGearIssue())
         {
-            tagCallout.callout.Title =
-                    $"{tagCallout.callout.Title}\n<align=\"right\">{TextSprites.CycleWaybills}{TextSprites.HandbrakeWheel}";
+            tagCallout.callout.Title = $"{tagCallout.callout.Title}{delimiter}{TextSprites.CycleWaybills}{TextSprites.HandbrakeWheel}";
         }
         else if (car.EndAirSystemIssue())
-                tagCallout.callout.Title =
-                    $"{tagCallout.callout.Title}\n<align=\"right\">{TextSprites.CycleWaybills}";
-        else if (car.HandbrakeApplied())
-                tagCallout.callout.Title =
-                    $"{tagCallout.callout.Title}\n<align=\"right\">{TextSprites.HandbrakeWheel}";
-            
+        {
+            tagCallout.callout.Title = $"{tagCallout.callout.Title}{delimiter}{TextSprites.CycleWaybills}";
 
+        }
+        else if (car.HandbrakeApplied())
+        {
+            tagCallout.callout.Title = $"{tagCallout.callout.Title}{delimiter}{TextSprites.HandbrakeWheel}";
+        }
         return;
     }
 }
