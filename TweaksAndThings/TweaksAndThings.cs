@@ -43,8 +43,9 @@ namespace TweaksAndThings
             //moddingContext.RegisterConsoleCommand(new EchoCommand());
 
             settings = moddingContext.LoadSettingsData<Settings>(self.Id);
-            if (!settings.WebhookSettingsList?.Any() ?? true)
+            if (!settings?.WebhookSettingsList?.Any() ?? true)
             {
+                if (settings == null) settings = new();
                 settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
                 this.moddingContext.SaveSettingsData(this.modDefinition.Id, settings ?? new());
             }
