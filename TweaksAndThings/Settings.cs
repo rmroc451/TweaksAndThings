@@ -12,10 +12,11 @@ public class Settings
 {
 
     public Settings() 
-    {}
+    {
+        WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
+    }
 
-    public Settings(
-        WebhookSettings webhookSettings, 
+    public Settings( 
         List<WebhookSettings> webhookSettingsList, 
         bool handBrakeAndAirTagModifiers
     )
@@ -29,7 +30,11 @@ public class Settings
 
     internal void AddAnotherRow()
     {
-        //if (!string.IsNullOrEmpty(WebhookSettingsList.Last().WebhookUrl)) WebhookSettingsList.Add(new());
+        if (!string.IsNullOrEmpty(WebhookSettingsList.Last().WebhookUrl))
+        {
+            WebhookSettingsList.Add(new());
+            Log.Information($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
+        }
     }
 }
 
