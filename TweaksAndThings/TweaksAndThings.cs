@@ -1,16 +1,11 @@
 ﻿using GalaSoft.MvvmLight.Messaging;
-using Game.Messages;
 using Game.State;
 using HarmonyLib;
-using Newtonsoft.Json.Linq;
 using Railloader;
 using Serilog;
-using Serilog.Debugging;
 using System.Linq;
 using System.Net.Http;
-using TweaksAndThings.Commands;
 using UI.Builder;
-using UI.CarInspector;
 
 namespace TweaksAndThings
 {
@@ -48,6 +43,11 @@ namespace TweaksAndThings
             //moddingContext.RegisterConsoleCommand(new EchoCommand());
 
             settings = moddingContext.LoadSettingsData<Settings>(self.Id);
+            if (settings.WebhookSettingsList?.Any() ?? false)
+            {
+                settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
+                this.moddingContext.SaveSettingsData(this.modDefinition.Id, settings ?? new());
+            }
         }
 
         public override void OnEnable()

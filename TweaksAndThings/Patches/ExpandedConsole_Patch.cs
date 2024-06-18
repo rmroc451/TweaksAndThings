@@ -102,7 +102,6 @@ public class ExpandedConsole_Add_Patch
         catch (Exception ex)
         {
             Log.Error(ex, ex.Message);
-            entry.Text += ex.ToString();
         }
     }
 
