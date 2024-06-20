@@ -72,12 +72,9 @@ namespace TweaksAndThings
         {
             logger.Information("Daytime!");
 
-            if (!settings?.WebhookSettingsList?.Any() ?? true)
-            {
-                if (settings == null) settings = new();
-                settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
-                settings.EngineRosterFuelColumnSettings = new();
-            }
+            if (settings == null) settings = new();
+            if (!settings?.WebhookSettingsList?.Any() ?? true) settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
+            if (settings?.EngineRosterFuelColumnSettings == null) settings.EngineRosterFuelColumnSettings = new();
 
             //WebhookUISection(ref builder);
             //builder.AddExpandingVerticalSpacer();
