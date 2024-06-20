@@ -4,6 +4,7 @@ using HarmonyLib;
 using Helpers;
 using Newtonsoft.Json;
 using Railloader;
+using RMROC451.TweaksAndThings.Settings;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -35,9 +36,7 @@ public class ExpandedConsole_Add_Patch
             TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
             StateManager shared = StateManager.Shared;
             GameStorage gameStorage = shared.Storage;
-            WebhookSettings settings = tweaksAndThings.settings.WebhookSettingsList.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);
-
-            Log.Information(entry.Text);
+            WebhookSettings settings = tweaksAndThings?.settings?.WebhookSettingsList?.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);
 
             if (
                 settings != null && 
@@ -50,7 +49,6 @@ public class ExpandedConsole_Add_Patch
 
                 var carId = t.IsMatch(entry.Text) ? Regex.Match(entry.Text, "car:(.*?)\"").Groups[1].Captures[0].ToString() : string.Empty;
                 Model.Car? car = TrainController.Shared.CarForString(carId);
-                Log.Information($"|{carId}| {car?.IsLocomotive}");
                 bool engineInMessage = car?.IsLocomotive ?? false;
                 var image = engineInMessage ?
                     new
@@ -91,7 +89,6 @@ public class ExpandedConsole_Add_Patch
                     }
                 };
                 string EndPoint = settings.WebhookUrl;
-                Log.Information(JsonConvert.SerializeObject(SuccessWebHook));
 
                 var content = new StringContent(JsonConvert.SerializeObject(SuccessWebHook), Encoding.UTF8, "application/json");
 

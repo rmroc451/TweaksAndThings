@@ -2,10 +2,14 @@
 using Game.State;
 using HarmonyLib;
 using Railloader;
+using RMROC451.TweaksAndThings.Settings;
 using Serilog;
+using System;
 using System.Linq;
 using System.Net.Http;
+using TweaksAndThings.Enums;
 using UI.Builder;
+using static Model.Car;
 
 namespace TweaksAndThings
 {
@@ -43,12 +47,6 @@ namespace TweaksAndThings
             //moddingContext.RegisterConsoleCommand(new EchoCommand());
 
             settings = moddingContext.LoadSettingsData<Settings>(self.Id);
-            if (!settings?.WebhookSettingsList?.Any() ?? true)
-            {
-                if (settings == null) settings = new();
-                settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
-                this.moddingContext.SaveSettingsData(this.modDefinition.Id, settings ?? new());
-            }
         }
 
         public override void OnEnable()
@@ -73,11 +71,53 @@ namespace TweaksAndThings
         public void ModTabDidOpen(UIPanelBuilder builder)
         {
             logger.Information("Daytime!");
+
+            if (!settings?.WebhookSettingsList?.Any() ?? true)
+            {
+                if (settings == null) settings = new();
+                settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
+                settings.EngineRosterFuelColumnSettings = new();
+            }
+
             //WebhookUISection(ref builder);
             //builder.AddExpandingVerticalSpacer();
             WebhooksListUISection(ref builder);
             builder.AddExpandingVerticalSpacer();
             HandbrakesAndAnglecocksUISection(ref builder);
+            builder.AddExpandingVerticalSpacer();
+            EnginRosterShowsFuelStatusUISection(ref builder);
+        }
+
+        private void EnginRosterShowsFuelStatusUISection(ref UIPanelBuilder builder)
+        {
+            var columns = Enum.GetValues(typeof(EngineRosterFuelDisplayColumn)).Cast<EngineRosterFuelDisplayColumn>().Select(i => i.ToString()).ToList();
+            builder.AddSection("Fuel Display in Engine Roster", delegate (UIPanelBuilder builder)
+            {
+                builder.AddField(
+                    "Enable",
+                    builder.AddDropdown(columns, (int)(settings?.EngineRosterFuelColumnSettings?.EngineRosterFuelStatusColumn ?? EngineRosterFuelDisplayColumn.None),
+                        delegate (int column)
+                        {
+                            if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList(), EngineRosterFuelColumnSettings = new() };
+                            settings.EngineRosterFuelColumnSettings.EngineRosterFuelStatusColumn = (EngineRosterFuelDisplayColumn)column;
+                            builder.Rebuild();
+                        }
+                    )
+                ).Tooltip("Enable Fuel Display in Engine Roster", $"Will add remaing fuel indication to Engine Roster (with details in roster row tooltip), Examples : {string.Join(" ", Enumerable.Range(0,4).Select(i => TextSprites.PiePercent(i, 4)))}");
+
+                builder.AddField(
+                    "Always Visible?",
+                    builder.AddToggle(
+                        () => settings?.EngineRosterFuelColumnSettings?.EngineRosterShowsFuelStatusAlways ?? false,
+                        delegate (bool enabled)
+                        {
+                            if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList(), EngineRosterFuelColumnSettings = new() };
+                            settings.EngineRosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways = enabled;
+                            builder.Rebuild();
+                        }
+                    )
+                ).Tooltip("Fuel Display in Engine Roster Always Visible", $"Always displayed, if you want it hidden and only shown when you care to see, uncheck this, and then you can press ALT for it to populate on the next UI refresh cycle.");
+            });
         }
 
         private void HandbrakesAndAnglecocksUISection(ref UIPanelBuilder builder)

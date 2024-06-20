@@ -11,6 +11,7 @@
     <GameAssembly Include="0Harmony" />
     <GameAssembly Include="KeyValue.Runtime" />
     <GameAssembly Include="Definition" />
+    <GameAssembly Include="Ops" />
 
     <GameAssembly Include="UnityEngine.CoreModule" />
     <GameAssembly Include="UnityEngine.UI" />
