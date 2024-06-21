@@ -14,7 +14,7 @@ using System.Text.RegularExpressions;
 using Track.Signals.Panel;
 using UI.Console;
 
-namespace TweaksAndThings.Patches;
+namespace RMROC451.TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(ExpandedConsole))]
 [HarmonyPatch(nameof(ExpandedConsole.Add))]
@@ -35,9 +35,7 @@ public class ExpandedConsole_Add_Patch
             TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
             StateManager shared = StateManager.Shared;
             GameStorage gameStorage = shared.Storage;
-            WebhookSettings settings = tweaksAndThings.settings.WebhookSettingsList.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);
-
-            Log.Information(entry.Text);
+            WebhookSettings settings = tweaksAndThings?.settings?.WebhookSettingsList?.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);
 
             if (
                 settings != null && 
@@ -50,7 +48,6 @@ public class ExpandedConsole_Add_Patch
 
                 var carId = t.IsMatch(entry.Text) ? Regex.Match(entry.Text, "car:(.*?)\"").Groups[1].Captures[0].ToString() : string.Empty;
                 Model.Car? car = TrainController.Shared.CarForString(carId);
-                Log.Information($"|{carId}| {car?.IsLocomotive}");
                 bool engineInMessage = car?.IsLocomotive ?? false;
                 var image = engineInMessage ?
                     new
@@ -91,7 +88,6 @@ public class ExpandedConsole_Add_Patch
                     }
                 };
                 string EndPoint = settings.WebhookUrl;
-                Log.Information(JsonConvert.SerializeObject(SuccessWebHook));
 
                 var content = new StringContent(JsonConvert.SerializeObject(SuccessWebHook), Encoding.UTF8, "application/json");
 

@@ -2,11 +2,12 @@
 using Model;
 using Model.OpsNew;
 using Railloader;
+using RMROC451.TweaksAndThings.Extensions;
 using UI;
 using UI.Tags;
 using UnityEngine;
 
-namespace TweaksAndThings.Patches;
+namespace RMROC451.TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(TagController))]
 [HarmonyPatch(nameof(TagController.UpdateTag), typeof(Car), typeof(TagCallout), typeof(OpsController))]
@@ -54,24 +55,4 @@ public class TagController_UpdateTag_Patch
                 _ => car.DisplayName
             };
     }
-}
-
-public static class ModelCarExtensions
-{
-    public static bool EndAirSystemIssue(this Model.Car car)
-    {
-        bool AEndAirSystemIssue = car[Car.LogicalEnd.A].IsCoupled && !car[Car.LogicalEnd.A].IsAirConnectedAndOpen;
-        bool BEndAirSystemIssue = car[Car.LogicalEnd.B].IsCoupled && !car[Car.LogicalEnd.B].IsAirConnectedAndOpen;
-        bool EndAirSystemIssue = AEndAirSystemIssue || BEndAirSystemIssue;
-        return EndAirSystemIssue;
-    }
-
-    public static bool HandbrakeApplied(this Model.Car car) =>
-        car.air.handbrakeApplied;
-
-    public static bool CarOrEndGearIssue(this Model.Car car) =>
-        car.EndAirSystemIssue() || car.HandbrakeApplied();
-
-    public static bool CarAndEndGearIssue(this Model.Car car) =>
-        car.EndAirSystemIssue() && car.HandbrakeApplied();
 }

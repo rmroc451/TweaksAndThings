@@ -20,7 +20,7 @@ This mod requires Railloader by Zamu.
 3. Run the game and enjoy all of the tweaks and things!
 
 ## Notes
-1. This mod currently supports Railroader verison 2024.4.4. This mod may break in future updates. I will do my best to continue to update this mod.
+1. This mod currently supports Railroader version 2024.4.4. This mod may break in future updates. I will do my best to continue to update this mod.
 2. It is possible that the developers of Railroader will implement their own fix for this issue. At such time this mod will be deprecated and no longer maintained. 
 3. As the saying goes, use mods at your own risk.
 
@@ -29,13 +29,13 @@ This mod requires Railloader by Zamu.
 **PLEASE READ AS THE WAY THIS MOD FUNCTIONS HAS CHANGED FROM PRIOR VERSIONS**
 
 1. Car Inspector : Handbrake & Air Line Helper
- * Gives two buttons that will scan the current car's connections, including the whole consist, and automatically release handbrakes, set anglecocks and connect glad hands.
+ * Gives two buttons that will scan the current car's connections, including the whole consist, and automatically release hand brakes, set anglecocks and connect glad hands.
 2. Car Tag Updates
  * Shows an indication of which cars in the FOV have Air System or Handbrake issues. 
  * **hold SHIFT** to only show the tags in the FOV for cars with an issue!
 3. Discord Webhooks
  * Allows the console messages to post to a discord webhook. useful for those wanting to keep an eye on 24/7 hosted saves.
- * Locomotive messages grab the locomotive `Ident.RoadNumber` and check the `CTC Panel Markers` if they exist.  If found, they will use the red/green color and embed the locmotive as an image in the message.  If no marker is found, it defaults to blue.
+ * Locomotive messages grab the locomotive `Ident.RoadNumber` and check the `CTC Panel Markers` if they exist.  If found, they will use the red/green color and embed the locomotive as an image in the message.  If no marker is found, it defaults to blue.
  * Currently, One person per server should have this per discord webhook, otherwise you will get duplicate messages to the webhook.
  * **Multiple hooks**: Allows for many different webhooks per client to be setup, and filtered to the `Ident.ReportingMark` so you can get messages to different hooks based on what save/server you are playing on.
  * **Customizable** from the in-game Railloader settings, find `RMROC451.TweaksAndThings`
