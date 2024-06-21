@@ -3,16 +3,17 @@ using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
 using Railloader;
+using RMROC451.TweaksAndThings.Enums;
+using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TweaksAndThings.Enums;
 using UI.Builder;
 using UI.CarInspector;
 using static Model.Car;
 
-namespace TweaksAndThings.Patches;
+namespace RMROC451.TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(CarInspector))]
 [HarmonyPatch(nameof(CarInspector.PopulateCarPanel), typeof(UIPanelBuilder))]
@@ -22,7 +23,7 @@ public class CarInspector_PopulateCarPanel_Patch
     private static IEnumerable<LogicalEnd> ends = Enum.GetValues(typeof(LogicalEnd)).Cast<LogicalEnd>();
 
     /// <summary>
-    /// If a caboose inspector is opened, it will auto set Anglecocks, gladhands and handbrakes
+    /// If a caboose inspector is opened, it will auto set Anglecocks, gladhands and hand brakes
     /// </summary>
     /// <param name="__instance"></param>
     /// <param name="builder"></param>
@@ -90,6 +91,16 @@ public class CarInspector_PopulateCarPanel_Patch
         return builder;
     }
 
+    //var dh = new DownloadHandlerAudioClip($"file://{cacheFileName}", AudioType.MPEG);
+    //dh.compressed = true; // This
+ 
+    //using (UnityWebRequest wr = new UnityWebRequest($"file://{cacheFileName}", "GET", dh, null)) {
+    //    yield return wr.SendWebRequest();
+    //    if (wr.responseCode == 200) {
+    //        audioSource.clip = dh.audioClip;
+    //    }
+    //}
+
     public static void MrocConsistHelper(Model.Car car, MrocHelperType mrocHelperType)
     {
         IEnumerable<Model.Car> consist = car.EnumerateCoupled(LogicalEnd.A);
@@ -104,7 +115,9 @@ public class CarInspector_PopulateCarPanel_Patch
                 } else
                 {
                     TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
-                    tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
+
+                    //when ApplyHandbrakesAsNeeded is called, and the consist contains an engine, it stops applying brakes.
+                    tc.ApplyHandbrakesAsNeeded(consist.Where(c => c.DetermineFuelCar(true) != null).ToList(), PlaceTrainHandbrakes.Automatic);
                 }
                 break;
 

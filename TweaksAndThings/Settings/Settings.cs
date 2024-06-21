@@ -1,9 +1,9 @@
 ﻿using Serilog;
 using System.Collections.Generic;
 using System.Linq;
-using TweaksAndThings.Enums;
+using RMROC451.TweaksAndThings.Enums;
 
-namespace RMROC451.TweaksAndThings.Settings;
+namespace RMROC451.TweaksAndThings;
 
 public class Settings
 {

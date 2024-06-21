@@ -1,26 +1,22 @@
 ﻿using HarmonyLib;
 using Model;
-using Model.Definition;
 using Model.Definition.Data;
 using Model.OpsNew;
-using Model.Physics;
 using Railloader;
-using RMROC451.TweaksAndThings.Settings;
+using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
-using TweaksAndThings.Enums;
+using RMROC451.TweaksAndThings.Enums;
 using UI;
-using UI.Builder;
 using UI.EngineRoster;
 using UI.Tooltips;
 using UnityEngine;
-using static Model.Car;
 
 
-namespace TweaksAndThings.Patches;
+namespace RMROC451.TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(EngineRosterRow))]
 [HarmonyPatch(nameof(EngineRosterRow.Refresh))]
@@ -48,7 +44,7 @@ public class EngineRosterRow_Refresh_Patch
             List<LoadSlot> loadSlots = __instance._engine.Definition.LoadSlots;
             if (!loadSlots.Any())
             {
-                engineOrTender = DetermineFuelCar(__instance._engine);
+                engineOrTender = __instance._engine.DetermineFuelCar()!;
                 loadSlots = engineOrTender != null ? engineOrTender.Definition.LoadSlots : Enumerable.Empty<LoadSlot>().ToList();
             }
 
@@ -100,23 +96,5 @@ public class EngineRosterRow_Refresh_Patch
         float num = capacity <= 0f ? 0 : Mathf.Clamp(quantity / capacity * 100, 0, 100);
 
         return $"{Mathf.FloorToInt(num):D2}%";
-    }
-
-    public static Car DetermineFuelCar(BaseLocomotive engine)
-    {
-        Car car;
-        if (engine is SteamLocomotive steamLocomotive && new Func<Car>(steamLocomotive.FuelCar) != null)
-        {
-            car = steamLocomotive.FuelCar();
-        }
-        else
-        {
-            if (!(engine is DieselLocomotive))
-            {
-                throw new InvalidOperationException($"Unable to detect locomotive fuel source for {engine}");
-            }
-            car = engine;
-        }
-        return car;
     }
 }

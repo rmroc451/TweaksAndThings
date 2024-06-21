@@ -1,4 +1,4 @@
-﻿namespace TweaksAndThings.Enums;
+﻿namespace RMROC451.TweaksAndThings.Enums;
 
 public enum MrocHelperType
 {

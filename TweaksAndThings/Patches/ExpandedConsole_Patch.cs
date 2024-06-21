@@ -4,7 +4,6 @@ using HarmonyLib;
 using Helpers;
 using Newtonsoft.Json;
 using Railloader;
-using RMROC451.TweaksAndThings.Settings;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -15,7 +14,7 @@ using System.Text.RegularExpressions;
 using Track.Signals.Panel;
 using UI.Console;
 
-namespace TweaksAndThings.Patches;
+namespace RMROC451.TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(ExpandedConsole))]
 [HarmonyPatch(nameof(ExpandedConsole.Add))]
