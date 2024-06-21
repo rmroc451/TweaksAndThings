@@ -115,9 +115,10 @@ public class CarInspector_PopulateCarPanel_Patch
                 } else
                 {
                     TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
-
+                    consist = consist.Where(c => c.DetermineFuelCar(true) != null);
+                    Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                     //when ApplyHandbrakesAsNeeded is called, and the consist contains an engine, it stops applying brakes.
-                    tc.ApplyHandbrakesAsNeeded(consist.Where(c => c.DetermineFuelCar(true) != null).ToList(), PlaceTrainHandbrakes.Automatic);
+                    tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
                 }
                 break;
 
