@@ -24,6 +24,7 @@ namespace RMROC451.TweaksAndThings.Extensions
 
         public static Car? DetermineFuelCar(this Car engine, bool returnEngineIfNull = false)
         {
+            if (engine == null) return null;
             Car? car;
             if (engine is SteamLocomotive steamLocomotive && new Func<Car>(steamLocomotive.FuelCar) != null)
             {

@@ -11,6 +11,7 @@ using System.Net.Http;
 using UI.Builder;
 
 using RMROC451.TweaksAndThings.Enums;
+using RMROC451.TweaksAndThings.Commands;
 
 namespace RMROC451.TweaksAndThings;
 
@@ -45,7 +46,7 @@ public class TweaksAndThings : SingletonPluginBase<TweaksAndThings>, IUpdateHand
 
         logger.Information("Hello! Constructor was called for {modId}/{modVersion}!", self.Id, self.Version);
 
-        //moddingContext.RegisterConsoleCommand(new EchoCommand());
+        moddingContext.RegisterConsoleCommand(new EchoCommand());
 
         settings = moddingContext.LoadSettingsData<Settings>(self.Id);
     }
