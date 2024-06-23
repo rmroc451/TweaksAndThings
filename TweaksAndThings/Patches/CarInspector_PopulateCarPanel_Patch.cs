@@ -2,9 +2,9 @@
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
+using Model;
 using Model.OpsNew;
 using Railloader;
-using RMROC451.TweaksAndThings;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
@@ -51,12 +51,18 @@ public class CarInspector_PopulateCarPanel_Patch
 
             if (consist.Any(c => c.EndAirSystemIssue()))
             {
-                hstack.AddButtonCompact("Connect Air Lines", delegate
+                hstack.AddButtonCompact("Connect Air", delegate
                 {
                     MrocConsistHelper(__instance._car, MrocHelperType.GladhandAndAnglecock);
                     hstack.Rebuild();
-                }).Tooltip("Connect Consist Air Lines", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
+                }).Tooltip("Connect Consist Air", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
             }
+
+            hstack.AddButtonCompact("Bleed Consist", delegate
+            {
+                MrocConsistHelper(__instance._car, MrocHelperType.BleedAirSystem);
+                hstack.Rebuild();
+            }).Tooltip("Bleed Air Lines", "Iterates over each car in this consist and bleeds the air out of the lines.");
         });
 
         return true;
@@ -111,16 +117,17 @@ public class CarInspector_PopulateCarPanel_Patch
         IEnumerable<Model.Car> consist = car.EnumerateCoupled(LogicalEnd.A);
 
         Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+        TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
         switch (mrocHelperType)
         {
             case MrocHelperType.Handbrake:
                 if (consist.Any(c => c.HandbrakeApplied()))
                 {
                     consist.Do(c => c.SetHandbrake(false));
-                } else
+                }
+                else
                 {
-                    TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
-                    consist = consist.Where(c => c.DetermineFuelCar(true) != null);
+                    consist = consist.Where(c => c is not BaseLocomotive && c.Archetype != Model.Definition.CarArchetype.Tender);
                     Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                     //when ApplyHandbrakesAsNeeded is called, and the consist contains an engine, it stops applying brakes.
                     tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
@@ -135,7 +142,7 @@ public class CarInspector_PopulateCarPanel_Patch
 
                         StateManager.ApplyLocal(
                             new PropertyChange(
-                                c.id, 
+                                c.id,
                                 KeyValueKeyFor(EndGearStateKey.Anglecock, c.LogicalToEnd(end)),
                                 new FloatPropertyValue(endGear.IsCoupled ? 1f : 0f)
                             )
@@ -148,6 +155,15 @@ public class CarInspector_PopulateCarPanel_Patch
 
                     })
                 );
+                break;
+
+            case MrocHelperType.BleedAirSystem:
+                consist = consist.Where(c => c.NotMotivePower());
+                Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+                foreach (Model.Car bleed in consist)
+                {
+                    StateManager.ApplyLocal(new PropertyChange(bleed.id, PropertyChange.Control.Bleed, 1));
+                }
                 break;
         }
     }

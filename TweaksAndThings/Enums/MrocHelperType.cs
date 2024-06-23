@@ -3,5 +3,6 @@
 public enum MrocHelperType
 {
     Handbrake,
-    GladhandAndAnglecock
+    GladhandAndAnglecock,
+    BleedAirSystem
 }

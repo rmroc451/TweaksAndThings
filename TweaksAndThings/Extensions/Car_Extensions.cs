@@ -36,5 +36,7 @@ namespace RMROC451.TweaksAndThings.Extensions
             }
             return car;
         }
+
+        public static bool NotMotivePower(this Car car) => car is not BaseLocomotive && car.Archetype != Model.Definition.CarArchetype.Tender;
     }
 }
