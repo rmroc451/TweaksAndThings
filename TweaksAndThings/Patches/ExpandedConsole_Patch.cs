@@ -32,7 +32,7 @@ public class ExpandedConsole_Add_Patch
     {
         try
         {
-            TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
+            TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
             StateManager shared = StateManager.Shared;
             GameStorage gameStorage = shared.Storage;
             WebhookSettings settings = tweaksAndThings?.settings?.WebhookSettingsList?.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);

@@ -4,6 +4,7 @@ using HarmonyLib;
 using KeyValue.Runtime;
 using Model.OpsNew;
 using Railloader;
+using RMROC451.TweaksAndThings;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
@@ -33,7 +34,7 @@ public class CarInspector_PopulateCarPanel_Patch
 	private static bool Prefix(CarInspector __instance, UIPanelBuilder builder)
     {
 
-        TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         if (!tweaksAndThings.IsEnabled) return true;
 
         var consist = __instance._car.EnumerateCoupled(LogicalEnd.A);

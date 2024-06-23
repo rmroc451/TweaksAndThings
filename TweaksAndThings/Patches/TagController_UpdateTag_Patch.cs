@@ -2,6 +2,7 @@
 using Model;
 using Model.OpsNew;
 using Railloader;
+using RMROC451.TweaksAndThings;
 using RMROC451.TweaksAndThings.Extensions;
 using UI;
 using UI.Tags;
@@ -20,7 +21,7 @@ public class TagController_UpdateTag_Patch
     private static void Postfix(Car car, TagCallout tagCallout)
     {
         TagController tagController = UnityEngine.Object.FindObjectOfType<TagController>();
-        TweaksAndThings tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
 
         if (!tweaksAndThings.IsEnabled || !tweaksAndThings.settings.HandBrakeAndAirTagModifiers)
         {
