@@ -2,6 +2,7 @@
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
+using Model.OpsNew;
 using Railloader;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UI.Builder;
 using UI.CarInspector;
+using UI.Tags;
 using static Model.Car;
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -61,27 +63,29 @@ public class CarInspector_PopulateCarPanel_Patch
 
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist)
     {
+        TagController tagController = UnityEngine.Object.FindFirstObjectByType<TagController>();
         foreach (Model.Car car in consist)
         {
-            builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake));
+            builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), tagController);
             foreach (LogicalEnd logicalEnd in ends)
             {
-                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsCoupled, car.LogicalToEnd(logicalEnd)));
-                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)));
-                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)));
+                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsCoupled, car.LogicalToEnd(logicalEnd)), tagController);
+                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)), tagController);
+                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)), tagController);
             }
         }
 
         return builder;
     }
 
-    private static UIPanelBuilder AddObserver(UIPanelBuilder builder, Model.Car car, string key)
+    private static UIPanelBuilder AddObserver(UIPanelBuilder builder, Model.Car car, string key, TagController tagController)
     {
         builder.AddObserver(
             car.KeyValueObject.Observe(
                 key,
                 delegate (Value value)
                 {
+                    tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
                     builder.Rebuild();
                 },
                 false
