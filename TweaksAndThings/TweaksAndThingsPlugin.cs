@@ -15,7 +15,7 @@ using RMROC451.TweaksAndThings.Commands;
 
 namespace RMROC451.TweaksAndThings;
 
-public class TweaksAndThings : SingletonPluginBase<TweaksAndThings>, IUpdateHandler, IModTabHandler
+public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>, IUpdateHandler, IModTabHandler
 {
     private HttpClient client;
     internal HttpClient Client
@@ -29,16 +29,16 @@ public class TweaksAndThings : SingletonPluginBase<TweaksAndThings>, IUpdateHand
         }
     }
     internal Settings? settings { get; private set; } = null;
-    readonly ILogger logger = Log.ForContext<TweaksAndThings>();
+    readonly ILogger logger = Log.ForContext<TweaksAndThingsPlugin>();
     IModdingContext moddingContext { get; set; }
     IModDefinition modDefinition { get; set; }
 
-    static TweaksAndThings()
+    static TweaksAndThingsPlugin()
     {
         Log.Information("Hello! Static Constructor was called!");
     }
 
-    public TweaksAndThings(IModdingContext moddingContext, IModDefinition self)
+    public TweaksAndThingsPlugin(IModdingContext moddingContext, IModDefinition self)
     {
         this.modDefinition = self;
         

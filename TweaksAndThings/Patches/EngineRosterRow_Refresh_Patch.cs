@@ -25,7 +25,7 @@ public class EngineRosterRow_Refresh_Patch
 {
     public static void Postfix(EngineRosterRow __instance)
     {
-        TweaksAndThings? tweaksAndThings = SingletonPluginBase<TweaksAndThings>.Shared;
+        TweaksAndThingsPlugin? tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         RosterFuelColumnSettings? rosterFuelColumnSettings = tweaksAndThings?.settings?.EngineRosterFuelColumnSettings;
 
         if (tweaksAndThings == null ||
