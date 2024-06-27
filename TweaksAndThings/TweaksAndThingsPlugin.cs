@@ -41,7 +41,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
     public TweaksAndThingsPlugin(IModdingContext moddingContext, IModDefinition self)
     {
         this.modDefinition = self;
-        
+
         this.moddingContext = moddingContext;
 
         logger.Information("Hello! Constructor was called for {modId}/{modVersion}!", self.Id, self.Version);
@@ -55,7 +55,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
     {
         logger.Information("OnEnable() was called!");
         var harmony = new Harmony(modDefinition.Id);
-        harmony.PatchCategory(modDefinition.Id.Replace(".",string.Empty));
+        harmony.PatchCategory(modDefinition.Id.Replace(".", string.Empty));
     }
 
     public override void OnDisable()
@@ -97,12 +97,12 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
                 builder.AddDropdown(columns, (int)(settings?.EngineRosterFuelColumnSettings?.EngineRosterFuelStatusColumn ?? EngineRosterFuelDisplayColumn.None),
                     delegate (int column)
                     {
-                        if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList(), EngineRosterFuelColumnSettings = new() };
+                        if (settings == null) settings = new();
                         settings.EngineRosterFuelColumnSettings.EngineRosterFuelStatusColumn = (EngineRosterFuelDisplayColumn)column;
                         builder.Rebuild();
                     }
                 )
-            ).Tooltip("Enable Fuel Display in Engine Roster", $"Will add reaming fuel indication to Engine Roster (with details in roster row tool tip), Examples : {string.Join(" ", Enumerable.Range(0,4).Select(i => TextSprites.PiePercent(i, 4)))}");
+            ).Tooltip("Enable Fuel Display in Engine Roster", $"Will add reaming fuel indication to Engine Roster (with details in roster row tool tip), Examples : {string.Join(" ", Enumerable.Range(0, 4).Select(i => TextSprites.PiePercent(i, 4)))}");
 
             builder.AddField(
                 "Always Visible?",
@@ -110,7 +110,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
                     () => settings?.EngineRosterFuelColumnSettings?.EngineRosterShowsFuelStatusAlways ?? false,
                     delegate (bool enabled)
                     {
-                        if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList(), EngineRosterFuelColumnSettings = new() };
+                        if (settings == null) settings = new();
                         settings.EngineRosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways = enabled;
                         builder.Rebuild();
                     }
@@ -129,12 +129,25 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
                     () => settings?.HandBrakeAndAirTagModifiers ?? false,
                     delegate (bool enabled)
                     {
-                        if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList() };
+                        if (settings == null) settings = new();
                         settings.HandBrakeAndAirTagModifiers = enabled;
                         builder.Rebuild();
                     }
                 )
             ).Tooltip("Enable Tag Updates", $"Will add {TextSprites.CycleWaybills} to the car tag title having Air System issues. Also prepends {TextSprites.HandbrakeWheel} if there is a handbrake set.\n\nHolding Left Alt while tags are displayed only shows tag titles that have issues.");
+
+            builder.AddField(
+                "Caboose Use",
+                builder.AddToggle(
+                    () => settings?.EndGearHelpersRequirePayment ?? false,
+                    delegate (bool enabled)
+                    {
+                        if (settings == null) settings = new();
+                        settings.EndGearHelpersRequirePayment = enabled;
+                        builder.Rebuild();
+                    }
+                )
+            ).Tooltip("Enable End Gear Helper Cost", $"Will cost 1 minute of AI Brake Crew & Caboose Crew time per car in the consist when the new inspector buttons are utilized.\n\n1.5x multiplier penalty to AI Brake Crew cost if no sufficiently crewed caboose nearby.\n\nCaboose starts reloading `Crew Hours` at any Team or Repair track (no waybill), after being stationary for 30 seconds.");
         });
     }
 
@@ -153,7 +166,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
                             () => settings?.WebhookSettingsList[z]?.WebhookEnabled ?? false,
                             delegate (bool enabled)
                             {
-                                if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList() };
+                                if (settings == null) settings = new();
                                 settings.WebhookSettingsList[z].WebhookEnabled = enabled;
                                 settings.AddAnotherRow();
                                 builder.Rebuild();
@@ -169,7 +182,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
                                 settings?.WebhookSettingsList[z]?.RailroadMark,
                                 delegate (string railroadMark)
                                 {
-                                    if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList() };
+                                    if (settings == null) settings = new();
                                     settings.WebhookSettingsList[z].RailroadMark = railroadMark;
                                     settings.AddAnotherRow();
                                     builder.Rebuild();
@@ -185,7 +198,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
                                 settings?.WebhookSettingsList[z]?.WebhookUrl,
                                 delegate (string webhookUrl)
                                 {
-                                    if (settings == null) settings = new() { WebhookSettingsList = new[] { new WebhookSettings() }.ToList() };
+                                    if (settings == null) settings = new();
                                     settings.WebhookSettingsList[z].WebhookUrl = webhookUrl;
                                     settings.AddAnotherRow();
                                     builder.Rebuild();

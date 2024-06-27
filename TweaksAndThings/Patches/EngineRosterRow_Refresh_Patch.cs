@@ -21,7 +21,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatch(typeof(EngineRosterRow))]
 [HarmonyPatch(nameof(EngineRosterRow.Refresh))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
-public class EngineRosterRow_Refresh_Patch
+internal class EngineRosterRow_Refresh_Patch
 {
     public static void Postfix(EngineRosterRow __instance)
     {

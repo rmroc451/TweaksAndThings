@@ -1,0 +1,23 @@
+{
+  "objects": [
+    {
+      "$find": [
+        {
+          "path": "definition.archetype",
+          "value": "Caboose"
+        }
+      ],
+      "definition": {
+        "loadSlots": [
+          {
+            "$add": {
+              "maximumCapacity": 8,
+              "loadUnits": "Quantity",
+              "requiredLoadIdentifier": "crew-hours"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

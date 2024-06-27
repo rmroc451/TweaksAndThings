@@ -5,6 +5,14 @@
     <!-- <MinorVersion>0</MinorVersion> -->
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="mroc-cabeese.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="mroc-cabeese.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <GameAssembly Include="Assembly-CSharp" />
     <GameAssembly Include="Railloader.Interchange" />
     <GameAssembly Include="Serilog" />
@@ -12,12 +20,14 @@
     <GameAssembly Include="KeyValue.Runtime" />
     <GameAssembly Include="Definition" />
     <GameAssembly Include="Ops" />
+    <GameAssembly Include="StrangeCustoms" />
 
     <GameAssembly Include="UnityEngine.CoreModule" />
     <GameAssembly Include="UnityEngine.UI" />
     <GameAssembly Include="Unity.TextMeshPro" />
 
     <GameAssembly Include="System.Net.Http" />
+    <GameAssembly Include="Core" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Krafs.Publicizer" Version="2.2.1">

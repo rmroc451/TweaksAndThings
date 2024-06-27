@@ -19,7 +19,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatch(typeof(ExpandedConsole))]
 [HarmonyPatch(nameof(ExpandedConsole.Add))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
-public class ExpandedConsole_Add_Patch
+internal class ExpandedConsole_Add_Patch
 {
     private static void Prefix(ref UI.Console.Console.Entry entry)
     {
