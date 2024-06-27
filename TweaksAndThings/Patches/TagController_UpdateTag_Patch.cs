@@ -2,7 +2,6 @@
 using Model;
 using Model.OpsNew;
 using Railloader;
-using RMROC451.TweaksAndThings;
 using RMROC451.TweaksAndThings.Extensions;
 using UI;
 using UI.Tags;
@@ -13,7 +12,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatch(typeof(TagController))]
 [HarmonyPatch(nameof(TagController.UpdateTag), typeof(Car), typeof(TagCallout), typeof(OpsController))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
-public class TagController_UpdateTag_Patch
+internal class TagController_UpdateTag_Patch
 {
     private const string tagTitleAndIconDelimeter = "\n<width=100%><align=\"right\">";
     private const string tagTitleFormat = "<align=left><margin-right={0}.5em>{1}</margin><line-height=0>";

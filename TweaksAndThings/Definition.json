@@ -7,7 +7,13 @@
     {
       "id": "railloader",
       "notBefore": "1.8.1"
-    }
+    },
+    "Zamu.StrangeCustoms"
   ],
-  "assemblies": [ "RMROC451.TweaksAndThings" ]
+  "assemblies": [ "RMROC451.TweaksAndThings" ],
+  "mixintos": {
+    "container:ne-caboose01": "file(mroc-cabeese.json)",
+    "container:ne-caboose02": "file(mroc-cabeese.json)",
+    "container:ne-caboose03": "file(mroc-cabeese.json)"
+  }
 }

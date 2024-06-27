@@ -17,17 +17,20 @@ public class Settings
     public Settings(
         List<WebhookSettings> webhookSettingsList,
         bool handBrakeAndAirTagModifiers,
-        RosterFuelColumnSettings engineRosterFuelColumnSettings
+        RosterFuelColumnSettings engineRosterFuelColumnSettings,
+        bool endGearHelpersRequirePayment
     )
     {
         WebhookSettingsList = webhookSettingsList;
         HandBrakeAndAirTagModifiers = handBrakeAndAirTagModifiers;
         EngineRosterFuelColumnSettings = engineRosterFuelColumnSettings;
+        EndGearHelpersRequirePayment = endGearHelpersRequirePayment;
     }
 
     public List<WebhookSettings>? WebhookSettingsList;
     public bool HandBrakeAndAirTagModifiers;
     public RosterFuelColumnSettings? EngineRosterFuelColumnSettings;
+    public bool EndGearHelpersRequirePayment;
 
     internal void AddAnotherRow()
     {
