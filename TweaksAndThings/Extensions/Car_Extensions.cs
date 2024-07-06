@@ -58,10 +58,10 @@ public static class Car_Extensions
 
     public static bool CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(c => c.IsCaboose());
 
-    public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool decrement = false)
+    public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, HashSet<string> carIdsCheckedAlready, bool decrement = false)
     {
         Car? output = null;
-        if (!car.IsCaboose()) return null;
+        if (carIdsCheckedAlready.Contains(car.id) || !car.IsCaboose()) return null;
 
         List<LoadSlot> loadSlots = car.Definition.LoadSlots;
         for (int i = 0; i < loadSlots.Count; i++)
@@ -78,33 +78,44 @@ public static class Car_Extensions
         return output;
     }
 
-    public static Car? HuntingForCabeeseNearCar(this Car car, float timeNeeded, TrainController tc, bool decrement = false)
+    public static Car? HuntingForCabeeseNearCar(this Car car, float timeNeeded, TrainController tc, HashSet<string> carIdsCheckedAlready, bool decrement = false)
+    {
+        List<(string carId, float distance)> source =
+            CarsNearCurrentCar(car, timeNeeded, tc, carIdsCheckedAlready, decrement);
+
+        Car output = FindNearestCabooseFromNearbyCars(tc, source);
+        if (output != null) output.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement);
+
+        return output;
+    }
+
+    private static Car FindNearestCabooseFromNearbyCars(TrainController tc, List<(string carId, float distance)> source) =>
+        (
+            from t in source
+            where t.distance < 21f //todo: add setting slider for catchment
+            orderby t.distance ascending
+            select tc.CarForId(t.carId)
+        ).FirstOrDefault();
+
+    private static List<(string carId, float distance)> CarsNearCurrentCar(Car car, float timeNeeded, TrainController tc, HashSet<string> carIdsCheckedAlready, bool decrement)
     {
         Vector3 position = car.GetMotionSnapshot().Position;
         Vector3 center = WorldTransformer.WorldToGame(position);
         Rect rect = new Rect(new Vector2(center.x - 30f, center.z - 30f), Vector2.one * 30f * 2f);
         var cars = tc.CarIdsInRect(rect);
         Log.Information($"{nameof(HuntingForCabeeseNearCar)} => {cars.Count()}");
-        bool decrementedAlready = false;
-        List<(string carId, float distance)> source = cars.Select(carId =>
-        {
-            Car car = tc.CarForId(carId);
-            if (car == null || !car.CabooseWithSufficientCrewHours(timeNeeded, decrement && !decrementedAlready))
-            {
-                return (carId: carId, distance: 1000f);
-            }
-            decrementedAlready = true;
-            Vector3 a = WorldTransformer.WorldToGame(car.GetMotionSnapshot().Position);
-            return (carId: carId, distance: Vector3.Distance(a, center));
-        }).ToList();
-
-        Car? output =
-            (from t in source
-             where t.distance < 21f
-             orderby t.distance ascending
-             select tc.CarForId(t.carId)
-            ).FirstOrDefault();
-
-        return output;
+        List<(string carId, float distance)> source = 
+            cars
+            .Select(carId =>
+                {
+                    Car car = tc.CarForId(carId);
+                    if (car == null || !car.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready))
+                    {
+                        return (carId: carId, distance: 1000f);
+                    }
+                    Vector3 a = WorldTransformer.WorldToGame(car.GetMotionSnapshot().Position);
+                    return (carId: carId, distance: Vector3.Distance(a, center));
+                }).ToList();
+        return source;
     }
 }

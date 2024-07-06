@@ -195,20 +195,24 @@ internal class CarInspector_PopulateCarPanel_Patch
 
     public static Car? NearbyCabooseWithAvailableCrew(Car car, float timeNeeded, bool decrement = false)
     {
+        HashSet<string> carIdsCheckedAlready = new();
+
         //check current car.
-        Car? output = car.CabooseWithSufficientCrewHours(timeNeeded, decrement);
+        Car? output = car.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement);
         if (output != null) return output; //short out if we are good
+        carIdsCheckedAlready.Add(car.id);
 
         //check consist, for cabeese
         IEnumerable<Car> consist = car.EnumerateCoupled(LogicalEnd.A);
-        output = consist.FirstOrDefault(c => c.CabooseWithSufficientCrewHours(timeNeeded, decrement));
+        output = consist.FirstOrDefault(c => c.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement));
         if (output != null) return output; //short out if we are good
+        carIdsCheckedAlready.UnionWith(consist.Select(c => c.id));
 
         //then check near consist cars for cabeese
         TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
         foreach (var c in consist)
         {
-            output = c.HuntingForCabeeseNearCar(timeNeeded, tc, decrement);
+            output = c.HuntingForCabeeseNearCar(timeNeeded, tc, carIdsCheckedAlready, decrement);
             if (output != null) return output; //short out if we are good
         }
 

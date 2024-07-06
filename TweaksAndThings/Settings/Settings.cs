@@ -34,7 +34,7 @@ public class Settings
 
     internal void AddAnotherRow()
     {
-        WebhookSettingsList = !WebhookSettingsList?.Any() ?? false ? new[] { new WebhookSettings() }.ToList() : new List<WebhookSettings>();
+        WebhookSettingsList ??= new[] { new WebhookSettings() }.ToList();
         if (!string.IsNullOrEmpty(WebhookSettingsList.OrderByDescending(wsl => wsl.WebhookUrl).Last().WebhookUrl))
         {
             WebhookSettingsList.Add(new());
@@ -76,4 +76,19 @@ public class RosterFuelColumnSettings
 
     public bool EngineRosterShowsFuelStatusAlways;
     public EngineRosterFuelDisplayColumn EngineRosterFuelStatusColumn;
+}
+
+public static class SettingsExtensions
+{
+    public static List<WebhookSettings> SanitizeEmptySettings(this IEnumerable<WebhookSettings>? settings)
+    {
+        List<WebhookSettings> output = 
+            settings?.Where(s => !string.IsNullOrEmpty(s.WebhookUrl))?.ToList() ?? 
+            new();
+
+        output.Add(new());
+
+        return output;
+    }
+        
 }

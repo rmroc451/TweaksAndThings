@@ -78,6 +78,10 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
         if (!settings?.WebhookSettingsList?.Any() ?? true) settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
         if (settings?.EngineRosterFuelColumnSettings == null) settings.EngineRosterFuelColumnSettings = new();
 
+
+        settings.WebhookSettingsList =
+            settings?.WebhookSettingsList.SanitizeEmptySettings();
+
         //WebhookUISection(ref builder);
         //builder.AddExpandingVerticalSpacer();
         WebhooksListUISection(ref builder);
