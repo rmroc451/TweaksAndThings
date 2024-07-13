@@ -8,12 +8,14 @@ using Network;
 using Railloader;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
+using RollingStock;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UI.Builder;
 using UI.CarInspector;
+using UI.ContextMenu;
 using UI.Tags;
 using static Model.Car;
 
@@ -70,7 +72,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist)
     {
         TagController tagController = UnityEngine.Object.FindFirstObjectByType<TagController>();
-        foreach (Model.Car car in consist.Where(c => c.TagCallout != null))
+        foreach (Model.Car car in consist.Where(c => c.Archetype != Model.Definition.CarArchetype.Tender))
         {
             builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), tagController);
             foreach (LogicalEnd logicalEnd in ends)
@@ -93,7 +95,8 @@ internal class CarInspector_PopulateCarPanel_Patch
                 {
                     try
                     {
-                        tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
+                        if (car.TagCallout != null) tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
+                        if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                         builder.Rebuild();
                     }
                     catch(Exception ex)
