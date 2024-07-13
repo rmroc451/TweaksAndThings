@@ -70,7 +70,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist)
     {
         TagController tagController = UnityEngine.Object.FindFirstObjectByType<TagController>();
-        foreach (Model.Car car in consist)
+        foreach (Model.Car car in consist.Where(c => c.TagCallout != null))
         {
             builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), tagController);
             foreach (LogicalEnd logicalEnd in ends)
