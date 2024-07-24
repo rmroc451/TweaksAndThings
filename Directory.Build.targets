@@ -12,7 +12,7 @@
   <PropertyGroup Condition="'$(AssemblyVersion)' == '' OR '$(MajorVersion)' != '' OR '$(MinorVersion)' != ''">
     <MajorVersion Condition="'$(MajorVersion)' == ''">0</MajorVersion>
     <MinorVersion Condition="'$(MinorVersion)' == ''">1</MinorVersion>
-    <PatchVersion Condition="'$(PatchVersion)' == ''">7</PatchVersion>
+    <PatchVersion Condition="'$(PatchVersion)' == ''">8</PatchVersion>
     <AssemblyVersion>$(MajorVersion).$(MinorVersion).$(PatchVersion)</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <ProductVersion>$(AssemblyVersion)</ProductVersion>
