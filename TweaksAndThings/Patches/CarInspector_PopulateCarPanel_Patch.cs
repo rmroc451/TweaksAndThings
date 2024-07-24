@@ -26,6 +26,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class CarInspector_PopulateCarPanel_Patch
 {
+    private static ILogger _log => Log.ForContext<CarInspector_PopulateCarPanel_Patch>();
     private static IEnumerable<LogicalEnd> ends = Enum.GetValues(typeof(LogicalEnd)).Cast<LogicalEnd>();
 
     /// <summary>
@@ -95,13 +96,13 @@ internal class CarInspector_PopulateCarPanel_Patch
                 {
                     try
                     {
-                        if (car.TagCallout != null) tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
-                        if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                         builder.Rebuild();
+                        if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true); //tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
+                        if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                     }
                     catch(Exception ex)
                     {
-                        Log.Warning(ex, $"{nameof(AddObserver)} {car} Exception logged for {key}");
+                        _log.ForContext("car", car).Warning(ex, $"{nameof(AddObserver)} {car} Exception logged for {key}");
                     }
                 },
                 false
@@ -125,7 +126,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     {
         TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
         IEnumerable<Model.Car> consist = car.EnumerateCoupled(LogicalEnd.A);
-        //Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+        _log.ForContext("car", car).Verbose($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
 
         CalculateCostIfEnabled(car, mrocHelperType, buttonsHaveCost, consist);
 
@@ -139,7 +140,6 @@ internal class CarInspector_PopulateCarPanel_Patch
                 else
                 {
                     consist = consist.Where(c => c is not BaseLocomotive && c.Archetype != Model.Definition.CarArchetype.Tender);
-                    Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                     //when ApplyHandbrakesAsNeeded is called, and the consist contains an engine, it stops applying brakes.
                     tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
                 }
@@ -166,7 +166,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 
             case MrocHelperType.BleedAirSystem:
                 consist = consist.Where(c => c.NotMotivePower());
-                Log.Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+                _log.ForContext("car", car).Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                 foreach (Model.Car bleed in consist)
                 {
                     StateManager.ApplyLocal(new PropertyChange(bleed.id, PropertyChange.Control.Bleed, 1));
@@ -187,12 +187,12 @@ internal class CarInspector_PopulateCarPanel_Patch
             if (cabooseWithAvailCrew == null) timeCost *= 1.5f;
             var cabooseFoundDisplay = cabooseWithAvailCrew?.DisplayName ?? "No caboose";
 
-            Log.Information($"{nameof(MrocConsistHelper)} {mrocHelperType} : [VACINITY CABEESE FOUND:{cabooseWithAvailCrew?.ToString() ?? "NONE"}] => Consist Length {consist.Count()} => costs {timeCost / 60} minutes  of AI Engineer time, $5 per hour = ~${Math.Ceiling((decimal)(timeCost / 3600) * 5)} (*2 if no caboose nearby)");
+            _log.ForContext("car", car).Information($"{nameof(MrocConsistHelper)} {mrocHelperType} : [VACINITY CABEESE FOUND:{cabooseWithAvailCrew?.ToString() ?? "NONE"}] => Consist Length {consist.Count()} => costs {timeCost / 60} minutes  of AI Engineer time, $5 per hour = ~${Math.Ceiling((decimal)(timeCost / 3600) * 5)} (*2 if no caboose nearby)");
 
 
             Multiplayer.SendError(StateManager.Shared._playersManager.LocalPlayer, $"{(cabooseWithAvailCrew != null ? $"{cabooseWithAvailCrew.DisplayName} Hours Adjusted: ({tsString})\n" : string.Empty)}Wages: ~(${Math.Ceiling((decimal)(timeCost / 3600) * 5)})");
 
-            if (buttonsHaveCost) StateManager_OnDayDidChange_Patch.UnbilledAutoBrakeCrewRunDuration += timeCost;
+            StateManager_OnDayDidChange_Patch.UnbilledAutoBrakeCrewRunDuration += timeCost;
         }
     }    
 
