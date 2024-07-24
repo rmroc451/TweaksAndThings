@@ -62,5 +62,32 @@ namespace RMROC451.TweaksAndThings.Extensions
                 oiler.PayWages();
             }
         }
+
+        public static IEnumerator MrocAutoHotboxSpotterLoop(this AutoHotboxSpotter spotter, Serilog.ILogger _log)
+        {
+            while (true)
+            {
+                bool hasCaboose = spotter._cars.CabooseInConsist();
+                if (!spotter.HasCars)
+                {
+                    yield return new WaitForSeconds(1f);
+                    continue;
+                }
+                _log.Information("AutoHotboxSpotter {name}: Hotbox Spotter Running, Has Caboose => {hasCaboose}; Has Cars {hasCars}", spotter.name, hasCaboose, spotter.HasCars);
+                spotter.CheckForHotbox();
+                while (spotter.HasCars)
+                {
+                    int num = Random.Range(60, 300);
+                    if (hasCaboose)
+                    {
+                        var numOrig = num;
+                        num = Random.Range(15, 30);
+                        _log.Information("AutoHotboxSpotter {name}: Next check went from num(60,300) => {numOrig}; to num(15,30) => {hasCaboose}", spotter.name, numOrig, num);
+                    }
+                    yield return new WaitForSeconds(num);
+                    spotter.CheckForHotbox();
+                }
+            }
+        }
     }
 }
