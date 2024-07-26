@@ -82,16 +82,73 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
         settings.WebhookSettingsList =
             settings?.WebhookSettingsList.SanitizeEmptySettings();
 
-        //WebhookUISection(ref builder);
-        //builder.AddExpandingVerticalSpacer();
-        WebhooksListUISection(ref builder);
-        builder.AddExpandingVerticalSpacer();
-        HandbrakesAndAnglecocksUISection(ref builder);
-        builder.AddExpandingVerticalSpacer();
-        EnginRosterShowsFuelStatusUISection(ref builder);
+        builder.AddTabbedPanels(settings._selectedTabState, delegate (UITabbedPanelBuilder tabBuilder)
+        {
+            tabBuilder.AddTab("Caboose Mods", "cabooseUpdates", CabooseMods);
+            tabBuilder.AddTab("UI", "rosterUi", UiUpdates);
+            tabBuilder.AddTab("Webhooks", "webhooks", WebhooksListUISection);
+        });
     }
 
-    private void EnginRosterShowsFuelStatusUISection(ref UIPanelBuilder builder)
+    private void CabooseMods(UIPanelBuilder builder)
+    {
+        builder.AddField(
+            "Caboose Use",
+            builder.AddToggle(
+                () => settings?.EndGearHelpersRequirePayment ?? false,
+                delegate (bool enabled)
+                {
+                    if (settings == null) settings = new();
+                    settings.EndGearHelpersRequirePayment = enabled;
+                    builder.Rebuild();
+                }
+            )
+        ).Tooltip("Enable End Gear Helper Cost", @$"Will cost 1 minute of AI Brake Crew & Caboose Crew time per car in the consist when the new inspector buttons are utilized.
+
+1.5x multiplier penalty to AI Brake Crew cost if no sufficiently crewed caboose nearby.
+
+Caboose starts reloading `Crew Hours` at any Team or Repair track (no waybill), after being stationary for 30 seconds.
+
+AutoOiler Update: Increases limit that crew will oiling a car from 75% -> 99%, also halves the time it takes (simulating crew from lead end and caboose handling half the train)
+
+AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 - 30 seconds (Safety Is Everyone's Job)");
+
+        builder.AddField(
+            $"AutoAI\nRequirement",
+            builder.AddToggle(
+                () => settings?.RequireConsistCabooseForOilerAndHotboxSpotter ?? false,
+                delegate (bool enabled)
+                {
+                    if (settings == null) settings = new();
+                    settings.RequireConsistCabooseForOilerAndHotboxSpotter = enabled;
+                    builder.Rebuild();
+                }
+            )
+        ).Tooltip("AI Engineer Requires Caboose", $@"A caboose is required in the consist to check for Hotboxes and perform Auto Oiler, if checked.");
+    }
+
+    private void UiUpdates(UIPanelBuilder builder)
+    {
+        builder.AddField(
+            "Enable Tag Updates",
+            builder.AddToggle(
+                () => settings?.HandBrakeAndAirTagModifiers ?? false,
+                delegate (bool enabled)
+                {
+                    if (settings == null) settings = new();
+                    settings.HandBrakeAndAirTagModifiers = enabled;
+                    builder.Rebuild();
+                }
+            )
+        ).Tooltip("Enable Tag Updates", $@"Will suffix tag title with:
+{TextSprites.CycleWaybills} if Air System issue.
+{TextSprites.HandbrakeWheel} if there is a handbrake set.
+{TextSprites.Hotbox} if a hotbox.");
+
+        EngineRosterShowsFuelStatusUISection(builder);
+    }
+
+    private void EngineRosterShowsFuelStatusUISection(UIPanelBuilder builder)
     {
         var columns = Enum.GetValues(typeof(EngineRosterFuelDisplayColumn)).Cast<EngineRosterFuelDisplayColumn>().Select(i => i.ToString()).ToList();
         builder.AddSection("Fuel Display in Engine Roster", delegate (UIPanelBuilder builder)
@@ -123,39 +180,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
         });
     }
 
-    private void HandbrakesAndAnglecocksUISection(ref UIPanelBuilder builder)
-    {
-        builder.AddSection("Tag Callout Handbrake and Air System Helper", delegate (UIPanelBuilder builder)
-        {
-            builder.AddField(
-                "Enable Tag Updates",
-                builder.AddToggle(
-                    () => settings?.HandBrakeAndAirTagModifiers ?? false,
-                    delegate (bool enabled)
-                    {
-                        if (settings == null) settings = new();
-                        settings.HandBrakeAndAirTagModifiers = enabled;
-                        builder.Rebuild();
-                    }
-                )
-            ).Tooltip("Enable Tag Updates", $"Will add {TextSprites.CycleWaybills} to the car tag title having Air System issues. Also prepends {TextSprites.HandbrakeWheel} if there is a handbrake set.\n\nHolding Left Alt while tags are displayed only shows tag titles that have issues.");
-
-            builder.AddField(
-                "Caboose Use",
-                builder.AddToggle(
-                    () => settings?.EndGearHelpersRequirePayment ?? false,
-                    delegate (bool enabled)
-                    {
-                        if (settings == null) settings = new();
-                        settings.EndGearHelpersRequirePayment = enabled;
-                        builder.Rebuild();
-                    }
-                )
-            ).Tooltip("Enable End Gear Helper Cost", $"Will cost 1 minute of AI Brake Crew & Caboose Crew time per car in the consist when the new inspector buttons are utilized.\n\n1.5x multiplier penalty to AI Brake Crew cost if no sufficiently crewed caboose nearby.\n\nCaboose starts reloading `Crew Hours` at any Team or Repair track (no waybill), after being stationary for 30 seconds.");
-        });
-    }
-
-    private void WebhooksListUISection(ref UIPanelBuilder builder)
+    private void WebhooksListUISection(UIPanelBuilder builder)
     {
         builder.AddSection("Webhooks List", delegate (UIPanelBuilder builder)
         {

@@ -3,6 +3,8 @@ using Model;
 using Model.OpsNew;
 using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
+using System.Collections.Generic;
+using System.Linq;
 using UI.Tags;
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -32,13 +34,16 @@ internal class TagController_UpdateTag_Patch
     private static void ProceedWithPostFix(Car car, TagCallout tagCallout)
     {
         tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", car.DisplayName);
+        List<string> tags = [];
+
+        if (car.HasHotbox) tags.Add(TextSprites.Hotbox);
+        if (car.EndAirSystemIssue()) tags.Add(TextSprites.CycleWaybills);
+        if (car.HandbrakeApplied()) tags.Add(TextSprites.HandbrakeWheel);
 
         tagCallout.callout.Title =
-            (car.CarAndEndGearIssue(), car.EndAirSystemIssue(), car.HandbrakeApplied()) switch
+            tags.Any() switch
             {
-                (true, _, _) => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{TextSprites.CycleWaybills}{TextSprites.HandbrakeWheel}".Replace("{0}", "2"),
-                (_, true, _) => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{TextSprites.CycleWaybills}".Replace("{0}", "1"),
-                (_, _, true) => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{TextSprites.HandbrakeWheel}".Replace("{0}", "1"),
+                true => $"{tagCallout.callout.Title}{tagTitleAndIconDelimeter}{string.Join("", tags)}".Replace("{0}", tags.Count().ToString()),
                 _ => car.DisplayName
             };
     }
