@@ -91,4 +91,7 @@ public static class SettingsExtensions
         return output;
     }
         
+    public static bool CabooseNonMotiveAllowedSetting(this TweaksAndThingsPlugin input, Car car) =>
+        input.EndGearHelpersRequirePayment() && car.set.Cars.CabooseInConsist() && car.NotMotivePower();
+
 }

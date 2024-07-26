@@ -1,9 +1,9 @@
-﻿using Game.Messages;
+﻿using Core;
+using Game.Messages;
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
-using Model.OpsNew;
 using Network;
 using Railloader;
 using RMROC451.TweaksAndThings.Enums;
@@ -13,6 +13,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UI;
 using UI.Builder;
 using UI.CarInspector;
 using UI.ContextMenu;
@@ -40,34 +41,59 @@ internal class CarInspector_PopulateCarPanel_Patch
 
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         if (!tweaksAndThings.IsEnabled) return true;
-        bool buttonsHaveCost = tweaksAndThings?.settings?.EndGearHelpersRequirePayment ?? false;
+        bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 
-        var consist = __instance._car.EnumerateCoupled(LogicalEnd.A);
+        var consist = __instance._car._set.Cars;
         builder = AddCarConsistRebuildObservers(builder, consist);
 
         builder.HStack(delegate (UIPanelBuilder hstack)
         {
             var buttonName = $"{(consist.Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} {TextSprites.HandbrakeWheel}";
-            hstack.AddButtonCompact(buttonName, delegate {
+            hstack.AddButtonCompact(buttonName, delegate
+            {
                 MrocConsistHelper(__instance._car, MrocHelperType.Handbrake, buttonsHaveCost);
                 hstack.Rebuild();
             }).Tooltip(buttonName, $"Iterates over cars in this consist and {(consist.Any(c => c.HandbrakeApplied()) ? "releases" : "sets")} {TextSprites.HandbrakeWheel}.");
 
             if (consist.Any(c => c.EndAirSystemIssue()))
             {
-                hstack.AddButtonCompact("Connect Air", delegate {
+                hstack.AddButtonCompact("Connect Air", delegate
+                {
                     MrocConsistHelper(__instance._car, MrocHelperType.GladhandAndAnglecock, buttonsHaveCost);
                     hstack.Rebuild();
                 }).Tooltip("Connect Consist Air", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
             }
 
-            hstack.AddButtonCompact("Bleed Consist", delegate {
+            hstack.AddButtonCompact("Bleed Consist", delegate
+            {
                 MrocConsistHelper(__instance._car, MrocHelperType.BleedAirSystem, buttonsHaveCost);
                 hstack.Rebuild();
             }).Tooltip("Bleed Air Lines", "Iterates over each car in this consist and bleeds the air out of the lines.");
         });
 
+        CabooseUiEnhancer(__instance, builder, consist, tweaksAndThings);
+
         return true;
+    }
+
+    private static void CabooseUiEnhancer(CarInspector __instance, UIPanelBuilder builder, IEnumerable<Car> consist, TweaksAndThingsPlugin plugin)
+    {
+        if (plugin.CabooseNonMotiveAllowedSetting(__instance._car))
+        {
+            builder.HStack(delegate (UIPanelBuilder hstack)
+            {
+                hstack.AddField("Consist Info", hstack.HStack(delegate (UIPanelBuilder field)
+                {
+                    int consistLength = consist.Count();
+                    int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(consist);
+                    int lengthInMeters = UnityEngine.Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(consist.ToList()) * 3.28084f);
+                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:0.0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
+
+                    field.AddLabel(() => newSubTitle(), UIPanelBuilder.Frequency.Fast)
+                    .Tooltip("Consist Info", "Reflects info about consist.").FlexibleWidth();
+                }));
+            });
+        }
     }
 
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist)
@@ -100,7 +126,7 @@ internal class CarInspector_PopulateCarPanel_Patch
                         if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true); //tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
                         if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         _log.ForContext("car", car).Warning(ex, $"{nameof(AddObserver)} {car} Exception logged for {key}");
                     }
@@ -114,7 +140,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 
     //var dh = new DownloadHandlerAudioClip($"file://{cacheFileName}", AudioType.MPEG);
     //dh.compressed = true; // This
- 
+
     //using (UnityWebRequest wr = new UnityWebRequest($"file://{cacheFileName}", "GET", dh, null)) {
     //    yield return wr.SendWebRequest();
     //    if (wr.responseCode == 200) {
@@ -125,7 +151,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     public static void MrocConsistHelper(Model.Car car, MrocHelperType mrocHelperType, bool buttonsHaveCost)
     {
         TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
-        IEnumerable<Model.Car> consist = car.EnumerateCoupled(LogicalEnd.A);
+        IEnumerable<Model.Car> consist = car._set.Cars;
         _log.ForContext("car", car).Verbose($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
 
         CalculateCostIfEnabled(car, mrocHelperType, buttonsHaveCost, consist);
@@ -194,7 +220,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 
             StateManager_OnDayDidChange_Patch.UnbilledAutoBrakeCrewRunDuration += timeCost;
         }
-    }    
+    }
 
     public static Car? NearbyCabooseWithAvailableCrew(Car car, float timeNeeded, bool decrement = false)
     {
@@ -206,7 +232,7 @@ internal class CarInspector_PopulateCarPanel_Patch
         carIdsCheckedAlready.Add(car.id);
 
         //check consist, for cabeese
-        IEnumerable<Car> consist = car.EnumerateCoupled(LogicalEnd.A);
+        IEnumerable<Car> consist = car._set.Cars;
         output = consist.FirstOrDefault(c => c.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement));
         if (output != null) return output; //short out if we are good
         carIdsCheckedAlready.UnionWith(consist.Select(c => c.id));
