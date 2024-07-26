@@ -12,10 +12,14 @@ namespace RMROC451.TweaksAndThings.Extensions;
 
 public static class Car_Extensions
 {
+    private static bool EndGearIssue(this Car car, Car.LogicalEnd end) =>
+            (!car[end].IsCoupled && car[end].IsAnglecockOpen) ||
+            (car[end].IsCoupled && !car[end].IsAirConnectedAndOpen);
+
     public static bool EndAirSystemIssue(this Car car)
     {
-        bool AEndAirSystemIssue = car[Car.LogicalEnd.A].IsCoupled && !car[Car.LogicalEnd.A].IsAirConnectedAndOpen;
-        bool BEndAirSystemIssue = car[Car.LogicalEnd.B].IsCoupled && !car[Car.LogicalEnd.B].IsAirConnectedAndOpen;
+        bool AEndAirSystemIssue = car.EndGearIssue(Car.LogicalEnd.A);
+        bool BEndAirSystemIssue = car.EndGearIssue(Car.LogicalEnd.B);
         bool EndAirSystemIssue = AEndAirSystemIssue || BEndAirSystemIssue;
         return EndAirSystemIssue;
     }
@@ -104,18 +108,18 @@ public static class Car_Extensions
         Rect rect = new Rect(new Vector2(center.x - 30f, center.z - 30f), Vector2.one * 30f * 2f);
         var cars = tc.CarIdsInRect(rect);
         Log.Information($"{nameof(HuntingForCabeeseNearCar)} => {cars.Count()}");
-        List<(string carId, float distance)> source = 
+        List<(string carId, float distance)> source =
             cars
             .Select(carId =>
+            {
+                Car car = tc.CarForId(carId);
+                if (car == null || !car.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready))
                 {
-                    Car car = tc.CarForId(carId);
-                    if (car == null || !car.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready))
-                    {
-                        return (carId: carId, distance: 1000f);
-                    }
-                    Vector3 a = WorldTransformer.WorldToGame(car.GetMotionSnapshot().Position);
-                    return (carId: carId, distance: Vector3.Distance(a, center));
-                }).ToList();
+                    return (carId: carId, distance: 1000f);
+                }
+                Vector3 a = WorldTransformer.WorldToGame(car.GetMotionSnapshot().Position);
+                return (carId: carId, distance: Vector3.Distance(a, center));
+            }).ToList();
         return source;
     }
 }
