@@ -6,6 +6,7 @@
     <!-- Copy the mod to the game directory -->
     <GameModDir Condition="'$(GameModDir)' == ''">$(GameDir)/Mods/$(AssemblyName)</GameModDir>
     <OutDir Condition="'$(Configuration)' == 'Debug'">$(GameModDir)/</OutDir>
+    <VersionTimestamp>$([System.DateTime]::UtcNow.ToString(`o`))</VersionTimestamp>
   </PropertyGroup>
 
   <!-- Replace the default version if something was set for it -->
@@ -30,7 +31,7 @@
   <!-- Publish the mod as a neat zip file -->
   <Target Name="PrepareForPublishing" AfterTargets="AfterBuild" Condition="'$(Configuration)' == 'Release'">
     <!-- Replace $(AssemblyVersion) with the actual version -->
-    <Exec Command="powershell -Command &quot;(Get-Content '$(OutputPath)Definition.json') -replace '\$\(AssemblyVersion\)', '$(AssemblyVersion)' | Set-Content '$(OutputPath)Definition.json'&quot;" />
+    <Exec Command="powershell -Command &quot;(Get-Content '$(OutputPath)Definition.json') -replace '\$\(AssemblyVersion\)', '$(AssemblyVersion)_$(VersionTimestamp)' | Set-Content '$(OutputPath)Definition.json'&quot;" />
 
     <PropertyGroup>
       <ModsDirectory>$(OutputPath)/Mods</ModsDirectory>

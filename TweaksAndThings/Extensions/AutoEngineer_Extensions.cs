@@ -12,7 +12,7 @@ namespace RMROC451.TweaksAndThings.Extensions
         private static float CabooseAutoOilerLimit(this bool hasCaboose) =>
             hasCaboose ? 0.99f : AutoOiler.OilIfBelow;
 
-        public static IEnumerator MrocAutoOilerLoop(this AutoOiler oiler, Serilog.ILogger _log)
+        public static IEnumerator MrocAutoOilerLoop(this AutoOiler oiler, Serilog.ILogger _log, bool cabooseRequired)
         {
             int originIndex = oiler.FindOriginIndex();
             bool hasCaboose = oiler._cars.CabooseInConsist();
@@ -21,13 +21,17 @@ namespace RMROC451.TweaksAndThings.Extensions
                 _log.Error("Couldn't find origin car {car}", oiler._originCar);
                 oiler._coroutine = null;
                 yield break;
+            } else if (CabooseRequirementChecker(string.Format("{0} {1}", oiler.GetType().Name, oiler.name), cabooseRequired, hasCaboose, _log))
+            {
+                yield break;
             }
             oiler._reverse = originIndex > oiler._cars.Count - originIndex;
             _log.Information(
-                "AutoOiler {name} starting, rev = {reverse}, caboose halving adjustment = {hasCaboose}, oil limit = {limit}", 
-                oiler.name, 
-                oiler._reverse, 
-                hasCaboose, 
+                "AutoOiler {name} starting, rev = {reverse}, caboose required = {req}, caboose halving adjustment = {hasCaboose}, oil limit = {limit}",
+                oiler.name,
+                oiler._reverse,
+                cabooseRequired,
+                hasCaboose,
                 hasCaboose.CabooseAutoOilerLimit()
             );
             while (true)
@@ -63,7 +67,7 @@ namespace RMROC451.TweaksAndThings.Extensions
             }
         }
 
-        public static IEnumerator MrocAutoHotboxSpotterLoop(this AutoHotboxSpotter spotter, Serilog.ILogger _log)
+        public static IEnumerator MrocAutoHotboxSpotterLoop(this AutoHotboxSpotter spotter, Serilog.ILogger _log, bool cabooseRequired)
         {
             while (true)
             {
@@ -73,7 +77,11 @@ namespace RMROC451.TweaksAndThings.Extensions
                     yield return new WaitForSeconds(1f);
                     continue;
                 }
-                _log.Information("AutoHotboxSpotter {name}: Hotbox Spotter Running, Has Caboose => {hasCaboose}; Has Cars {hasCars}", spotter.name, hasCaboose, spotter.HasCars);
+                _log.Information("AutoHotboxSpotter {name}: Hotbox Spotter Running, Has Caboose => {hasCaboose}; Has Cars {hasCars}; Requires Caboose {requiresCaboose}", spotter.name, hasCaboose, spotter.HasCars, cabooseRequired);
+                if (CabooseRequirementChecker(string.Format("{0} {1}", spotter.GetType().Name, spotter.name), cabooseRequired, hasCaboose, _log))
+                {
+                    yield break;
+                }
                 spotter.CheckForHotbox();
                 while (spotter.HasCars)
                 {
@@ -82,12 +90,21 @@ namespace RMROC451.TweaksAndThings.Extensions
                     {
                         var numOrig = num;
                         num = Random.Range(15, 30);
-                        _log.Information("AutoHotboxSpotter {name}: Next check went from num(60,300) => {numOrig}; to num(15,30) => {hasCaboose}", spotter.name, numOrig, num);
+                        _log.Information("AutoHotboxSpotter {name}: Next check went from num(60,300) => {numOrig}; to num(15,30) => {hasCaboose}; Requires Caboose {requiresCaboose}", spotter.name, numOrig, num, hasCaboose, cabooseRequired);
                     }
                     yield return new WaitForSeconds(num);
                     spotter.CheckForHotbox();
                 }
             }
+        }
+
+        private static bool CabooseRequirementChecker(string name, bool cabooseRequired, bool hasCaboose, Serilog.ILogger _log)
+        {
+            bool error = cabooseRequired && !hasCaboose;
+            if (error) {
+                _log.Debug("{name}: Couldn't find required caboose!", name);
+            }
+            return error;
         }
     }
 }

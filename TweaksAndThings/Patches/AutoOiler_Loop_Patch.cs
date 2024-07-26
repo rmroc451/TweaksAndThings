@@ -18,9 +18,10 @@ internal class AutoOiler_Loop_Patch
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         if (!tweaksAndThings.IsEnabled) return true;
-        bool buttonsHaveCost = tweaksAndThings?.settings?.EndGearHelpersRequirePayment ?? false;
+        bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
+        bool cabooseRequired = tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter();
 
-        if (buttonsHaveCost)__result = __instance.MrocAutoOilerLoop(_log);
+        if (buttonsHaveCost) __result = __instance.MrocAutoOilerLoop(_log, cabooseRequired);
         return !buttonsHaveCost; //only hit this if !buttonsHaveCost, since Loop is a coroutine
     }
 }

@@ -7,7 +7,6 @@ using RollingStock;
 using System.Linq;
 using UI;
 using UI.ContextMenu;
-using static Model.Car;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -21,15 +20,14 @@ internal class CarPickable_HandleShowContextMenu_Patch
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         if (!tweaksAndThings.IsEnabled) return;
 
-        bool buttonsHaveCost = tweaksAndThings?.settings?.EndGearHelpersRequirePayment ?? false;
+        bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
         ContextMenu shared = ContextMenu.Shared;
-        var consist = car.EnumerateCoupled(LogicalEnd.A);
-        shared.AddButton(ContextMenuQuadrant.Unused2, $"{(consist.Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} Consist", SpriteName.Handbrake, delegate
+        shared.AddButton(ContextMenuQuadrant.Unused2, $"{(car._set.Cars.Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} Consist", SpriteName.Handbrake, delegate
         {
             CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.Handbrake, buttonsHaveCost);
         });
 
-        if (consist.Any(c => c.EndAirSystemIssue()))
+        if (car._set.Cars.Any(c => c.EndAirSystemIssue()))
         {
             shared.AddButton(ContextMenuQuadrant.Unused2, $"Air Up Consist", SpriteName.Select, delegate
             {
@@ -37,7 +35,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
             });
         }
 
-        if (consist.Any(c => c.SupportsBleed()))
+        if (car._set.Cars.Any(c => c.SupportsBleed()))
         {
             shared.AddButton(ContextMenuQuadrant.Unused2, $"Bleed Consist", SpriteName.Bleed, delegate
             {
