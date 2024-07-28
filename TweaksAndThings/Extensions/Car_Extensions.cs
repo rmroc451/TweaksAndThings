@@ -1,4 +1,6 @@
-﻿using Helpers;
+﻿using Game.Messages;
+using Game.State;
+using Helpers;
 using Model;
 using Model.Definition.Data;
 using Model.OpsNew;
@@ -60,7 +62,9 @@ public static class Car_Extensions
 
     public static bool IsCaboose(this Car car) => car.Archetype == Model.Definition.CarArchetype.Caboose;
 
-    public static bool CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(c => c.IsCaboose());
+    public static bool IsCabooseAndStoppedForLoadRefresh(this Car car) => car.IsCaboose() && car.IsStopped(30f);
+
+    public static Car? CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(c => c.IsCaboose());
 
     public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, HashSet<string> carIdsCheckedAlready, bool decrement = false)
     {
@@ -122,4 +126,12 @@ public static class Car_Extensions
             }).ToList();
         return source;
     }
+
+    public static void AdjustHotboxValue(this Car car, float hotboxValue) =>
+        StateManager.ApplyLocal(
+            new PropertyChange(
+                car.id, PropertyChange.KeyForControl(PropertyChange.Control.Hotbox),
+                new FloatPropertyValue(hotboxValue)
+            )
+        );
 }

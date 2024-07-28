@@ -90,10 +90,13 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
         });
     }
 
+    private static string cabooseUse => "Caboose Use";
+    private static string autoAiRequirment => "AutoAI\nRequirement";
+
     private void CabooseMods(UIPanelBuilder builder)
     {
         builder.AddField(
-            "Caboose Use",
+            cabooseUse,
             builder.AddToggle(
                 () => settings?.EndGearHelpersRequirePayment ?? false,
                 delegate (bool enabled)
@@ -109,12 +112,14 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
 Caboose starts reloading `Crew Hours` at any Team or Repair track (no waybill), after being stationary for 30 seconds.
 
-AutoOiler Update: Increases limit that crew will oiling a car from 75% -> 99%, also halves the time it takes (simulating crew from lead end and caboose handling half the train)
+AutoOiler Update: Increases limit that crew will oiling a car from 75% -> 99%, also halves the time it takes (simulating crew from lead end and caboose handling half the train).
+
+AutoOiler Update: if `{cabooseUse}` & `{autoAiRequirment.Replace("\n", " ")}` checked, then when a caboose is present, the AutoOiler will repair hotboxes afer oiling them to 100%.
 
 AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 - 30 seconds (Safety Is Everyone's Job)");
 
         builder.AddField(
-            $"AutoAI\nRequirement",
+            autoAiRequirment,
             builder.AddToggle(
                 () => settings?.RequireConsistCabooseForOilerAndHotboxSpotter ?? false,
                 delegate (bool enabled)
