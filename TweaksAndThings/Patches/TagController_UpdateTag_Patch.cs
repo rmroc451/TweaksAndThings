@@ -36,6 +36,7 @@ internal class TagController_UpdateTag_Patch
         tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", car.DisplayName);
         List<string> tags = [];
 
+        if (OpsController_AnnounceCoalescedPayments_Patch.CrewCarStatus(car).spotted) tags.Add("+");
         if (car.HasHotbox) tags.Add(TextSprites.Hotbox);
         if (car.EndAirSystemIssue()) tags.Add(TextSprites.CycleWaybills);
         if (car.HandbrakeApplied()) tags.Add(TextSprites.HandbrakeWheel);

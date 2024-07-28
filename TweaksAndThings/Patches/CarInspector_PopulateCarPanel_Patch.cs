@@ -208,7 +208,7 @@ internal class CarInspector_PopulateCarPanel_Patch
             float originalTimeCost = consist.CalculateCostForAutoEngineerEndGearSetting();
             float timeCost = originalTimeCost;
             float crewCost = timeCost / 3600; //hours of time deducted from caboose.
-            var tsString = crewCost.FormatCrewHours(IndustryComponent_Service_Patch.CrewHoursLoad().description);
+            var tsString = crewCost.FormatCrewHours(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad().description);
             Car? cabooseWithAvailCrew = NearbyCabooseWithAvailableCrew(car, crewCost, buttonsHaveCost);
             if (cabooseWithAvailCrew == null) timeCost *= 1.5f;
             var cabooseFoundDisplay = cabooseWithAvailCrew?.DisplayName ?? "No caboose";
