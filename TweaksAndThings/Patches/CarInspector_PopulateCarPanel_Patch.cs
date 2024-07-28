@@ -43,7 +43,7 @@ internal class CarInspector_PopulateCarPanel_Patch
         if (!tweaksAndThings.IsEnabled) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 
-        var consist = __instance._car._set.Cars;
+        var consist = __instance._car.EnumerateCoupled();
         builder = AddCarConsistRebuildObservers(builder, consist);
 
         builder.HStack(delegate (UIPanelBuilder hstack)
@@ -122,8 +122,8 @@ internal class CarInspector_PopulateCarPanel_Patch
                 {
                     try
                     {
-                        builder.Rebuild();
-                        if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true); //tagController.UpdateTag(car, car.TagCallout, OpsController.Shared);
+                        builder.RebuildOnInterval(.01f);
+                        if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true);
                         if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                     }
                     catch (Exception ex)
@@ -151,7 +151,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     public static void MrocConsistHelper(Model.Car car, MrocHelperType mrocHelperType, bool buttonsHaveCost)
     {
         TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
-        IEnumerable<Model.Car> consist = car._set.Cars;
+        IEnumerable<Model.Car> consist = car.EnumerateCoupled();
         _log.ForContext("car", car).Verbose($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
 
         CalculateCostIfEnabled(car, mrocHelperType, buttonsHaveCost, consist);
@@ -232,7 +232,7 @@ internal class CarInspector_PopulateCarPanel_Patch
         carIdsCheckedAlready.Add(car.id);
 
         //check consist, for cabeese
-        IEnumerable<Car> consist = car._set.Cars;
+        IEnumerable<Car> consist = car.EnumerateCoupled();
         output = consist.FirstOrDefault(c => c.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement));
         if (output != null) return output; //short out if we are good
         carIdsCheckedAlready.UnionWith(consist.Select(c => c.id));
