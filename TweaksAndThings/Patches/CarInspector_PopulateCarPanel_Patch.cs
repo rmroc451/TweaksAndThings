@@ -44,10 +44,10 @@ internal class CarInspector_PopulateCarPanel_Patch
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 
         var consist = __instance._car.EnumerateCoupled();
-        builder = AddCarConsistRebuildObservers(builder, consist);
 
         builder.HStack(delegate (UIPanelBuilder hstack)
         {
+            hstack = AddCarConsistRebuildObservers(hstack, consist);
             var buttonName = $"{(consist.Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} {TextSprites.HandbrakeWheel}";
             hstack.AddButtonCompact(buttonName, delegate
             {
@@ -122,7 +122,7 @@ internal class CarInspector_PopulateCarPanel_Patch
                 {
                     try
                     {
-                        builder.RebuildOnInterval(.01f);
+                        builder.Rebuild();
                         if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true);
                         if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                     }
