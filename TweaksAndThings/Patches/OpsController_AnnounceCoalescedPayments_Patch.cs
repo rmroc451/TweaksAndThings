@@ -4,7 +4,7 @@ using HarmonyLib;
 using Model;
 using Model.Definition.Data;
 using Model.Ops.Definition;
-using Model.OpsNew;
+using Model.Ops;
 using Network;
 using Railloader;
 using RMROC451.TweaksAndThings.Extensions;

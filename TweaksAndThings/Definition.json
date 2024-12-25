@@ -6,9 +6,12 @@
   "requires": [
     {
       "id": "railloader",
-      "notBefore": "1.8.1"
+      "notBefore": "1.9.6.8"
     },
-    "Zamu.StrangeCustoms"
+    {
+      "id": "Zamu.StrangeCustoms",
+      "notBefore": "1.10.24358.413"
+    }
   ],
   "assemblies": [ "RMROC451.TweaksAndThings" ],
   "mixintos": {

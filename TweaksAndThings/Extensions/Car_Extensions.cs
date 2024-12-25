@@ -3,7 +3,7 @@ using Game.State;
 using Helpers;
 using Model;
 using Model.Definition.Data;
-using Model.OpsNew;
+using Model.Ops;
 using Serilog;
 using System;
 using System.Collections.Generic;

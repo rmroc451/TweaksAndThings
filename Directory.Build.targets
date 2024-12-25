@@ -39,7 +39,7 @@
 
       <!-- Folder we'll put the published zips into -->
       <PublishPath>../bin</PublishPath>
-      <ZipName>$(PublishPath)/$(AssemblyName)_$(AssemblyVersion).zip</ZipName>
+      <ZipName>$(PublishPath)/$(AssemblyName)_$(AssemblyVersion)_Experimental.zip</ZipName>
     </PropertyGroup>
 
     <!-- Assure the output path exists -->
