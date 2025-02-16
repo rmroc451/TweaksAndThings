@@ -109,8 +109,7 @@ public static class Car_Extensions
     {
         Vector3 position = car.GetMotionSnapshot().Position;
         Vector3 center = WorldTransformer.WorldToGame(position);
-        Rect rect = new Rect(new Vector2(center.x - 30f, center.z - 30f), Vector2.one * 30f * 2f);
-        var cars = tc.CarIdsInRect(rect);
+        var cars = tc.CarIdsInRadius(center, 60f);
         Log.Information($"{nameof(HuntingForCabeeseNearCar)} => {cars.Count()}");
         List<(string carId, float distance)> source =
             cars

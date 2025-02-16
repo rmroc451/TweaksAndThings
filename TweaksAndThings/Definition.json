@@ -5,12 +5,16 @@
   "version": "$(AssemblyVersion)",
   "requires": [
     {
+      "id": "railroader",
+      "notBefore": "2024.6"
+    },
+    {
       "id": "railloader",
-      "notBefore": "1.9.6.8"
+      "notBefore": "1.9.6.14"
     },
     {
       "id": "Zamu.StrangeCustoms",
-      "notBefore": "1.10.24358.413"
+      "notBefore": "1.10.25017.313"
     }
   ],
   "assemblies": [ "RMROC451.TweaksAndThings" ],
