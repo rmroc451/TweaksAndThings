@@ -34,7 +34,7 @@ internal class TagController_UpdateTag_Patch
     private static void ProceedWithPostFix(Car car, TagCallout tagCallout)
     {
         tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", car.DisplayName);
-        List<string> tags = [];
+        List<string> tags = new();
 
         if (OpsController_AnnounceCoalescedPayments_Patch.CrewCarStatus(car).spotted) tags.Add("+");
         if (car.HasHotbox) tags.Add(TextSprites.Hotbox);

@@ -22,20 +22,20 @@ internal class CarPickable_HandleShowContextMenu_Patch
 
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
         ContextMenu shared = ContextMenu.Shared;
-        shared.AddButton(ContextMenuQuadrant.Unused2, $"{(car.EnumerateCoupled().Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} Consist", SpriteName.Handbrake, delegate
+        shared.AddButton(ContextMenuQuadrant.Unused1, $"{(car.EnumerateCoupled().Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} Consist", SpriteName.Handbrake, delegate
         {
             CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.Handbrake, buttonsHaveCost);
         });
 
         if (car.EnumerateCoupled().Any(c => c.EndAirSystemIssue()))
         {
-            shared.AddButton(ContextMenuQuadrant.Unused2, $"Air Up Consist", SpriteName.Select, delegate
+            shared.AddButton(ContextMenuQuadrant.Unused1, $"Air Up Consist", SpriteName.Select, delegate
             {
                 CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.GladhandAndAnglecock, buttonsHaveCost);
             });
         }
 
-        if (car.EnumerateCoupled().Any(c => c.SupportsBleed()))
+        if (!car.EnumerateCoupled().Any(c => !c.SupportsBleed()))
         {
             shared.AddButton(ContextMenuQuadrant.Unused2, $"Bleed Consist", SpriteName.Bleed, delegate
             {
@@ -47,7 +47,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
         {
             CameraSelector.shared.FollowCar(car);
         });
-
+        shared.radius = 200f;
         shared.BuildItemAngles();
         shared.StartCoroutine(shared.AnimateButtonsShown());
     }

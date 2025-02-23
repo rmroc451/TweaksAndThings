@@ -50,7 +50,8 @@ internal class CarPrototypeLibrary_LoadForId_Patch
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class OpsController_AnnounceCoalescedPayments_Patch
 {
-    static Dictionary<string, (bool spotted, bool filling)> CrewCarDict = [];
+    static Dictionary<string, (bool spotted, bool filling)> CrewCarDict = new();
+
     public static (bool spotted, bool filling) CrewCarStatus(Car car)
     {
         bool found = CrewCarDict.TryGetValue(car.id, out (bool spotted, bool filling) val);
@@ -61,12 +62,13 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
     }
 
     static GameDateTime dateTime = TimeWeather.Now;
-    static readonly IEnumerable<Type> refillLocations = [
+    static readonly IEnumerable<Type> refillLocations = 
+        new List<Type>() {
         typeof(PassengerStop),
         typeof(SimplePassengerStop),
         typeof(TeamTrack),
         typeof(RepairTrack)
-    ];
+        };
 
     public static Load CrewHoursLoad()
     {
@@ -116,7 +118,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
 
             var cabeese = passengerStops
-                .SelectMany(t => t.TrackSpans?.Select(s => (tc.CarsOnSpan(s) ?? []).Where(c => c.IsCaboose()))?.SelectMany(c => c?.Select(c2 => (t, c2))));
+                .SelectMany(t => t.TrackSpans?.Select(s => (tc.CarsOnSpan(s) ?? Enumerable.Empty<Car>()).Where(c => c.IsCaboose()))?.SelectMany(c => c?.Select(c2 => (t, c2))));
             //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
 
             CrewCarDict = CrewCarDict.Where(kvp => cabeese.Select(c => c.c2.id).Contains(kvp.Key)).ToDictionary(k => k.Key, v => v.Value);
