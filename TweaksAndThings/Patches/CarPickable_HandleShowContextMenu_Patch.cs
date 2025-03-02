@@ -47,7 +47,6 @@ internal class CarPickable_HandleShowContextMenu_Patch
         {
             CameraSelector.shared.FollowCar(car);
         });
-        shared.radius = 200f;
         shared.BuildItemAngles();
         shared.StartCoroutine(shared.AnimateButtonsShown());
     }
