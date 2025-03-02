@@ -27,6 +27,7 @@ internal class ContextMenu_Show_Patch
             return true;
         }
         __instance.CancelHideCoroutine();
+        if (__instance.contentRectTransform.childCount >= 1) __instance.contentRectTransform.GetChild(0).DestroyAllChildren(); //YOINK DEM CIRCLES!
         __instance.SetupTemplate(rootCanvas);
         __instance.centerLabel.text = centerText;
         Canvas componentInParent = ((Component)__instance.contentRectTransform).GetComponentInParent<Canvas>();
