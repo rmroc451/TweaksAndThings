@@ -1,5 +1,6 @@
 ﻿<Project>
   <Import Project="Paths.user" Condition="Exists('Paths.user')" />
+  <Import Project="Assembly.version" Condition="Exists('Assembly.version')" />
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
