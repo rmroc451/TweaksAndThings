@@ -43,7 +43,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
             });
         }
 
-        shared.AddButton(ContextMenuQuadrant.Unused2, $"Follow", SpriteName.Inspect, delegate
+        shared.AddButton(ContextMenuQuadrant.General, $"Follow", SpriteName.Inspect, delegate
         {
             CameraSelector.shared.FollowCar(car);
         });
