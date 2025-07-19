@@ -2,12 +2,14 @@
 using Game.State;
 using Helpers;
 using Model;
+using Model.Definition;
 using Model.Definition.Data;
 using Model.Ops;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.AccessControl;
 using UnityEngine;
 
 namespace RMROC451.TweaksAndThings.Extensions;
@@ -62,9 +64,15 @@ public static class Car_Extensions
 
     public static bool IsCaboose(this Car car) => car.Archetype == Model.Definition.CarArchetype.Caboose;
 
-    public static bool IsCabooseAndStoppedForLoadRefresh(this Car car) => car.IsCaboose() && car.IsStopped(30f);
+    public static bool IsCabooseAndStoppedForLoadRefresh(this Car car, bool isFull) => car.IsCaboose() && car.IsStopped(30f) && !isFull;
 
     public static Car? CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(c => c.IsCaboose());
+
+    public static bool ConsistNoFreight(this IEnumerable<Car> input) =>
+        input.Where(c => !c.IsLocomotive).Any() &&
+        input
+        .Where(c => !c.IsLocomotive)
+        .All(c => !c.Archetype.IsFreight());
 
     public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, HashSet<string> carIdsCheckedAlready, bool decrement = false)
     {

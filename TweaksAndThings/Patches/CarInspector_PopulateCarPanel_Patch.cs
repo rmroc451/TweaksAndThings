@@ -173,20 +173,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 
             case MrocHelperType.GladhandAndAnglecock:
                 consist.Do(c =>
-                    ends.Do(end =>
-                    {
-                        EndGear endGear = c[end];
-
-                        StateManager.ApplyLocal(
-                            new PropertyChange(
-                                c.id,
-                                KeyValueKeyFor(EndGearStateKey.Anglecock, c.LogicalToEnd(end)),
-                                new FloatPropertyValue(endGear.IsCoupled ? 1f : 0f)
-                            )
-                        );
-
-                        if (c.TryGetAdjacentCar(end, out Model.Car c2)) StateManager.ApplyLocal(new SetGladhandsConnected(c.id, c2.id, true));
-                    })
+                    CarEndAirUpdate(c)
                 );
                 break;
 
@@ -201,7 +188,25 @@ internal class CarInspector_PopulateCarPanel_Patch
         }
     }
 
-    private static void CalculateCostIfEnabled(Car car, MrocHelperType mrocHelperType, bool buttonsHaveCost, IEnumerable<Car> consist)
+    internal static void CarEndAirUpdate(Car c)
+    {
+        ends.Do(end =>
+        {
+            EndGear endGear = c[end];
+
+            StateManager.ApplyLocal(
+                new PropertyChange(
+                    c.id,
+                    KeyValueKeyFor(EndGearStateKey.Anglecock, c.LogicalToEnd(end)),
+                    new FloatPropertyValue(endGear.IsCoupled ? 1f : 0f)
+                )
+            );
+
+            if (c.TryGetAdjacentCar(end, out Model.Car c2)) StateManager.ApplyLocal(new SetGladhandsConnected(c.id, c2.id, true));
+        });
+    }
+
+    internal static void CalculateCostIfEnabled(Car car, MrocHelperType mrocHelperType, bool buttonsHaveCost, IEnumerable<Car> consist)
     {
         if (buttonsHaveCost)
         {

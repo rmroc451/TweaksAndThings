@@ -14,6 +14,7 @@ using UI;
 using UI.EngineRoster;
 using UI.Tooltips;
 using UnityEngine;
+using Game.State;
 
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -28,6 +29,9 @@ internal class EngineRosterRow_Refresh_Patch
         TweaksAndThingsPlugin? tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         RosterFuelColumnSettings? rosterFuelColumnSettings = tweaksAndThings?.settings?.EngineRosterFuelColumnSettings;
 
+        string fuelInfoText = string.Empty;
+        string fuelInfoTooltip = string.Empty;
+
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 
             !tweaksAndThings.IsEnabled ||
@@ -38,8 +42,9 @@ internal class EngineRosterRow_Refresh_Patch
 
         try
         {
-            string fuelInfoText = string.Empty;
-            string fuelInfoTooltip = string.Empty;
+            IEnumerable<Car> consist = __instance._engine.EnumerateCoupled().Where(c => c.EnableOiling);
+            bool cabooseRequirementFulfilled = consist.CabooseInConsist() || !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || consist.ConsistNoFreight();
+            float offendingPercentage = 0;
             Car engineOrTender = __instance._engine;
             List<LoadSlot> loadSlots = __instance._engine.Definition.LoadSlots;
             if (!loadSlots.Any())
@@ -57,10 +62,40 @@ internal class EngineRosterRow_Refresh_Patch
                 {
                     CarLoadInfo valueOrDefault = loadInfo.GetValueOrDefault();
                     var fuelLevel = FuelLevel(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity);
+                    offendingPercentage = CalcPercentLoad(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity);
                     fuelInfoText += loadSlots[i].RequiredLoadIdentifier == offender ? fuelLevel + " " : string.Empty;
                     //fuelInfoText += TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity) + " ";
                     fuelInfoTooltip += $"{TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity)} {valueOrDefault.LoadString(CarPrototypeLibrary.instance.LoadForId(valueOrDefault.LoadId))}\n";
                 }
+            }
+
+            try
+            {
+                if (cabooseRequirementFulfilled && StateManager.Shared.Storage.OilFeature)
+                {
+                    float lowestOilLevel = consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled;
+                    var oilLevel = FuelLevel(lowestOilLevel, 1);
+                    fuelInfoTooltip += $"{lowestOilLevel.TriColorPiePercent(1)} {oilLevel} Consist Oil Lowest Level\n";
+                    if (CalcPercentLoad(lowestOilLevel, 1) < offendingPercentage)
+                    {
+                        fuelInfoText = $"{oilLevel} ";
+                    }
+
+                    if (consist.Any(c => c.HasHotbox))
+                    {
+                        fuelInfoText = $"{TextSprites.Hotbox} ";
+                        fuelInfoTooltip = $"{TextSprites.Hotbox} Hotbox detected!\n{fuelInfoTooltip}";
+                    }
+                }
+                else if (!cabooseRequirementFulfilled && StateManager.Shared.Storage.OilFeature)
+                {
+                    fuelInfoTooltip += $"Add Caboose To Consist For Consist Oil Level Reporting\n";
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error Detecting oiling consist status for engine roster");
             }
 
             switch (rosterFuelColumnSettings.EngineRosterFuelStatusColumn)
@@ -77,7 +112,6 @@ internal class EngineRosterRow_Refresh_Patch
                 default:
                     break;
             }
-
         } catch (Exception ex)
         {
             rosterFuelColumnSettings.EngineRosterFuelStatusColumn = EngineRosterFuelDisplayColumn.None;
@@ -91,10 +125,15 @@ internal class EngineRosterRow_Refresh_Patch
         tooltip.TooltipInfo = new TooltipInfo(tooltip.tooltipTitle, fuelInfoTooltip);
     }
 
-    public static string FuelLevel(float quantity, float capacity)
+    public static float CalcPercentLoad(float quantity, float capacity)
     {
         float num = capacity <= 0f ? 0 : Mathf.Clamp(quantity / capacity * 100, 0, 100);
 
-        return $"{Mathf.FloorToInt(num):D2}%";
+        return num;
+    }
+
+    public static string FuelLevel(float quantity, float capacity)
+    {
+        return $"{Mathf.FloorToInt(CalcPercentLoad(quantity, capacity)):D2}%";
     }
 }

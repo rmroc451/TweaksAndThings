@@ -1,8 +1,10 @@
-﻿using HarmonyLib;
+﻿using Game.State;
+using HarmonyLib;
 using Model;
 using Model.Ops;
 using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using UI.Tags;
@@ -26,18 +28,23 @@ internal class TagController_UpdateTag_Patch
             return;
         }
 
-        ProceedWithPostFix(car, tagCallout);
+        ProceedWithPostFix(car, tagCallout, tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter());
 
         return;
     }
 
-    private static void ProceedWithPostFix(Car car, TagCallout tagCallout)
+    private static void ProceedWithPostFix(Car car, TagCallout tagCallout, bool cabooseRequired)
     {
         tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", car.DisplayName);
         List<string> tags = new();
 
         if (OpsController_AnnounceCoalescedPayments_Patch.CrewCarStatus(car).spotted) tags.Add("+");
-        if (car.HasHotbox) tags.Add(TextSprites.Hotbox);
+        //if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : $"<cspace=-1em>{TextSprites.Warning}{car.Oiled.TriColorPiePercent(1)}</cspace>");
+        if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : car.Oiled.TriColorPiePercent(1));
+        IEnumerable<Car> consist = car.EnumerateCoupled().Where(c => c.EnableOiling);
+        bool cabooseRequirementFulfilled = consist.CabooseInConsist() || !cabooseRequired || consist.ConsistNoFreight();
+        if (cabooseRequirementFulfilled && car.IsLocomotive && !car.NeedsOiling && StateManager.Shared.Storage.OilFeature && consist.Any(c => c.NeedsOiling)) 
+            tags.Add(consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled.TriColorPiePercent(1));
         if (car.EndAirSystemIssue()) tags.Add(TextSprites.CycleWaybills);
         if (car.HandbrakeApplied()) tags.Add(TextSprites.HandbrakeWheel);
 
