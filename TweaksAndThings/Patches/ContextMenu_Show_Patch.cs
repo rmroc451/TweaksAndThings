@@ -19,7 +19,7 @@ internal class ContextMenu_Show_Patch
     static bool Prefix(UI.ContextMenu.ContextMenu __instance, string centerText)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
 
         if (!__instance.GetRootCanvas(out var rootCanvas))
         {
@@ -77,7 +77,7 @@ internal class ContextMenu_DefaultAngleForItem_Patch
     static bool Prefix(UI.ContextMenu.ContextMenu __instance, ref float __result, ContextMenuQuadrant quadrant, int index, int quadrantItemCount)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
 
 
         int num = quadrant switch
@@ -108,7 +108,7 @@ internal class ContextMenu_AddButton_Patch
     static bool Prefix(UI.ContextMenu.ContextMenu __instance, ContextMenuQuadrant quadrant, string title, Sprite sprite, Action action)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
 
 
         List<ContextMenuItem> list = __instance._quadrants[(int)quadrant];

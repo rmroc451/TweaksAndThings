@@ -5,6 +5,7 @@ using RMROC451.TweaksAndThings.Enums;
 using UI.Builder;
 using Model;
 using RMROC451.TweaksAndThings.Extensions;
+using UnityEngine.InputSystem;
 
 namespace RMROC451.TweaksAndThings;
 
@@ -23,7 +24,12 @@ public class Settings
         RosterFuelColumnSettings engineRosterFuelColumnSettings,
         bool endGearHelpersRequirePayment,
         bool requireConsistCabooseForOilerAndHotboxSpotter,
-        bool cabooseAllowsConsistInfo
+        bool cabooseAllowsConsistInfo,
+        bool cabooseRequiredForLocoTagOilIndication,
+        bool servicingFundPenalty,
+        bool safetyFirst,
+        CrewHourLoadMethod loadCrewHoursMethod,
+        float cabeeseSearchRadiusFtInMeters
     )
     {
         WebhookSettingsList = webhookSettingsList;
@@ -32,6 +38,11 @@ public class Settings
         EndGearHelpersRequirePayment = endGearHelpersRequirePayment;
         RequireConsistCabooseForOilerAndHotboxSpotter = requireConsistCabooseForOilerAndHotboxSpotter;
         CabooseAllowsConsistInfo = cabooseAllowsConsistInfo;
+        CabooseRequiredForLocoTagOilIndication = cabooseRequiredForLocoTagOilIndication;
+        ServicingFundPenalty = servicingFundPenalty;
+        SafetyFirst = safetyFirst;
+        LoadCrewHoursMethod = loadCrewHoursMethod;
+        CabeeseSearchRadiusFtInMeters = cabeeseSearchRadiusFtInMeters;
     }
 
     public readonly UIState<string> _selectedTabState = new UIState<string>(null);
@@ -41,6 +52,11 @@ public class Settings
     public bool EndGearHelpersRequirePayment;
     public bool RequireConsistCabooseForOilerAndHotboxSpotter;
     public bool CabooseAllowsConsistInfo;
+    public bool CabooseRequiredForLocoTagOilIndication;
+    public bool ServicingFundPenalty;
+    public bool SafetyFirst;
+    public CrewHourLoadMethod LoadCrewHoursMethod;
+    public float CabeeseSearchRadiusFtInMeters;
 
     internal void AddAnotherRow()
     {
@@ -101,6 +117,8 @@ public static class SettingsExtensions
         return output;
     }
 
+    public static bool IsEnabled(this TweaksAndThingsPlugin input) =>
+        input?.IsEnabled ?? false;
     public static bool CabooseAllowsConsistInfo(this TweaksAndThingsPlugin input) =>
         input?.settings?.CabooseAllowsConsistInfo ?? false;
     public static bool EndGearHelpersRequirePayment(this TweaksAndThingsPlugin input) =>
@@ -108,6 +126,16 @@ public static class SettingsExtensions
     public static bool RequireConsistCabooseForOilerAndHotboxSpotter(this TweaksAndThingsPlugin input) =>
         input?.settings?.RequireConsistCabooseForOilerAndHotboxSpotter ?? false;
     public static bool CabooseNonMotiveAllowedSetting(this TweaksAndThingsPlugin input, Car car) =>
-        input.EndGearHelpersRequirePayment() && car.set.Cars.CabooseInConsist() && car.NotMotivePower();
+        input.EndGearHelpersRequirePayment() && !car.MotivePower() && (bool)car.FindMyCaboose(0.0f, false);
+    public static bool CabooseRequiredForLocoOilIndicator(this TweaksAndThingsPlugin input) =>
+        input?.settings?.CabooseRequiredForLocoTagOilIndication ?? false;
+    public static bool ServiceFundPenalties(this TweaksAndThingsPlugin input) =>
+        input?.settings?.ServicingFundPenalty ?? false;
+    public static bool SafetyFirst(this TweaksAndThingsPlugin input) =>
+        input?.settings?.SafetyFirst ?? false;
+    public static bool DayLoadCrewHours(this TweaksAndThingsPlugin input) =>
+        (input?.settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks) == CrewHourLoadMethod.Daily;
+    public static float CabeeseSearchRadiusInMeters(this TweaksAndThingsPlugin input) =>
+        input?.settings?.CabeeseSearchRadiusFtInMeters ?? 21f;
 
 }

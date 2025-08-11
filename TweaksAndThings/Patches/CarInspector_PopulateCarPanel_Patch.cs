@@ -40,7 +40,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     {
 
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 
         var consist = __instance._car.EnumerateCoupled();
@@ -82,6 +82,7 @@ internal class CarInspector_PopulateCarPanel_Patch
         {
             builder.HStack(delegate (UIPanelBuilder hstack)
             {
+                hstack = AddCarConsistRebuildObservers(hstack, consist, all: false);
                 hstack.AddField("Consist Info", hstack.HStack(delegate (UIPanelBuilder field)
                 {
                     int consistLength = consist.Count();
@@ -96,7 +97,7 @@ internal class CarInspector_PopulateCarPanel_Patch
         }
     }
 
-    private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist)
+    private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist, bool all = true)
     {
         TagController tagController = UnityEngine.Object.FindFirstObjectByType<TagController>();
         foreach (Model.Car car in consist.Where(c => c.Archetype != Model.Definition.CarArchetype.Tender))
@@ -105,8 +106,8 @@ internal class CarInspector_PopulateCarPanel_Patch
             foreach (LogicalEnd logicalEnd in ends)
             {
                 builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsCoupled, car.LogicalToEnd(logicalEnd)), tagController);
-                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)), tagController);
-                builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)), tagController);
+                if (all) builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.IsAirConnected, car.LogicalToEnd(logicalEnd)), tagController);
+                if (all) builder = AddObserver(builder, car, KeyValueKeyFor(EndGearStateKey.Anglecock, car.LogicalToEnd(logicalEnd)), tagController);
             }
         }
 
@@ -148,8 +149,9 @@ internal class CarInspector_PopulateCarPanel_Patch
     //    }
     //}
 
-    public static void MrocConsistHelper(Model.Car car, MrocHelperType mrocHelperType, bool buttonsHaveCost)
+    public static int MrocConsistHelper(Model.Car car, MrocHelperType mrocHelperType, bool buttonsHaveCost)
     {
+        int output = 0;
         TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
         IEnumerable<Model.Car> consist = car.EnumerateCoupled();
         _log.ForContext("car", car).Verbose($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
@@ -178,14 +180,26 @@ internal class CarInspector_PopulateCarPanel_Patch
                 break;
 
             case MrocHelperType.BleedAirSystem:
-                consist = consist.Where(c => c.NotMotivePower());
+                consist = consist.Where(c => !c.MotivePower());
                 _log.ForContext("car", car).Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                 foreach (Model.Car bleed in consist)
                 {
                     StateManager.ApplyLocal(new PropertyChange(bleed.id, PropertyChange.Control.Bleed, 1));
                 }
                 break;
+
+            case MrocHelperType.Oil:
+                consist = consist.Where(c => c.NeedsOiling || c.HasHotbox);
+                _log.ForContext("car", car).Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+                foreach (Model.Car oil in consist)
+                {
+                    StateManager.ApplyLocal(new PropertyChange(oil.id, nameof(Car.Oiled).ToLower(), new FloatPropertyValue(1)));
+                    output += car.HasHotbox ? 1 : 0;
+                    if (car.HasHotbox) car.AdjustHotboxValue();
+                }
+                break;
         }
+        return output;
     }
 
     internal static void CarEndAirUpdate(Car c)
@@ -214,7 +228,7 @@ internal class CarInspector_PopulateCarPanel_Patch
             float timeCost = originalTimeCost;
             float crewCost = timeCost / 3600; //hours of time deducted from caboose.
             var tsString = crewCost.FormatCrewHours(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad().description);
-            Car? cabooseWithAvailCrew = NearbyCabooseWithAvailableCrew(car, crewCost, buttonsHaveCost);
+            Car? cabooseWithAvailCrew = car.FindMyCaboose(crewCost, buttonsHaveCost);
             if (cabooseWithAvailCrew == null) timeCost *= 1.5f;
             var cabooseFoundDisplay = cabooseWithAvailCrew?.DisplayName ?? "No caboose";
 
@@ -225,31 +239,5 @@ internal class CarInspector_PopulateCarPanel_Patch
 
             StateManager_OnDayDidChange_Patch.UnbilledAutoBrakeCrewRunDuration += timeCost;
         }
-    }
-
-    public static Car? NearbyCabooseWithAvailableCrew(Car car, float timeNeeded, bool decrement = false)
-    {
-        HashSet<string> carIdsCheckedAlready = new();
-
-        //check current car.
-        Car? output = car.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement);
-        if (output != null) return output; //short out if we are good
-        carIdsCheckedAlready.Add(car.id);
-
-        //check consist, for cabeese
-        IEnumerable<Car> consist = car.EnumerateCoupled();
-        output = consist.FirstOrDefault(c => c.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement));
-        if (output != null) return output; //short out if we are good
-        carIdsCheckedAlready.UnionWith(consist.Select(c => c.id));
-
-        //then check near consist cars for cabeese
-        TrainController tc = UnityEngine.Object.FindObjectOfType<TrainController>();
-        foreach (var c in consist)
-        {
-            output = c.HuntingForCabeeseNearCar(timeNeeded, tc, carIdsCheckedAlready, decrement);
-            if (output != null) return output; //short out if we are good
-        }
-
-        return output;
     }
 }

@@ -7,7 +7,7 @@ namespace RMROC451.TweaksAndThings.Extensions;
 
 public static class TextSprite_Extensions
 {
-    public static string TriColorPiePercent(this float quantity, float capacity)
+    public static string TriColorPiePercent(this float quantity, float capacity, string name = "")
     {
         int num;
         if (capacity <= 0f)
@@ -29,6 +29,8 @@ public static class TextSprite_Extensions
             color = "#D53427"; //Red
         }
 
-        return $"<sprite tint=1 color={color} name=Pie{num:D2}>";
+        string sprite = string.IsNullOrEmpty(name) ? $"Pie{num:D2}" : name;
+
+        return $"<sprite tint=1 color={color} name={sprite}>";
     }
 }

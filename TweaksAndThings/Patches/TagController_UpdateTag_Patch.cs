@@ -4,7 +4,7 @@ using Model;
 using Model.Ops;
 using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
-using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UI.Tags;
@@ -23,28 +23,34 @@ internal class TagController_UpdateTag_Patch
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
 
-        if (!tweaksAndThings.IsEnabled || !tweaksAndThings.settings.HandBrakeAndAirTagModifiers)
+        if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.settings.HandBrakeAndAirTagModifiers)
         {
             return;
         }
 
-        ProceedWithPostFix(car, tagCallout, tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter());
+        ProceedWithPostFix(car, tagCallout, tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || !tweaksAndThings.CabooseRequiredForLocoOilIndicator());
 
         return;
     }
 
     private static void ProceedWithPostFix(Car car, TagCallout tagCallout, bool cabooseRequired)
     {
-        tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", car.DisplayName);
+        tagCallout.callout.Title = string.Format(tagTitleFormat, "{0}", Hyperlink.To(car));
         List<string> tags = new();
+        string oilSpriteName = string.Empty;// "OilCan";
 
         if (OpsController_AnnounceCoalescedPayments_Patch.CrewCarStatus(car).spotted) tags.Add("+");
         //if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : $"<cspace=-1em>{TextSprites.Warning}{car.Oiled.TriColorPiePercent(1)}</cspace>");
-        if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : car.Oiled.TriColorPiePercent(1));
+        if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : car.Oiled.TriColorPiePercent(1, oilSpriteName));
         IEnumerable<Car> consist = car.EnumerateCoupled().Where(c => c.EnableOiling);
-        bool cabooseRequirementFulfilled = consist.CabooseInConsist() || !cabooseRequired || consist.ConsistNoFreight();
-        if (cabooseRequirementFulfilled && car.IsLocomotive && !car.NeedsOiling && StateManager.Shared.Storage.OilFeature && consist.Any(c => c.NeedsOiling)) 
-            tags.Add(consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled.TriColorPiePercent(1));
+        Func<bool> cabooseRequirementFulfilled = () => (!cabooseRequired || consist.ConsistNoFreight() || car.FindMyCaboose(0.0f, false)); 
+        if (StateManager.Shared.Storage.OilFeature
+            && car.IsLocomotive 
+            && !car.NeedsOiling 
+            && (consist.Any(c => c.NeedsOiling) || consist.Any(c => c.HasHotbox)
+            && cabooseRequirementFulfilled())
+        ) 
+            tags.Add(consist.Any(c => c.HasHotbox) ? TextSprites.Hotbox : consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled.TriColorPiePercent(1, oilSpriteName));
         if (car.EndAirSystemIssue()) tags.Add(TextSprites.CycleWaybills);
         if (car.HandbrakeApplied()) tags.Add(TextSprites.HandbrakeWheel);
 

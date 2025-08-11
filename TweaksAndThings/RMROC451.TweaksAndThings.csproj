@@ -32,6 +32,10 @@
     <GameAssembly Include="UnityEngine.InputLegacyModule" />
     <GameAssembly Include="UnityEngine.InputModule" />
     <GameAssembly Include="Unity.TextMeshPro" />
+    <GameAssembly Include="Map.Runtime" />
+    <GameAssembly Include="UnityEngine.PhysicsModule" />
+    <GameAssembly Include="UnityEngine.ImageConversionModule" />
+    <GameAssembly Include="UnityEngine.IMGUIModule" />
 
     <GameAssembly Include="System.Net.Http" />
     <GameAssembly Include="Core" />

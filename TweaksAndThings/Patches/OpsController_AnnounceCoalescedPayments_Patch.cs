@@ -85,13 +85,11 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
         float rate2 = 24 * 2 * 8;// carLoadRate = 8 crew hours in 30 min loading; (24h * 2 to get half hour chunks * 8 hours to load in those chunks)
         float num2 = 99999999; //QuantityInStorage for crew-hours (infinite where crew can be shuffling about)
         float quantityToLoad = Mathf.Min(num2, IndustryComponent.RateToValue(rate2, deltaTime));
-        OpsCarAdapter? oca = car.IsCaboose() ? new OpsCarAdapter(car, OpsController.Shared) : null;
-        bool isFull = !car.IsCaboose() ? true : (oca?.IsFull(CrewHoursLoad()) ?? true);
         if (car.IsCaboose() && !CrewCarStatus(car).spotted)
         {
-            CrewCarDict[car.id] = (true, !isFull);
+            CrewCarDict[car.id] = (true, CrewCarDict[car.id].filling);
         }
-        if (car.IsCabooseAndStoppedForLoadRefresh(isFull))
+        if (car.IsCabooseAndStoppedForLoadRefresh(new OpsCarAdapter(car, OpsController.Shared).IsFull(CrewHoursLoad())))
         {
             if (!CrewCarDict[car.id].filling) Multiplayer.Broadcast($"{Hyperlink.To(car)}: \"Topping off caboose crew.\"");
             CrewCarDict[car.id] = (CrewCarDict[car.id].spotted, true);
@@ -101,15 +99,14 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
                 Multiplayer.Broadcast($"{Hyperlink.To(car)}: \"Caboose crew topped off.\"");
                 CrewCarDict[car.id] = (CrewCarDict[car.id].spotted, false);
             }
-            (oca ?? new OpsCarAdapter(car, OpsController.Shared)).Load(CrewHoursLoad(), quantityToLoad);
+            new OpsCarAdapter(car, OpsController.Shared).Load(CrewHoursLoad(), quantityToLoad);
         }
     }
 
     public static bool Prefix(IndustryComponent __instance)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!StateManager.IsHost || !tweaksAndThings.IsEnabled || !(tweaksAndThings?.settings?.EndGearHelpersRequirePayment ?? false)) return true;
-
+        if (!StateManager.IsHost || !tweaksAndThings.IsEnabled() || !tweaksAndThings.EndGearHelpersRequirePayment() || tweaksAndThings.DayLoadCrewHours()) return true;
 
         TrainController tc = UnityEngine.Object.FindAnyObjectByType<TrainController>();
         try {

@@ -1,15 +1,17 @@
 ﻿using Core;
 using HarmonyLib;
 using Model;
+using Model.Ops;
 using Network;
 using Railloader;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
 using Serilog;
+using System;
 using System.Linq;
-using System.Runtime.Remoting.Messaging;
 using UI;
+using UI.Tags;
 using UnityEngine;
 
 
@@ -37,12 +39,11 @@ internal class CarPickable_Activate_Patch
     private static bool Prefix(CarPickable __instance, PickableActivateEvent evt)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
         bool bCtrlAltHeld = GameInput.IsControlDown && GameInput.IsAltDown;
 
         _log.ForContext("car", __instance.car).Information($"{GameInput.IsShiftDown} {GameInput.IsControlDown} {GameInput.IsAltDown} {bCtrlAltHeld} ");
 
-        //On Double click of a car: follow
         if (OnPointerDown(evt, PickableActivation.Primary))
         {
             CameraSelector.shared.FollowCar(__instance.car);
@@ -57,27 +58,29 @@ internal class CarPickable_Activate_Patch
             var consist = __instance.car.EnumerateCoupled();
             bool handbrakesApplied = consist.Any(c => c.HandbrakeApplied());
             bool airSystemIssues = consist.Any(c => c.EndAirSystemIssue());
-            bool needsOiling = GameInput.IsShiftDown && consist.All(c => c.IsStopped()) && consist.Any(c => c.NeedsOiling || c.HasHotbox) && (consist.CabooseInConsist() || !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter());
+            Func<bool> cabooseNear = () => (bool)__instance.car.FindMyCaboose(0.0f, false);
+            bool needsOiling = GameInput.IsShiftDown && consist.All(c => c.IsStopped()) && consist.Any(c => c.NeedsOiling || c.HasHotbox) && (!tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || cabooseNear());
             var chargeIt = handbrakesApplied || airSystemIssues || needsOiling;
             //CTRL + ALT + SHIFT : BrakesAngleCocksAndOiling
             //CTRL + ALT : Release Consist Brakes and Check AngleCocks
-            //CTRL + SHIFT : Toggle Consist Brakes
-            //CTRL : Toggle Car Brakes & Airup Car
-            //ALT + SHIFT : Check Consist AngleCocks
-            //ALT : Open Inspector to Car
+            //ALT + SHIFT : toggle consist brakes
+            //CTRL + SHIFT : Check Consist Angle Cocks
+            //ALT : Toggle car brakes and & air up cars
+            //CTRL : NOTHING; BASE CAR INSPECTOR    
+
             if (bCtrlAltHeld)
             {
                 BrakesAngleCocksAndOiling(__instance, tweaksAndThings, GameInput.IsShiftDown, consist, handbrakesApplied, airSystemIssues, needsOiling, chargeIt);
                 _log.ForContext("car", __instance.car).Information($"ctrlAlt{(GameInput.IsShiftDown ? "shift" : string.Empty)}Held!");
                 output = false;
             }
-            else if (GameInput.IsControlDown && GameInput.IsShiftDown)
+            else if (GameInput.IsAltDown && GameInput.IsShiftDown)
             {
                 CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(__instance.car, MrocHelperType.Handbrake, tweaksAndThings.EndGearHelpersRequirePayment());
                 _log.ForContext("car", __instance.car).Information("ctrlShiftHeld!");
                 output = false;
             }
-            else if (GameInput.IsAltDown && GameInput.IsShiftDown)
+            else if (GameInput.IsControlDown && GameInput.IsShiftDown)
             {
                 if (airSystemIssues)
                     CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(__instance.car, MrocHelperType.GladhandAndAnglecock, tweaksAndThings.EndGearHelpersRequirePayment());
@@ -86,15 +89,13 @@ internal class CarPickable_Activate_Patch
             }
             else if (GameInput.IsAltDown)
             {
-                UI.CarInspector.CarInspector.Show(__instance.car);
-                _log.ForContext("car", __instance.car).Information("altHeld!");
-                output = false;
-            }
-            else if (GameInput.IsControlDown)
-            {
                 __instance.car.SetHandbrake(!__instance.car.HandbrakeApplied());
                 CarInspector_PopulateCarPanel_Patch.CarEndAirUpdate(__instance.car);
+                if (__instance.car.TryGetAdjacentCar(Car.LogicalEnd.A, out Model.Car cA)) CarInspector_PopulateCarPanel_Patch.CarEndAirUpdate(cA);
+                if (__instance.car.TryGetAdjacentCar(Car.LogicalEnd.B, out Model.Car cB)) CarInspector_PopulateCarPanel_Patch.CarEndAirUpdate(cB);
                 _log.ForContext("car", __instance.car).Information("ctrlHeld!");
+                TagController.Shared.UpdateTag(__instance.car, __instance.car.TagCallout, OpsController.Shared);
+                __instance.car.TagCallout.Update();
                 output = false;
             }
             return output;
@@ -120,18 +121,9 @@ internal class CarPickable_Activate_Patch
         if (airSystemIssues)
             CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(__instance.car, MrocHelperType.GladhandAndAnglecock, false);
         if (needsOiling)
-        {
-            foreach (var car in consist.Where(c => c.NeedsOiling || c.HasHotbox))
-            {
-                float num2 = 1f - car.Oiled;
-                car.OffsetOiled(num2);
-                hbFix += car.HasHotbox ? 1 : 0;
-                if (car.HasHotbox) car.AdjustHotboxValue(0f);
-            }
+            hbFix = CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(__instance.car, MrocHelperType.Oil, false);
             if (hbFix > 0)
                 Multiplayer.Broadcast($"Near {Hyperlink.To(__instance.car)}: \"{hbFix.Pluralize("hotbox") + " repaired!"}\"");
-        }
-
         if (chargeIt)
             CarInspector_PopulateCarPanel_Patch.CalculateCostIfEnabled(__instance.car, MrocHelperType.Handbrake, tweaksAndThings.EndGearHelpersRequirePayment(), consist);
     }

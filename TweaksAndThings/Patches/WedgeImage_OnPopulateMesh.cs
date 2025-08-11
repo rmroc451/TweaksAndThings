@@ -13,7 +13,7 @@ internal class WedgeImage_OnPopulateMesh_Patch
     private static void Postfix(VertexHelper vh)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return;
+        if (!tweaksAndThings.IsEnabled()) return;
 
         vh.Clear(); //clear the image backgrounds for now.
     }

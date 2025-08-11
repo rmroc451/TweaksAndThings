@@ -2,8 +2,11 @@
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
+using Model.Ops;
 using Network;
 using Railloader;
+using RMROC451.TweaksAndThings.Extensions;
+using System.Linq;
 using UnityEngine;
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -18,8 +21,28 @@ internal class StateManager_OnDayDidChange_Patch
     private static void Postfix(StateManager __instance)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled || !(tweaksAndThings?.settings?.EndGearHelpersRequirePayment ?? false)) return;
-        if (StateManager.IsHost) PayAutoBrakeCrewWages(__instance);
+        if (!tweaksAndThings.IsEnabled()) return;
+
+        if (StateManager.IsHost) DoNewDayActivites(tweaksAndThings, __instance);
+    }
+
+    private static void DoNewDayActivites(TweaksAndThingsPlugin tweaksAndThings, StateManager __instance)
+    {
+        if (tweaksAndThings.EndGearHelpersRequirePayment() && tweaksAndThings.DayLoadCrewHours()) LoadCabeese(__instance);
+        if (tweaksAndThings.EndGearHelpersRequirePayment()) PayAutoBrakeCrewWages(__instance);
+    }
+
+    private static void LoadCabeese(StateManager __instance)
+    {
+        foreach (var car in TrainController.Shared.Cars.Where(Car_Extensions.IsCaboose))
+        {
+            var data = car.QuantityCapacityOfLoad(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad());
+            if (data.quantity < data.capacity)
+            {
+                Multiplayer.Broadcast($"{Hyperlink.To(car)}: \"Caboose crew topped off.\"");
+                new OpsCarAdapter(car, OpsController.Shared).Load(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad(), data.capacity - data.quantity);
+            }
+        }
     }
 
     private static void PayAutoBrakeCrewWages(StateManager __instance)

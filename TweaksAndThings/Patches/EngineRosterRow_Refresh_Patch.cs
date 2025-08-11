@@ -34,7 +34,7 @@ internal class EngineRosterRow_Refresh_Patch
 
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 
-            !tweaksAndThings.IsEnabled ||
+            !tweaksAndThings.IsEnabled() ||
             rosterFuelColumnSettings.EngineRosterFuelStatusColumn == EngineRosterFuelDisplayColumn.None || (!GameInput.IsAltDown && !rosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways))
         {
             return;
@@ -43,7 +43,10 @@ internal class EngineRosterRow_Refresh_Patch
         try
         {
             IEnumerable<Car> consist = __instance._engine.EnumerateCoupled().Where(c => c.EnableOiling);
-            bool cabooseRequirementFulfilled = consist.CabooseInConsist() || !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || consist.ConsistNoFreight();
+            bool cabooseRequirementFulfilled = 
+                !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() 
+                || consist.ConsistNoFreight() 
+                ||  (bool)__instance._engine.FindMyCaboose(0.0f, false);
             float offendingPercentage = 0;
             Car engineOrTender = __instance._engine;
             List<LoadSlot> loadSlots = __instance._engine.Definition.LoadSlots;
