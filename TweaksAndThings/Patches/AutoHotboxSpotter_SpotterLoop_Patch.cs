@@ -17,7 +17,7 @@ internal class AutoHotboxSpotter_SpotterLoop_Patch
     public static bool Prefix(AutoHotboxSpotter __instance, ref IEnumerator __result)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
         bool cabooseRequired = tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter();
 

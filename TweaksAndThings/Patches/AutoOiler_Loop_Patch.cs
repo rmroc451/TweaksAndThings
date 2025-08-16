@@ -17,9 +17,9 @@ internal class AutoOiler_Loop_Patch
     public static bool Prefix(AutoOiler __instance, ref IEnumerator __result)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled) return true;
+        if (!tweaksAndThings.IsEnabled()) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
-        bool cabooseRequired = tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter();
+        bool cabooseRequired = tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() && !__instance._cars.ConsistNoFreight();
 
         if (buttonsHaveCost) __result = __instance.MrocAutoOilerLoop(_log, cabooseRequired);
         return !buttonsHaveCost; //only hit this if !buttonsHaveCost, since Loop is a coroutine

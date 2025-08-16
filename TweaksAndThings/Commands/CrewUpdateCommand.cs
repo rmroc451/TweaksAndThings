@@ -1,10 +1,14 @@
-﻿using Game.State;
+﻿using Game.Notices;
+using Game.State;
 using Helpers;
 using Model.Ops;
 using Network;
 using RMROC451.TweaksAndThings.Extensions;
+using RMROC451.TweaksAndThings.Patches;
 using System.Linq;
+using Track;
 using UI.Console;
+using UnityEngine;
 
 namespace RMROC451.TweaksAndThings.Commands;
 
@@ -37,8 +41,15 @@ public class EchoCommand : IConsoleCommand
                 return "+ to include area or - to leave it out";
         }
 
-        if (comps[2] == "+") message += $" {OpsController.Shared.ClosestArea(car)?.name ?? "???"}";
-            Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {Hyperlink.To(car)}: \"{message}\"");
+        var gamePoint = car.GetCenterPosition(Graph._graph);
+        EntityReference entityReference = new EntityReference(EntityType.Position, new Vector4( gamePoint.x, gamePoint.y, gamePoint.z, 0));
+        EntityReference loco = new EntityReference(EntityType.Car, car.id);
+        if (comps[2] == "+") message = new Hyperlink(entityReference.URI(), string.Format(message, OpsController.Shared.ClosestArea(car)?.name ?? "???"));
+
+        car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared._playersManager.LocalPlayer}");
+        ExpandedConsole_Add_Patch.SendMs(null, $"{Hyperlink.To(car)} {message}");
+        Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {Hyperlink.To(car)}: \"{message}\"");
+
         return string.Empty;
     }
 }

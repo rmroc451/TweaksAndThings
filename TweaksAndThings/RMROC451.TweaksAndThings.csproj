@@ -1,9 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <!-- Optionally, set a few things to your liking -->
+  <PropertyGroup><!-- Optionally, set a few things to your liking -->
     <!-- <MajorVersion>1</MajorVersion> -->
     <!-- <MinorVersion>0</MinorVersion> -->
+  
+    <SignAssembly>False</SignAssembly>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>False</Optimize>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Patches\BindingsWindow_Patches.cs" />
+  </ItemGroup>
   <ItemGroup>
     <None Remove="mroc-cabeese.json" />
   </ItemGroup>
@@ -22,9 +30,17 @@
     <GameAssembly Include="Ops" />
     <GameAssembly Include="StrangeCustoms" />
 
+    <GameAssembly Include="Unity.InputSystem" />
     <GameAssembly Include="UnityEngine.CoreModule" />
     <GameAssembly Include="UnityEngine.UI" />
+    <GameAssembly Include="UnityEngine.UIModule" />
+    <GameAssembly Include="UnityEngine.InputLegacyModule" />
+    <GameAssembly Include="UnityEngine.InputModule" />
     <GameAssembly Include="Unity.TextMeshPro" />
+    <GameAssembly Include="Map.Runtime" />
+    <GameAssembly Include="UnityEngine.PhysicsModule" />
+    <GameAssembly Include="UnityEngine.ImageConversionModule" />
+    <GameAssembly Include="UnityEngine.IMGUIModule" />
 
     <GameAssembly Include="System.Net.Http" />
     <GameAssembly Include="Core" />

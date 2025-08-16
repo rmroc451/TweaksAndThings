@@ -2,8 +2,11 @@
 using Game.State;
 using Helpers;
 using Model;
+using Model.Definition;
 using Model.Definition.Data;
 using Model.Ops;
+using Model.Ops.Timetable;
+using Railloader;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -51,7 +54,7 @@ public static class Car_Extensions
         return car;
     }
 
-    public static bool NotMotivePower(this Car car) => car is not BaseLocomotive && car.Archetype != Model.Definition.CarArchetype.Tender;
+    public static bool MotivePower(this Car car) => car is BaseLocomotive || car.Archetype == Model.Definition.CarArchetype.Tender;
 
     /// <summary>
     /// For every car in the consist, cost 1 minute of AI Engineer time.
@@ -62,14 +65,48 @@ public static class Car_Extensions
 
     public static bool IsCaboose(this Car car) => car.Archetype == Model.Definition.CarArchetype.Caboose;
 
-    public static bool IsCabooseAndStoppedForLoadRefresh(this Car car) => car.IsCaboose() && car.IsStopped(30f);
+    public static Car? CarCaboose(this Car car) => car.IsCaboose() ? car : null;
 
-    public static Car? CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(c => c.IsCaboose());
+    public static bool IsCabooseAndStoppedForLoadRefresh(this Car car, bool isFull) => car.IsCaboose() && car.IsStopped(30f) && !isFull;
 
-    public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, HashSet<string> carIdsCheckedAlready, bool decrement = false)
+    public static Car? CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(IsCaboose);
+
+    public static bool ConsistNoFreight(this IEnumerable<Car> input) =>
+        input.Where(c => !c.MotivePower()).Any() &&
+        input
+        .Where(c => !c.MotivePower())
+        .All(c => !c.MrocIsFreight());
+
+    public static bool ConsistFreight(this IEnumerable<Car> input) =>
+        input.Where(c => !c.MotivePower()).Any() &&
+        input
+        .Where(c => !c.MotivePower())
+        .All(c => c.MrocIsFreight());
+
+    public static bool MrocIsFreight(this Car c) =>
+        c.Archetype.IsFreight() || c.Archetype switch
+    {
+            CarArchetype.LocomotiveDiesel => false,
+            CarArchetype.LocomotiveSteam => false,
+            CarArchetype.Coach => false,
+            CarArchetype.Baggage => false,
+            _ => true
+        };
+
+
+    public static bool SelectedEngineExpress(this TrainController input) =>
+        input.SelectedLocomotive.TryGetTimetableTrain(out Timetable.Train t) && 
+        t.TrainClass == Timetable.TrainClass.First;
+
+    public static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false) =>
+        (
+            car.CarCaboose() ?? car.CarsNearCurrentCar(timeNeeded, decrement).FindNearestCabooseFromNearbyCars()
+        )?.CabooseWithSufficientCrewHours(timeNeeded, decrement);
+
+    public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool decrement = false)
     {
         Car? output = null;
-        if (carIdsCheckedAlready.Contains(car.id) || !car.IsCaboose()) return null;
+        if (car is null || !car.IsCaboose()) return null;
 
         List<LoadSlot> loadSlots = car.Definition.LoadSlots;
         for (int i = 0; i < loadSlots.Count; i++)
@@ -86,47 +123,47 @@ public static class Car_Extensions
         return output;
     }
 
-    public static Car? HuntingForCabeeseNearCar(this Car car, float timeNeeded, TrainController tc, HashSet<string> carIdsCheckedAlready, bool decrement = false)
+    private static Car? FindNearestCabooseFromNearbyCars(this IEnumerable<(Car car, bool crewCar, float distance)> source) =>
+        source
+        ?.OrderBy(c => c.crewCar ? 0 : 1)
+        ?.ThenBy(c => c.distance)
+        ?.Select(c => c.car)
+        ?.FirstOrDefault();
+
+    private static IEnumerable<(Car car, bool crewCar, float distance)> CarsNearCurrentCar(this Car car, float timeNeeded, bool decrement)
     {
-        List<(string carId, float distance)> source =
-            CarsNearCurrentCar(car, timeNeeded, tc, carIdsCheckedAlready, decrement);
+        Area carArea = OpsController.Shared.ClosestArea(car);
 
-        Car output = FindNearestCabooseFromNearbyCars(tc, source);
-        if (output != null) output.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready, decrement);
+        var cabeese = OpsController.Shared
+            .CarsInArea(carArea)
+            .Select(c => TrainController.Shared.CarForId(c.Id))
+            .Union(car.EnumerateCoupled())
+            .Where(c => c.IsCaboose());
 
-        return output;
-    }
+        //if (cabeese?.Any() ?? false) Log.Information($"{nameof(CarsNearCurrentCar)}[{car.DisplayName}] => {cabeese.Count()}");
 
-    private static Car FindNearestCabooseFromNearbyCars(TrainController tc, List<(string carId, float distance)> source) =>
-        (
-            from t in source
-            where t.distance < 21f //todo: add setting slider for catchment
-            orderby t.distance ascending
-            select tc.CarForId(t.carId)
-        ).FirstOrDefault();
+        List<(Car car, bool crewCar, float distance)> source =
+            cabeese.Select(c => (car: c, crewCar: c.IsCrewCar(), distance: car.Distance(c))).ToList();
 
-    private static List<(string carId, float distance)> CarsNearCurrentCar(Car car, float timeNeeded, TrainController tc, HashSet<string> carIdsCheckedAlready, bool decrement)
-    {
-        Vector3 position = car.GetMotionSnapshot().Position;
-        Vector3 center = WorldTransformer.WorldToGame(position);
-        var cars = tc.CarIdsInRadius(center, 60f);
-        Log.Information($"{nameof(HuntingForCabeeseNearCar)} => {cars.Count()}");
-        List<(string carId, float distance)> source =
-            cars
-            .Select(carId =>
-            {
-                Car car = tc.CarForId(carId);
-                if (car == null || !car.CabooseWithSufficientCrewHours(timeNeeded, carIdsCheckedAlready))
-                {
-                    return (carId: carId, distance: 1000f);
-                }
-                Vector3 a = WorldTransformer.WorldToGame(car.GetMotionSnapshot().Position);
-                return (carId: carId, distance: Vector3.Distance(a, center));
-            }).ToList();
         return source;
     }
 
-    public static void AdjustHotboxValue(this Car car, float hotboxValue) =>
+    public static float Distance(this Car car1, Car car2)
+    {
+        Vector3 position = car1.GetMotionSnapshot().Position;
+        Vector3 center = WorldTransformer.WorldToGame(position);
+        Vector3 a = WorldTransformer.WorldToGame(car2.GetMotionSnapshot().Position);
+
+        return Vector3.Distance(a, center);
+                }
+
+    public static bool IsCrewCar(this Car car) =>
+        !string.IsNullOrEmpty(TrainController.Shared.SelectedLocomotive?.trainCrewId) &&
+        car.trainCrewId == TrainController.Shared.SelectedLocomotive?.trainCrewId;
+
+
+    //public static void AdjustHotboxValue(this Car car) => car.ControlProperties[PropertyChange.Control.Hotbox] = null;
+    public static void AdjustHotboxValue(this Car car, float hotboxValue = 0f) =>
         StateManager.ApplyLocal(
             new PropertyChange(
                 car.id, PropertyChange.KeyForControl(PropertyChange.Control.Hotbox),

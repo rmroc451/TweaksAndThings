@@ -14,6 +14,7 @@ using UI;
 using UI.EngineRoster;
 using UI.Tooltips;
 using UnityEngine;
+using Game.State;
 
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -23,44 +24,97 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class EngineRosterRow_Refresh_Patch
 {
+    private static Serilog.ILogger _log => Log.ForContext<EngineRosterRow_Refresh_Patch>();
+
     public static void Postfix(EngineRosterRow __instance)
     {
         TweaksAndThingsPlugin? tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         RosterFuelColumnSettings? rosterFuelColumnSettings = tweaksAndThings?.settings?.EngineRosterFuelColumnSettings;
 
+        string fuelInfoText = string.Empty;
+        string fuelInfoTooltip = string.Empty;
+
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 
-            !tweaksAndThings.IsEnabled ||
-            rosterFuelColumnSettings.EngineRosterFuelStatusColumn == EngineRosterFuelDisplayColumn.None || (!GameInput.IsAltDown && !rosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways))
+            !tweaksAndThings.IsEnabled() ||
+            rosterFuelColumnSettings.EngineRosterFuelStatusColumn == EngineRosterFuelDisplayColumn.None || (!GameInput.IsAltDown && !rosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways) ||
+            __instance._engine.IsMuEnabled
+            )
         {
             return;
         }
 
         try
         {
-            string fuelInfoText = string.Empty;
-            string fuelInfoTooltip = string.Empty;
             Car engineOrTender = __instance._engine;
-            List<LoadSlot> loadSlots = __instance._engine.Definition.LoadSlots;
-            if (!loadSlots.Any())
+            IEnumerable<Car> locos = engineOrTender.EnumerateCoupled().Where(c => c.IsLocomotive).ToList();
+            IEnumerable<Car> consist = engineOrTender.EnumerateCoupled().Where(c => c.EnableOiling).ToList();
+            bool cabooseRequirementFulfilled = 
+                !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() 
+                || consist.ConsistNoFreight() 
+                ||  (bool)engineOrTender.FindMyCaboose(0.0f, false);
+            float offendingPercentage = 100f;
+
+            foreach (Car loco in locos)
             {
-                engineOrTender = __instance._engine.DetermineFuelCar()!;
-                loadSlots = engineOrTender != null ? engineOrTender.Definition.LoadSlots : Enumerable.Empty<LoadSlot>().ToList();
+                var investigate = loco;
+                List<LoadSlot> loadSlots = investigate.Definition.LoadSlots;
+                if (!loadSlots.Any())
+                {
+                    investigate = investigate.DetermineFuelCar()!;
+                    loadSlots = investigate != null ? investigate.Definition.LoadSlots : Enumerable.Empty<LoadSlot>().ToList();
+                }
+
+                var offender = loadSlots.OrderBy(ls => (investigate.GetLoadInfo(ls.RequiredLoadIdentifier, out int slotIndex)?.Quantity ?? 0) / loadSlots[slotIndex].MaximumCapacity).FirstOrDefault().RequiredLoadIdentifier;
+
+
+                for (int i = 0; i < loadSlots.Count; i++)
+                {
+                    CarLoadInfo? loadInfo = investigate.GetLoadInfo(i);
+                    if (loadInfo.HasValue)
+                    {
+                        CarLoadInfo valueOrDefault = loadInfo.GetValueOrDefault();
+                        var fuelLevel = FuelLevel(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity);
+                        var offenderCheck = CalcPercentLoad(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity);
+
+                        if (offenderCheck < offendingPercentage)
+                        {
+                            offendingPercentage = offenderCheck;
+                            fuelInfoText = loadSlots[i].RequiredLoadIdentifier == offender ? $"{fuelLevel} " : string.Empty;
+                        }
+
+                        fuelInfoTooltip += $"{TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity)} {valueOrDefault.LoadString(CarPrototypeLibrary.instance.LoadForId(valueOrDefault.LoadId))} {(!loco.id.Equals(__instance._engine.id) ? $"{loco.DisplayName}" : "")}\n";
+                    }
+                }
             }
 
-            var offender = loadSlots.OrderBy(ls => (engineOrTender.GetLoadInfo(ls.RequiredLoadIdentifier, out int slotIndex)?.Quantity ?? 0) / loadSlots[slotIndex].MaximumCapacity).FirstOrDefault().RequiredLoadIdentifier;
-
-            for (int i = 0; i < loadSlots.Count; i++)
+            try
             {
-                CarLoadInfo? loadInfo = engineOrTender.GetLoadInfo(i);
-                if (loadInfo.HasValue)
+                if (cabooseRequirementFulfilled && StateManager.Shared.Storage.OilFeature && consist.Any())
                 {
-                    CarLoadInfo valueOrDefault = loadInfo.GetValueOrDefault();
-                    var fuelLevel = FuelLevel(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity);
-                    fuelInfoText += loadSlots[i].RequiredLoadIdentifier == offender ? fuelLevel + " " : string.Empty;
-                    //fuelInfoText += TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity) + " ";
-                    fuelInfoTooltip += $"{TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity)} {valueOrDefault.LoadString(CarPrototypeLibrary.instance.LoadForId(valueOrDefault.LoadId))}\n";
+                    float lowestOilLevel = consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled;
+                    var oilLevel = FuelLevel(lowestOilLevel, 1);
+                    fuelInfoTooltip += $"{lowestOilLevel.TriColorPiePercent(1)} {oilLevel} Consist Oil Lowest Level\n";
+                    if (CalcPercentLoad(lowestOilLevel, 1) < offendingPercentage)
+                    {
+                        fuelInfoText = $"{oilLevel} ";
+                    }
+
+                    if (consist.Any(c => c.HasHotbox))
+                    {
+                        fuelInfoText = $"{TextSprites.Hotbox} ";
+                        fuelInfoTooltip = $"{TextSprites.Hotbox} Hotbox detected!\n{fuelInfoTooltip}";
+                    }
                 }
+                else if (!cabooseRequirementFulfilled && StateManager.Shared.Storage.OilFeature)
+                {
+                    fuelInfoTooltip += $"Add Caboose To Consist For Consist Oil Level Reporting\n";
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error Detecting oiling consist status for engine roster");
             }
 
             switch (rosterFuelColumnSettings.EngineRosterFuelStatusColumn)
@@ -77,7 +131,6 @@ internal class EngineRosterRow_Refresh_Patch
                 default:
                     break;
             }
-
         } catch (Exception ex)
         {
             rosterFuelColumnSettings.EngineRosterFuelStatusColumn = EngineRosterFuelDisplayColumn.None;
@@ -91,10 +144,15 @@ internal class EngineRosterRow_Refresh_Patch
         tooltip.TooltipInfo = new TooltipInfo(tooltip.tooltipTitle, fuelInfoTooltip);
     }
 
-    public static string FuelLevel(float quantity, float capacity)
+    public static float CalcPercentLoad(float quantity, float capacity)
     {
         float num = capacity <= 0f ? 0 : Mathf.Clamp(quantity / capacity * 100, 0, 100);
 
-        return $"{Mathf.FloorToInt(num):D2}%";
+        return num;
+    }
+
+    public static string FuelLevel(float quantity, float capacity)
+    {
+        return $"{Mathf.FloorToInt(CalcPercentLoad(quantity, capacity)):D2}%";
     }
 }

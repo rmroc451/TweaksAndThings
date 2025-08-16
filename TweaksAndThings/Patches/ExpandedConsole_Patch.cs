@@ -25,13 +25,15 @@ internal class ExpandedConsole_Add_Patch
     {
         entry.Text = $"{entry.Timestamp} : {entry.Text}";
         entry.Timestamp = RealNow();
-        SendMs(ref entry);
+        SendMs((UI.Console.Console.Entry?)entry);
     }
 
-    static void SendMs(ref UI.Console.Console.Entry entry)
+    internal static void SendMs(UI.Console.Console.Entry? entry, string? text = null)
     {
         try
         {
+            if (entry is null && !String.IsNullOrEmpty(text)) entry = new() { Text = text };
+            var msgText = entry?.Text ?? string.Empty;
             TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
             StateManager shared = StateManager.Shared;
             GameStorage gameStorage = shared.Storage;
@@ -46,7 +48,7 @@ internal class ExpandedConsole_Add_Patch
             {
                 var t = new Regex("car:(.*)\"");
 
-                var carId = t.IsMatch(entry.Text) ? Regex.Match(entry.Text, "car:(.*?)\"").Groups[1].Captures[0].ToString() : string.Empty;
+                var carId = t.IsMatch(msgText) ? Regex.Match(msgText, "car:(.*?)\"").Groups[1].Captures[0].ToString() : string.Empty;
                 Model.Car? car = TrainController.Shared.CarForString(carId);
                 bool engineInMessage = car?.IsLocomotive ?? false;
                 var image = engineInMessage ?
@@ -81,7 +83,7 @@ internal class ExpandedConsole_Add_Patch
                     {
                         new
                         {
-                            description= Regex.Replace(entry.Text, "<.*?>", "").Replace(": ", "\n"),
+                            description= Regex.Replace(msgText, "<.*?>", "").Replace(": ", "\n"),
                             timestamp=DateTime.UtcNow,
                             image
                         },
