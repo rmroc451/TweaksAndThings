@@ -1,8 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <!-- Optionally, set a few things to your liking -->
+  <PropertyGroup><!-- Optionally, set a few things to your liking -->
     <!-- <MajorVersion>1</MajorVersion> -->
     <!-- <MinorVersion>0</MinorVersion> -->
+  
+    <SignAssembly>False</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>False</Optimize>
+    <DebugType>portable</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Patches\BindingsWindow_Patches.cs" />

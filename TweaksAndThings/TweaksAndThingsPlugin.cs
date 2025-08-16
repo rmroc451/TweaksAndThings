@@ -1,6 +1,7 @@
 ﻿// Ignore Spelling: RMROC
 
 using GalaSoft.MvvmLight.Messaging;
+using Game;
 using Game.Messages;
 using Game.State;
 using HarmonyLib;
@@ -205,24 +206,6 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
         ).Tooltip("Safety First", $@"On non-express timetabled consists, a caboose is required in the consist increase AE max speed > 20 in {Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Road)}/{Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Waypoint)} mode.");
         #endregion
 
-        #region CabeeseSearchRadius
-        builder.Spacer(spacing);
-        builder.AddField(
-            "Cabeese Search Radius",
-            builder.AddSlider(
-                () => this.CabeeseSearchRadiusInMeters(),
-                () => $"{string.Format(Mathf.CeilToInt(this.CabeeseSearchRadiusInMeters() * 3.28084f).ToString(), "N0")}ft",
-                delegate (float input) { 
-                    settings = settings ?? new();
-                    settings.CabeeseSearchRadiusFtInMeters = Mathf.CeilToInt(input);
-                    builder.Rebuild();
-                },
-                minValue: 1f,
-                maxValue: Mathf.CeilToInt(5280f / 2f / 3.28084f),
-                wholeNumbers: true
-            )
-        ).Tooltip("Cabeese Catchment Area", "How far should the cabeese hunting logic look away from the cars in the area to find a caboose?");
-        #endregion
     }
 
     private void UiUpdates(UIPanelBuilder builder)

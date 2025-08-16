@@ -1,4 +1,5 @@
 ﻿using Game.Messages;
+using Game.State;
 using Helpers;
 using Model;
 using Model.Definition;
@@ -64,6 +65,8 @@ public static class Car_Extensions
 
     public static bool IsCaboose(this Car car) => car.Archetype == Model.Definition.CarArchetype.Caboose;
 
+    public static Car? CarCaboose(this Car car) => car.IsCaboose() ? car : null;
+
     public static bool IsCabooseAndStoppedForLoadRefresh(this Car car, bool isFull) => car.IsCaboose() && car.IsStopped(30f) && !isFull;
 
     public static Car? CabooseInConsist(this IEnumerable<Car> input) => input.FirstOrDefault(IsCaboose);
@@ -96,12 +99,14 @@ public static class Car_Extensions
         t.TrainClass == Timetable.TrainClass.First;
 
     public static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false) =>
-        car.CarsNearCurrentCar(timeNeeded, decrement).FindNearestCabooseFromNearbyCars();
+        (
+            car.CarCaboose() ?? car.CarsNearCurrentCar(timeNeeded, decrement).FindNearestCabooseFromNearbyCars()
+        )?.CabooseWithSufficientCrewHours(timeNeeded, decrement);
 
     public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool decrement = false)
     {
         Car? output = null;
-        if (!car.IsCaboose()) return null;
+        if (car is null || !car.IsCaboose()) return null;
 
         List<LoadSlot> loadSlots = car.Definition.LoadSlots;
         for (int i = 0; i < loadSlots.Count; i++)
@@ -118,29 +123,24 @@ public static class Car_Extensions
         return output;
     }
 
-    private static Car FindNearestCabooseFromNearbyCars(this List<(Car car, bool crewCar, float distance)> source) =>
+    private static Car? FindNearestCabooseFromNearbyCars(this IEnumerable<(Car car, bool crewCar, float distance)> source) =>
         source
-        .OrderBy(c => c.crewCar ? 0 : 1)
-        .ThenBy(c => c.distance)
-        .Select(c => c.car)
-        .FirstOrDefault();
+        ?.OrderBy(c => c.crewCar ? 0 : 1)
+        ?.ThenBy(c => c.distance)
+        ?.Select(c => c.car)
+        ?.FirstOrDefault();
 
-    private static List<(Car car, bool crewCar, float distance)> CarsNearCurrentCar(this Car car, float timeNeeded, bool decrement)
+    private static IEnumerable<(Car car, bool crewCar, float distance)> CarsNearCurrentCar(this Car car, float timeNeeded, bool decrement)
     {
+        Area carArea = OpsController.Shared.ClosestArea(car);
 
-        var cabeese =
-            car.EnumerateCoupled().SelectMany(consistCar =>
-            {
-                Vector3 position = consistCar.GetMotionSnapshot().Position;
-                Vector3 center = WorldTransformer.WorldToGame(position);
-                var o = TrainController.Shared
-                    .CarIdsInRadius(center, SingletonPluginBase<TweaksAndThingsPlugin>.Shared.CabeeseSearchRadiusInMeters())
-                    .Where(c => TrainController.Shared.CarForId(c).IsCaboose());
-                return o;
-            }).Distinct().Select(c => TrainController.Shared.CarForId(c));
+        var cabeese = OpsController.Shared
+            .CarsInArea(carArea)
+            .Select(c => TrainController.Shared.CarForId(c.Id))
+            .Union(car.EnumerateCoupled())
+            .Where(c => c.IsCaboose());
 
-
-        Log.Information($"{nameof(CarsNearCurrentCar)} => {cabeese.Count()}");
+        //if (cabeese?.Any() ?? false) Log.Information($"{nameof(CarsNearCurrentCar)}[{car.DisplayName}] => {cabeese.Count()}");
 
         List<(Car car, bool crewCar, float distance)> source =
             cabeese.Select(c => (car: c, crewCar: c.IsCrewCar(), distance: car.Distance(c))).ToList();
@@ -158,9 +158,16 @@ public static class Car_Extensions
                 }
 
     public static bool IsCrewCar(this Car car) =>
-        !string.IsNullOrEmpty(TrainController.Shared.SelectedLocomotive.trainCrewId) &&
-        car.trainCrewId == TrainController.Shared.SelectedLocomotive.trainCrewId;
+        !string.IsNullOrEmpty(TrainController.Shared.SelectedLocomotive?.trainCrewId) &&
+        car.trainCrewId == TrainController.Shared.SelectedLocomotive?.trainCrewId;
 
 
-    public static void AdjustHotboxValue(this Car car) => car.ControlProperties[PropertyChange.Control.Hotbox] = null;
+    //public static void AdjustHotboxValue(this Car car) => car.ControlProperties[PropertyChange.Control.Hotbox] = null;
+    public static void AdjustHotboxValue(this Car car, float hotboxValue = 0f) =>
+        StateManager.ApplyLocal(
+            new PropertyChange(
+                car.id, PropertyChange.KeyForControl(PropertyChange.Control.Hotbox),
+                new FloatPropertyValue(hotboxValue)
+            )
+        );
 }

@@ -1,4 +1,6 @@
-﻿using Model.AI;
+﻿using Game.Messages;
+using Model.AI;
+using Network;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -61,7 +63,8 @@ namespace RMROC451.TweaksAndThings.Extensions
                         if (car.HasHotbox && car.Oiled == 1f && cabooseRequired && foundCaboose)
                         {
                             _log.Information("AutoOiler {name}: {foundCaboose} repaired hotbox {car}", oiler.name, foundCaboose, car);
-                            car.AdjustHotboxValue();
+                            Multiplayer.Broadcast($"{Hyperlink.To(oiler._originCar)}: \"{Hyperlink.To(car)} hotbox repaired!\"");
+                            car.SendPropertyChange(PropertyChange.Control.Hotbox, false);
                         }
                         num += adjustedTimeToWalk;
                         oiler._pendingRunDuration += adjustedTimeToWalk;
