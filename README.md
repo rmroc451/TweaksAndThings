@@ -173,6 +173,6 @@ Enter Tweaks and Things.
 Yes, these are client side mods. Host doesn't need to have them.
 
 ### What version of Railroader does this mod work with?
-2024.4.4
+2024.6 -> [Full Requirements](./TweaksAndThings/Definition.json)
 
 *Special thanks and credit to Zamu for creating Railloader and for help with making the mod a bit more robust.*
