@@ -36,18 +36,51 @@ Enter Tweaks and Things.
 
 ### QOL & Cabeese Modifications:
 <ul>
-  <li><b>A:</b> Adding a visual indication to the car's callout tag to indicate:
+  <li><b>A:</b> Car Level Updates:
         <ul>
             <li><b>A1:</b> If a car is a participant in a disconnected air hose (currently uses the copy waybill icon)</li>
             <li><b>A2:</b> If a car's hand brake is set (currently uses the handbrake icon)</li>
-            <li><b>A3:</b> Oiling Level/Hotbox Indication : pie chart or 🔥 icon
+            <li><b>A3  (🟢 NEW v2.0.0):</b> Oiling Level/Hotbox Indication : pie chart or 🔥 icon
                 <ul>
                     <li><b>A3a:</b> <u>On Rolling Stock:</u> Indicates the car's oiling level, if oiling feature is enabled</li>
                     <li><b>A3b:</b> <u>On Locomotive:</u> Indicates the worst oiling level of a car from the connected consist (see <b>S1</b>)</li>
                 </ul>
             </li>
             <li><b>A4:</b> Adds a "+" on cabeese tags when on a track span that reloads their crew hours load (see <b>C</b>)</li>
+            <li><b>A5 (🟢 NEW v2.0.0):</b> Car Click Hotkey Modifiers 
+               <ul>
+                  <li><b>A5a:</b> `alt left click` : toggle car hand brake and connect glad hands on both ends</li>
+                  <li><b>A5b:</b> `alt shift click` : toggle consists brakes and connect all glad hands</li>
+                  <li><b>A5c:</b> `ctrl alt click` : drop all brakes and connect all glad hands in the consist</li>
+                  <li><b>A5d:</b> `ctrl alt shift click` : same as above but will auto oil the entire consist!</li>
+               </ul>
+            </li>
         </ul>
+  </li>
+  <li><b>B:</b> Car Context Menu Updates
+     <ul>
+        <li><b>B1 (🔵 MODIFIED v2.0.0):</b> Context Menu (right click car) Updates<br/>
+              When right clicking on a car you get some new individual car options:
+              <ul>
+                 <li><b>B1a:</b> Bleed<br/>
+                 Dumps all of the air in the car's air system</li>
+                 <li><b>B1b:</b> Apply/Release Handbrake<br/>
+                 Toggles the individual car's handbrake</li>
+              </ul>
+           </li>
+           <li><b>B2 (🟢 NEW v2.0.0):</b> SHIFT Context Menu (right click car) Updates<br/>
+              When right clicking on a car and holding SHIFT you get some new consist level options:
+              <ul>
+                 <li><b>B2a:</b> Bleed Consist<br/>
+                 Dumps all of the air in all the consist car air systems</li>
+                 <li><b>B2b:</b> Set/Release Consist Handbrakes<br/>
+                 If handbrakes are detected on, it knocks them all off.<br/>
+                 If no handbrakes are detected in the consist, it utilizes the RailRoader base game handbrake detection for when cuts of cars are spawned.</li>
+                 <li><b>B2c:</b> Air Up Consist<br/>
+                 Connects all gladhands and opens angle cocks for the consist.
+              </ul>
+           </li>
+     </ul>
   </li>
   <li><b>C:</b> Cabeese Modifications
         <ul>
@@ -60,7 +93,7 @@ Enter Tweaks and Things.
                     <li><b>C1e:</b> See <b>S1b1/S1b2/S1b3</b> for what this is used for.</li>
                 </ul>
             </li>
-            <li><b>C2:</b> Proximity Detection<br/>
+            <li><b>C2 (🔵 MODIFIED v2.0.0):</b> Proximity Detection<br/>
                 Order of detection when requesting to adjust <b>crew-hours</b> for an action:
                 <ul>
                     <li><b>C2a:</b> Car initiating the action is a caboose, if so use this caboose</li>
@@ -91,10 +124,10 @@ Enter Tweaks and Things.
   </li>
   <li><b>M:</b> Miscellaneous
         <ul>
-            <li><b>M1:</b> Repair tracks now require cars to be waybilled, or they will not be serviced/overhauled.<br/>They will report on the company window's location section as <b>'No Work Order Assigned'</b>.</li>
+            <li><b>M1 (🟢 NEW v2.0.0):</b> Repair tracks now require cars to be waybilled, or they will not be serviced/overhauled.<br/>They will report on the company window's location section as <b>'No Work Order Assigned'</b>.</li>
             <li><b>M2:</b> Engine Roster Tweaks<br/>
                 <ul>
-                    <li><b>M2a:</b> MU'd locomotives will automatically be hidden unless they are <b>SELECTED</b> or <b>FAVORITED</b>.</li>
+                    <li><b>M2a  (🟢 NEW v2.0.0):</b> MU'd locomotives will automatically be hidden unless they are <b>SELECTED</b> or <b>FAVORITED</b>.</li>
                     <li><b>M2b:</b> Fuel Display in Engine Roster<br/>
                     Will add reamaing fuel indication to Engine Roster (with details in roster row tool tip (see <b>S2c</b>))</li>
                         <ul>
@@ -103,9 +136,12 @@ Enter Tweaks and Things.
                     </li>
                 </ul>
             </li>
-            <li><b>M3:</b> MU Adjacency Restriction Removal <h3 style="color:red; display:inline">(USE AT OWN RISK)</h3></br>
+            <li><b>M3 (🟢 NEW v2.0.1):</b> MU Adjacency Restriction Removal <h3 style="color:red; display:inline">(USE AT OWN RISK)</h3></br>
                 Engines no longer are required to be adjacent to eachother to contribute to MU. They can be dispersed throughout the train.<br/>
                 The primary MU engine still acts as the main air reservoir, meaning train braking emits from that engine at this time.
+            </li>
+            <li><b>M4 (🟢 NEW v2.0.0):</b> `ctrl alt click` on a track in the map, sets the selected locomotives waypoint there when in waypoint mode.<br/>
+               If you have mapenhancer with cars displayed, if you keycombo click on a car icon, it will set the auto couple attempt.
             </li>
         </ul>
   </li>
@@ -124,20 +160,20 @@ Enter Tweaks and Things.
                             <li><b>S1b6:</b> <b>AutoHotboxSpotter Update:</b> decrease the random wait from 30 - 300 seconds to 15 - 30 seconds (Safety Is Everyone's Job)</li>
                             <li><b>S1b6:</b> <b>Costs from S1B1/S1B2:</b> added to financials at end of day with an entry of <b>AI Brake Crew</b>.</li>
                         </ul>
-                    <li><b>S1c:</b> Refill / Crew Hours Load Option<br/>Select whether you want to manually reload cabeese via:
+                    <li><b>S1c (🟢 NEW v2.0.0):</b> Refill / Crew Hours Load Option<br/>Select whether you want to manually reload cabeese via:
                         <ul>
                             <li><b>S1c1:</b> track method - (team/repair/passenger stop)</li>
                             <li><b>S1c2:</b> daily caboose top off - refill to 8h at new day</li>
                         </ul>
                     </li>
                     <li><b>S1d:</b> AutoAI Requirement (AI Hotbox\Oiler Requires Caboose)<br/>A caboose is required in the consist to check for Hotboxes and perform Auto Oiler, if checked.</li>
-                    <li><b>S1e:</b> Safety First!<br/>On non-express timetabled freight consists, a caboose with some crew-hours (see <b>C1</b>) is required in the consist to increase AE max speed > 20 in <b>ROAD</b>/<b>WAYPOINT</b> modes.</li>
+                    <li><b>S1e (🟢 NEW v2.0.0):</b> Safety First!<br/>On non-express timetabled freight consists, a caboose with some crew-hours (see <b>C1</b>) is required in the consist to increase AE max speed > 20 in <b>ROAD</b>/<b>WAYPOINT</b> modes.</li>
                 </ul>
             <li><b>S2:</b> UI
                 <ul>
                     <li><b>S2a:</b> Enable Tag Updates<br/>
                     Allows all tag updates from <b>A</b> to display.</li>
-                    <li><b>S2b:</b> Debt Allowance<br/>
+                    <li><b>S2b (🟢 NEW v2.0.0):</b> Debt Allowance<br/>
                     Will allow interchange service and repair shops to still function when you are insolvent, at a 20% overdraft fee.</li>
                     <li><b>S2c:</b> Engine Roster Fuel/Info
                         <ul>
