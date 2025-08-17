@@ -49,7 +49,11 @@ Enter Tweaks and Things.
             <li><b>A4:</b> Adds a "+" on cabeese tags when on a track span that reloads their crew hours load (see <b>C</b>)</li>
             <li><b>A5 (🟢 NEW v2.0.0):</b> Car Click Hotkey Modifiers 
                <ul>
-                  <li><b>A5a:</b> `alt left click` : toggle car hand brake and connect glad hands on both ends</li>
+                  <li><b>A5a:</b> `alt left click` : toggle car hand brake and connect glad hands on both ends
+                     <ul>
+                        <li>[ ] https://github.com/rmroc451/TweaksAndThings/issues/43 : Add setting to dump air vs connecting when used (requested by CD WEISS)</li>
+                     </ul>
+                  </li>
                   <li><b>A5b:</b> `alt shift click` : toggle consists brakes and connect all glad hands</li>
                   <li><b>A5c:</b> `ctrl alt click` : drop all brakes and connect all glad hands in the consist</li>
                   <li><b>A5d:</b> `ctrl alt shift click` : same as above but will auto oil the entire consist!</li>
