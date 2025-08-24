@@ -206,7 +206,7 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
                             o.Dispose();
                         }
                         var loco = TrainController.Shared.SelectedLocomotive;
-                        TrainController.Shared.SelectedCar = null;
+                        if (!TrainController.Shared.SelectRecall()) TrainController.Shared.SelectedCar = null;
                         _keyChangeObservers.Clear();
                         recalcing = true;
                         new WaitForSeconds(0.25f);
