@@ -52,7 +52,7 @@ internal class EngineRosterRow_Refresh_Patch
             bool cabooseRequirementFulfilled = 
                 !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() 
                 || consist.ConsistNoFreight() 
-                ||  (bool)engineOrTender.FindMyCaboose(0.0f, false);
+                ||  (bool)engineOrTender.FindMyCabooseSansLoadRequirement();
             float offendingPercentage = 100f;
 
             foreach (Car loco in locos)

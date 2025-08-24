@@ -129,7 +129,7 @@ public static class SettingsExtensions
     public static bool RequireConsistCabooseForOilerAndHotboxSpotter(this TweaksAndThingsPlugin input) =>
         input?.settings?.RequireConsistCabooseForOilerAndHotboxSpotter ?? false;
     public static bool CabooseNonMotiveAllowedSetting(this TweaksAndThingsPlugin input, Car car) =>
-        input.EndGearHelpersRequirePayment() && !car.MotivePower() && (bool)car.FindMyCaboose(0.0f, false);
+        input.EndGearHelpersRequirePayment() && !car.MotivePower() && (bool)car.FindMyCabooseSansLoadRequirement();
     public static bool CabooseRequiredForLocoOilIndicator(this TweaksAndThingsPlugin input) =>
         input?.settings?.CabooseRequiredForLocoTagOilIndication ?? false;
     public static bool ServiceFundPenalties(this TweaksAndThingsPlugin input) =>

@@ -43,7 +43,7 @@ internal class TagController_UpdateTag_Patch
         //if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : $"<cspace=-1em>{TextSprites.Warning}{car.Oiled.TriColorPiePercent(1)}</cspace>");
         if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : car.Oiled.TriColorPiePercent(1, oilSpriteName));
         IEnumerable<Car> consist = car.EnumerateCoupled().Where(c => c.EnableOiling);
-        Func<bool> cabooseRequirementFulfilled = () => (!cabooseRequired || consist.ConsistNoFreight() || car.FindMyCaboose(0.0f, false)); 
+        Func<bool> cabooseRequirementFulfilled = () => (!cabooseRequired || consist.ConsistNoFreight() || (bool)car.FindMyCabooseSansLoadRequirement()); 
         if (StateManager.Shared.Storage.OilFeature
             && car.IsLocomotive 
             && !car.NeedsOiling 

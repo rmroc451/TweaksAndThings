@@ -62,7 +62,7 @@ internal class CarPickable_Activate_Patch
         var consist = car.EnumerateCoupled();
         bool handbrakesApplied = consist.Any(c => c.HandbrakeApplied());
         bool airSystemIssues = consist.Any(c => c.EndAirSystemIssue());
-        Func<bool> cabooseNear = () => (bool)car.FindMyCaboose(0.0f, false);
+        Func<bool> cabooseNear = () => (bool)car.FindMyCabooseSansLoadRequirement();
         bool needsOiling = GameInput.IsShiftDown && consist.All(c => c.IsStopped()) && consist.Any(c => c.NeedsOiling || c.HasHotbox) && (!tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || cabooseNear());
         var chargeIt = handbrakesApplied || airSystemIssues || needsOiling;
         //CTRL + ALT + SHIFT : BrakesAngleCocksAndOiling

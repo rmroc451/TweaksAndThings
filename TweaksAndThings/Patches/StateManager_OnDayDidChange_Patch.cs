@@ -36,11 +36,11 @@ internal class StateManager_OnDayDidChange_Patch
     {
         foreach (var car in TrainController.Shared.Cars.Where(Car_Extensions.IsCaboose))
         {
-            var data = car.QuantityCapacityOfLoad(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad());
+            var data = car.QuantityCapacityOfLoad(OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours);
             if (data.quantity < data.capacity)
             {
                 Multiplayer.Broadcast($"{Hyperlink.To(car)}: \"Caboose crew topped off.\"");
-                new OpsCarAdapter(car, OpsController.Shared).Load(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad(), data.capacity - data.quantity);
+                new OpsCarAdapter(car, OpsController.Shared).Load(OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours, data.capacity - data.quantity);
             }
         }
     }

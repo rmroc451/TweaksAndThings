@@ -19,7 +19,7 @@ namespace RMROC451.TweaksAndThings.Extensions
         public static IEnumerator MrocAutoOilerLoop(this AutoOiler oiler, Serilog.ILogger _log, bool cabooseRequired)
         {
             int originIndex = oiler.FindOriginIndex();
-            Model.Car? foundCaboose = oiler._originCar.FindMyCaboose(0.0f, false);
+            Model.Car? foundCaboose = oiler._originCar.FindMyCabooseSansLoadRequirement();
             if (originIndex < 0)
             {
                 _log.Error("Couldn't find origin car {car}", oiler._originCar);
@@ -41,7 +41,7 @@ namespace RMROC451.TweaksAndThings.Extensions
             while (true)
             {
                 yield return new WaitForSeconds(AutoOiler.StartDelay.CabooseHalvedFloat(foundCaboose));
-                foundCaboose = oiler._originCar.FindMyCaboose(0.0f,false);
+                foundCaboose = oiler._originCar.FindMyCabooseSansLoadRequirement();
                 int carIndex = originIndex;
                 float adjustedTimeToWalk = AutoOiler.TimeToWalkCar.CabooseHalvedFloat(foundCaboose);
                 do
@@ -80,7 +80,7 @@ namespace RMROC451.TweaksAndThings.Extensions
 
         public static IEnumerator MrocAutoHotboxSpotterLoop(this AutoHotboxSpotter spotter, Serilog.ILogger _log, bool cabooseRequired)
         {
-            Func<Model.Car?> foundCaboose = () => spotter._locomotive.FindMyCaboose(0.0f, false);
+            Func<Model.Car?> foundCaboose = () => spotter._locomotive.FindMyCabooseSansLoadRequirement();
             while (true)
             {
                 if (!spotter.HasCars)

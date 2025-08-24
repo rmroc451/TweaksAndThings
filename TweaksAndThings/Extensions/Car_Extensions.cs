@@ -7,6 +7,7 @@ using Model.Definition.Data;
 using Model.Ops;
 using Model.Ops.Timetable;
 using Railloader;
+using RMROC451.TweaksAndThings.Patches;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -98,21 +99,28 @@ public static class Car_Extensions
         input.SelectedLocomotive.TryGetTimetableTrain(out Timetable.Train t) && 
         t.TrainClass == Timetable.TrainClass.First;
 
-    public static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false) =>
+    public static Car? FindMyCabooseSansLoadRequirement(this Car car) =>
+        FindMyCaboose(car, 0f, decrement: false, requireLoad: false);
+
+    public static Car? FindMyCabooseWithLoadRequirement(this Car car, float timeNeeded, bool decrement) =>
+        FindMyCaboose(car, timeNeeded, decrement, requireLoad: false);
+
+    private static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false, bool requireLoad = true) =>
         (
             car.CarCaboose() ?? car.CarsNearCurrentCar(timeNeeded, decrement).FindNearestCabooseFromNearbyCars()
         )?.CabooseWithSufficientCrewHours(timeNeeded, decrement);
 
-    public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool decrement = false)
+    public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool requireLoad, bool decrement = false)
     {
         Car? output = null;
         if (car is null || !car.IsCaboose()) return null;
+        if (!requireLoad) return car;
 
         List<LoadSlot> loadSlots = car.Definition.LoadSlots;
         for (int i = 0; i < loadSlots.Count; i++)
         {
             CarLoadInfo? loadInfo = car.GetLoadInfo(i);
-            if (loadInfo.HasValue)
+            if (loadInfo.HasValue && loadInfo.Value.LoadId == OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours.id)
             {
                 CarLoadInfo valueOrDefault = loadInfo.GetValueOrDefault();
                 output = valueOrDefault.Quantity >= timeNeeded ? car : null;

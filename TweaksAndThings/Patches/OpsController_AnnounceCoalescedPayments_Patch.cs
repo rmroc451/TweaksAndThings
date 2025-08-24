@@ -24,7 +24,7 @@ internal class CarExtensions_LoadString_Patch
 {
     public static bool Prefix(CarLoadInfo info, Load load, ref string __result)
     {
-        bool output = load.id == OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad().id;
+        bool output = load.id == OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours.id;
         if (output) __result = info.Quantity.FormatCrewHours(load.description);
 
         return !output;
@@ -38,7 +38,7 @@ internal class CarPrototypeLibrary_LoadForId_Patch
 {
     public static bool Prefix(string loadId, ref Load __result)
     {
-        Load load = OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad();
+        Load load = OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours;
         if (loadId == load.id) __result = load;
 
         return __result == null;
@@ -70,7 +70,9 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
         typeof(RepairTrack)
         };
 
-    public static Load CrewHoursLoad()
+    private static Load _crewLoadHours;
+    internal static Load CrewLoadHours => _crewLoadHours ?? CrewHoursLoad();
+    private static Load CrewHoursLoad()
     {
         Load load = (Load)ScriptableObject.CreateInstance(typeof(Load));
         load.name = "crew-hours";
