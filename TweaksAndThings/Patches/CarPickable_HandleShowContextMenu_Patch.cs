@@ -4,6 +4,7 @@ using Railloader;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
+using System;
 using System.Linq;
 using UI;
 using UI.ContextMenu;
@@ -35,8 +36,6 @@ internal class CarPickable_HandleShowContextMenu_Patch
         });
         if (GameInput.IsShiftDown)
         {
-
-
             if (!car.EnumerateCoupled().Any(c => !c.SupportsBleed()))
             {
                 shared.AddButton(ContextMenuQuadrant.Brakes, $"Bleed Consist", SpriteName.Bleed, delegate
@@ -52,7 +51,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
 
             if (car.EnumerateCoupled().Any(c => c.EndAirSystemIssue()))
             {
-                shared.AddButton(ContextMenuQuadrant.Unused2, $"Air Up Consist", SpriteName.Select, delegate
+                shared.AddButton(ContextMenuQuadrant.General, $"Air Up Consist", SpriteName.Select, delegate
             {
                 CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.GladhandAndAnglecock, buttonsHaveCost);
             });
@@ -76,7 +75,9 @@ internal class CarPickable_HandleShowContextMenu_Patch
             CameraSelector.shared.FollowCar(car);
         });
 
-        shared.Show(car.DisplayName);
+        string secondaryLine = car.Waybill.HasValue ? $"{Environment.NewLine}{car.Waybill.Value.Destination.DisplayName}" : string.Empty;
+        secondaryLine = secondaryLine.Length > 10 + Environment.NewLine.Length ? $"{secondaryLine.Substring(0, 7+ Environment.NewLine.Length)}..." : secondaryLine;
+        shared.Show($"{car.DisplayName}{secondaryLine}");
         shared.BuildItemAngles();
         shared.StartCoroutine(shared.AnimateButtonsShown());
         return false;
