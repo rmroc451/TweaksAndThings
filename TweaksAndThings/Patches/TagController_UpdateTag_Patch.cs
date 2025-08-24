@@ -28,7 +28,7 @@ internal class TagController_UpdateTag_Patch
             return;
         }
 
-        ProceedWithPostFix(car, tagCallout, tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || !tweaksAndThings.CabooseRequiredForLocoOilIndicator());
+        ProceedWithPostFix(car, tagCallout, tweaksAndThings.CabooseRequiredForLocoOilIndicator());
 
         return;
     }

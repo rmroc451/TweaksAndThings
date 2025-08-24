@@ -113,18 +113,18 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
 
             var passengerStops = OpsController.Shared.AllIndustries
                 .SelectMany(i => i.TrackDisplayables.Where(t => refillLocations.Contains(t.GetType())));
-            //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
+            //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
 
             var cabeese = passengerStops
                 .SelectMany(t => t.TrackSpans?.Select(s => (tc.CarsOnSpan(s) ?? Enumerable.Empty<Car>()).Where(c => c.IsCaboose()))?.SelectMany(c => c?.Select(c2 => (t, c2))));
-            //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
+            //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
 
             CrewCarDict = CrewCarDict.Where(kvp => cabeese.Select(c => c.c2.id).Contains(kvp.Key)).ToDictionary(k => k.Key, v => v.Value);
 
             var deltaTime = (float)(TimeWeather.Now.TotalSeconds - dateTime.TotalSeconds);
             foreach (var caboose in cabeese)
             {
-                //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
+                //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
                 CarLoadCrewHelper(caboose.c2, deltaTime);
             }
             dateTime = TimeWeather.Now;

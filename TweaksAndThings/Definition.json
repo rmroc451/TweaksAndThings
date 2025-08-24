@@ -21,6 +21,7 @@
   "mixintos": {
     "container:ne-caboose01": "file(mroc-cabeese.json)",
     "container:ne-caboose02": "file(mroc-cabeese.json)",
-    "container:ne-caboose03": "file(mroc-cabeese.json)"
+    "container:ne-caboose03": "file(mroc-cabeese.json)",
+    "game-graph": "file(tweakedLoadIDS.json)"
   }
 }

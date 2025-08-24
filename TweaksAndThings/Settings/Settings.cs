@@ -29,7 +29,8 @@ public class Settings
         bool servicingFundPenalty,
         bool safetyFirst,
         CrewHourLoadMethod loadCrewHoursMethod,
-        float cabeeseSearchRadiusFtInMeters
+        float cabeeseSearchRadiusFtInMeters,
+        bool trainBrakeDisplayShowsColorsInCalloutMode
     )
     {
         WebhookSettingsList = webhookSettingsList;
@@ -43,6 +44,7 @@ public class Settings
         SafetyFirst = safetyFirst;
         LoadCrewHoursMethod = loadCrewHoursMethod;
         CabeeseSearchRadiusFtInMeters = cabeeseSearchRadiusFtInMeters;
+        TrainBrakeDisplayShowsColorsInCalloutMode = trainBrakeDisplayShowsColorsInCalloutMode;
     }
 
     public readonly UIState<string> _selectedTabState = new UIState<string>(null);
@@ -57,6 +59,7 @@ public class Settings
     public bool SafetyFirst;
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
+    public bool TrainBrakeDisplayShowsColorsInCalloutMode;
 
     internal void AddAnotherRow()
     {
@@ -64,7 +67,7 @@ public class Settings
         if (!string.IsNullOrEmpty(WebhookSettingsList.OrderByDescending(wsl => wsl.WebhookUrl).Last().WebhookUrl))
         {
             WebhookSettingsList.Add(new());
-            Log.Information($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
+            Log.Debug($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
         }
     }
 }
@@ -135,7 +138,7 @@ public static class SettingsExtensions
         input?.settings?.SafetyFirst ?? false;
     public static bool DayLoadCrewHours(this TweaksAndThingsPlugin input) =>
         (input?.settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks) == CrewHourLoadMethod.Daily;
-    public static float CabeeseSearchRadiusInMeters(this TweaksAndThingsPlugin input) =>
-        input?.settings?.CabeeseSearchRadiusFtInMeters ?? 21f;
+    public static bool TrainBrakeDisplayShowsColorsInCalloutMode(this TweaksAndThingsPlugin input) =>
+        input?.settings?.TrainBrakeDisplayShowsColorsInCalloutMode ?? false;
 
 }

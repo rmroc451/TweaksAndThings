@@ -30,7 +30,7 @@ namespace RMROC451.TweaksAndThings.Extensions
                 yield break;
             }
             oiler._reverse = originIndex > oiler._cars.Count - originIndex;
-            _log.Information(
+            _log.Debug(
                 "AutoOiler {name} starting, rev = {reverse}, caboose required = {req}, caboose halving adjustment = {hasCaboose}, oil limit = {limit}",
                 oiler.name,
                 oiler._reverse,
@@ -58,11 +58,11 @@ namespace RMROC451.TweaksAndThings.Extensions
                             num += num3;
                             oiler._pendingRunDuration += num3;
                             oiler._oiledCount++;
-                            _log.Information("AutoOiler {name}: oiled {car} from {orig} => {new}", oiler.name, car, origOil, car.Oiled);
+                            _log.Debug("AutoOiler {name}: oiled {car} from {orig} => {new}", oiler.name, car, origOil, car.Oiled);
                         }
                         if (car.HasHotbox && car.Oiled == 1f && cabooseRequired && foundCaboose)
                         {
-                            _log.Information("AutoOiler {name}: {foundCaboose} repaired hotbox {car}", oiler.name, foundCaboose, car);
+                            _log.Debug("AutoOiler {name}: {foundCaboose} repaired hotbox {car}", oiler.name, foundCaboose, car);
                             Multiplayer.Broadcast($"{Hyperlink.To(oiler._originCar)}: \"{Hyperlink.To(car)} hotbox repaired!\"");
                             car.SendPropertyChange(PropertyChange.Control.Hotbox, false);
                         }
@@ -89,7 +89,7 @@ namespace RMROC451.TweaksAndThings.Extensions
                     continue;
                 }
                 var fc = foundCaboose();
-                _log.Information("AutoHotboxSpotter {name}: Hotbox Spotter Running, Found Caboose => {hasCaboose}; Has Cars {hasCars}; Requires Caboose {requiresCaboose}", 
+                _log.Debug("AutoHotboxSpotter {name}: Hotbox Spotter Running, Found Caboose => {hasCaboose}; Has Cars {hasCars}; Requires Caboose {requiresCaboose}", 
                     spotter.name, fc, spotter.HasCars, cabooseRequired);
                 if (CabooseRequirementChecker(string.Format("{0} {1}", spotter.GetType().Name, spotter.name), cabooseRequired, fc, _log))
                 {
@@ -104,7 +104,7 @@ namespace RMROC451.TweaksAndThings.Extensions
                     {
                         var numOrig = num;
                         num = Random.Range(15, 30);
-                        _log.Information("AutoHotboxSpotter {name}: Next check went from num(60,300) => {numOrig}; to num(15,30) => {hasCaboose}; Requires Caboose {requiresCaboose}", spotter.name, numOrig, num, fc, cabooseRequired);
+                        _log.Debug("AutoHotboxSpotter {name}: Next check went from num(60,300) => {numOrig}; to num(15,30) => {hasCaboose}; Requires Caboose {requiresCaboose}", spotter.name, numOrig, num, fc, cabooseRequired);
                     }
                     yield return new WaitForSeconds(num);
                     spotter.CheckForHotbox();

@@ -1,4 +1,5 @@
 ﻿using Game.Notices;
+using Game.State;
 using HarmonyLib;
 using Model;
 using Serilog;
@@ -14,10 +15,11 @@ internal class NoticeExtensions_PostNotice_Patch
     private static ILogger _log => Log.ForContext<NoticeExtensions_PostNotice_Patch>();
     static void Postfix(Car car, string key, string content)
     {
+        if (!StateManager.IsHost) return;
         try
         {
 
-            //Log.Information($"{car.DisplayName} patch PostNotice");
+            //Log.Debug($"{car.DisplayName} patch PostNotice");
             if (!string.IsNullOrEmpty(content) &&
                 key.Equals("ai-wpt") && 
                 content.ToLower().Contains("Arrived at Waypoint".ToLower())

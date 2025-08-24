@@ -46,9 +46,9 @@ public class EchoCommand : IConsoleCommand
         EntityReference loco = new EntityReference(EntityType.Car, car.id);
         if (comps[2] == "+") message = new Hyperlink(entityReference.URI(), string.Format(message, OpsController.Shared.ClosestArea(car)?.name ?? "???"));
 
-        car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared._playersManager.LocalPlayer}");
+        if (StateManager.IsHost) car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared._playersManager.LocalPlayer}");
         ExpandedConsole_Add_Patch.SendMs(null, $"{Hyperlink.To(car)} {message}");
-        Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {Hyperlink.To(car)}: \"{message}\"");
+        if (!StateManager.IsHost) Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {Hyperlink.To(car)}: \"{message}\"");
 
         return string.Empty;
     }

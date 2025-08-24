@@ -38,7 +38,7 @@ internal class AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch
 
             if (orig != maxSpeedMph)
             {
-                _log.Information($"{Enum.GetName(typeof(AutoEngineerMode), mode)}[{TrainController.Shared.SelectedLocomotive.DisplayName}] {nameof(AutoEngineerOrdersExtensions.MaxSpeedMph)} limited to {limitedSpeed} from {orig}; No Caboose in Consist;");
+                _log.Debug($"{Enum.GetName(typeof(AutoEngineerMode), mode)}[{TrainController.Shared.SelectedLocomotive.DisplayName}] {nameof(AutoEngineerOrdersExtensions.MaxSpeedMph)} limited to {limitedSpeed} from {orig}; No Caboose in Consist;");
             }
         }
 
@@ -50,7 +50,9 @@ internal class AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch
     {
         var _persistence = new AutoEngineerPersistence(TrainController.Shared.SelectedLocomotive.KeyValueObject);
         var OrdersHelper = new AutoEngineerOrdersHelper(TrainController.Shared.SelectedLocomotive, _persistence);
-        
+
+        if (TrainController.Shared.SelectedLocomotive.EnumerateCoupled().All(c => c.IsCaboose() || c.MotivePower())) return false;
+
         bool cabooseReq = SingletonPluginBase<TweaksAndThingsPlugin>.Shared.RequireConsistCabooseForOilerAndHotboxSpotter();
         string logMessage = $"\n{nameof(SafetyFirstGoverningApplies)}:{Enum.GetName(typeof(AutoEngineerMode), OrdersHelper.Mode)}[{TrainController.Shared.SelectedLocomotive.DisplayName}] ";
         Func<bool> firstClass = () =>
@@ -85,7 +87,7 @@ internal class AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch
 
         logMessage += $"\nGovern AE? {output}";
 
-        _log.Information(logMessage);
+        _log.Debug(logMessage);
 
         return output;
     }
