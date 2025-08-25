@@ -86,6 +86,8 @@ internal class AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch
             noCaboose();
 
         logMessage += $"\nGovern AE? {output}";
+        if (_log.IsEnabled(Serilog.Events.LogEventLevel.Debug))
+            logMessage += $"\n{Environment.StackTrace}";
 
         _log.Information(logMessage);
 

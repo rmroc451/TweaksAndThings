@@ -30,9 +30,7 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
 
     private static readonly HashSet<IDisposable> _keyChangeObservers = new();
     private static readonly Dictionary<string, Dictionary<string, OpsCarPosition>> locoConsistDestinations = new();
-    private static readonly HashSet<Car> consist = new();
-    private static string _lastLocoCarId = string.Empty;
-    private static bool recalcing = false;
+    private static string _lastSelectedLoco = string.Empty;
 
     static string getDictKey(Car car) => car.DisplayName;
 
@@ -40,7 +38,9 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
     {
         PrepLocoUsage(out BaseLocomotive selectedLoco, out int numberOfCars);
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled()) return;
+        if (!tweaksAndThings.IsEnabled() || (locoConsistDestinations.TryGetValue(getDictKey(selectedLoco), out Dictionary<string, OpsCarPosition> cars) && cars != null && _lastSelectedLoco == getDictKey(selectedLoco))) return;
+
+        _lastSelectedLoco = getDictKey(selectedLoco);
 
         IterateCarsDetectDestinations(
             __instance,
@@ -220,7 +220,6 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
         _log.Debug($"{getDictKey(selectedLoco)} --> HI BOB[{numberOfCars}]");
         foreach (var o in _keyChangeObservers) o.Dispose();
         _keyChangeObservers.Clear();
-        recalcing = false;
     }
 
     private static OpsCarPosition? GetCarDestinationIdentifier(Car c)
@@ -276,7 +275,11 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
                 key,
                 delegate (Value value)
                 {
-                    if (recalcing) return;
+
+                    _log.Debug($"{getDictKey(car)} OBSV {key}: {value}");
+
+                    if (locoConsistDestinations.TryGetValue(getDictKey(TrainController.Shared.SelectedLocomotive), out Dictionary<string, OpsCarPosition> cars) && cars == null) return;
+
                     bool waybillChng = (new[] { Car.KeyOpsWaybill, Car.KeyOpsRepairDestination }).Contains(key);
                     string? destId = 
                         waybillChng ? 
@@ -284,8 +287,7 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
                         null;
                     if (waybillChng)
                     {
-                        if (locoConsistDestinations.TryGetValue(getDictKey(TrainController.Shared.SelectedLocomotive), out Dictionary<string, OpsCarPosition> cars)
-                            && cars.TryGetValue(getDictKey(car), out OpsCarPosition pos)
+                        if (cars.TryGetValue(getDictKey(car), out OpsCarPosition pos)
                             && pos.Identifier == destId)
                         {
                             return;
@@ -307,7 +309,7 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
                         var loco = TrainController.Shared.SelectedLocomotive;
                         if (!TrainController.Shared.SelectRecall()) TrainController.Shared.SelectedCar = null;
                         _keyChangeObservers.Clear();
-                        recalcing = true;
+                        if (locoConsistDestinations.TryGetValue(getDictKey(TrainController.Shared.SelectedLocomotive), out _)) locoConsistDestinations[getDictKey(TrainController.Shared.SelectedLocomotive)] = null;
                         TrainController.Shared.SelectedCar = loco;
                     }
                     catch (Exception ex)
