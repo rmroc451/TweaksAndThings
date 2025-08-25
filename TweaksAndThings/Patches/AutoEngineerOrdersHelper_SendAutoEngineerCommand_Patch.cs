@@ -72,7 +72,7 @@ internal class AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch
 
         Func<bool> noCaboose = () =>
         {
-            bool output = (bool)TrainController.Shared.SelectedLocomotive.FindMyCabooseSansLoadRequirement();
+            bool output = TrainController.Shared.SelectedLocomotive.FindMyCabooseSansLoadRequirement() == null;
             logMessage += $"\ncaboose? {!output}";
             return output;
         };
@@ -87,7 +87,7 @@ internal class AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch
 
         logMessage += $"\nGovern AE? {output}";
 
-        _log.Debug(logMessage);
+        _log.Information(logMessage);
 
         return output;
     }
