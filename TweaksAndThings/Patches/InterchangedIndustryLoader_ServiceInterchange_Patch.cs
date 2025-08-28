@@ -48,8 +48,7 @@ internal class InterchangedIndustryLoader_ServiceInterchange_Patch
             if (num4 > 0)
             {
                 var canAfford = shared.CanAfford(num4);
-                penalty = Mathf.CeilToInt(!canAfford ? num4 * 0.2f : 0);
-                __instance.Industry.ApplyToBalance(-num4, __instance.ledgerCategory, null, 0, quiet: true);
+                penalty += Mathf.CeilToInt(!canAfford ? num4 * 0.2f : 0);
 
                 num2 += num4;
                 num3++;
