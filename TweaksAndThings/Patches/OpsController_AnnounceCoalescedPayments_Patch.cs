@@ -98,6 +98,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             var data = car.QuantityCapacityOfLoad(CrewHoursLoad());
             if ((data.quantity + quantityToLoad > data.capacity) && data.quantity < data.capacity)
             {
+                quantityToLoad = data.capacity; //ensure topping off
                 Multiplayer.Broadcast($"{Hyperlink.To(car)}: \"Caboose crew topped off.\"");
                 CrewCarDict[car.id] = (CrewCarDict[car.id].spotted, false);
             }
