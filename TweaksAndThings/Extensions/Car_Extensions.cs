@@ -103,7 +103,7 @@ public static class Car_Extensions
         FindMyCaboose(car, 0f, decrement: false, requireLoad: false);
 
     public static Car? FindMyCabooseWithLoadRequirement(this Car car, float timeNeeded, bool decrement) =>
-        FindMyCaboose(car, timeNeeded, decrement, requireLoad: false);
+        FindMyCaboose(car, timeNeeded, decrement, requireLoad: true);
 
     private static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false, bool requireLoad = true) =>
         (
