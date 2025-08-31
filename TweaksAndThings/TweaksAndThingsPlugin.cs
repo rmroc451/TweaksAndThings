@@ -40,7 +40,6 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
     static TweaksAndThingsPlugin()
     {
-        Log.Debug("Hello! Static Constructor was called!");
     }
 
     public TweaksAndThingsPlugin(IModdingContext moddingContext, IModDefinition self)
@@ -58,7 +57,6 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
     public override void OnEnable()
     {
-        logger.Debug("OnEnable() was called!");
         var harmony = new Harmony(modDefinition.Id);
         harmony.PatchCategory(modDefinition.Id.Replace(".", string.Empty));
     }
@@ -72,13 +70,10 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
     public void Update()
     {
-        logger.Verbose("UPDATE()");
     }
 
     public void ModTabDidOpen(UIPanelBuilder builder)
     {
-        logger.Debug("Daytime!");
-
         if (settings == null) settings = new();
         if (!settings?.WebhookSettingsList?.Any() ?? true) settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
         if (settings?.EngineRosterFuelColumnSettings == null) settings.EngineRosterFuelColumnSettings = new();
@@ -347,7 +342,6 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
 
     public void ModTabDidClose()
     {
-        logger.Debug("Nighttime...");
         this.moddingContext.SaveSettingsData(this.modDefinition.Id, settings ?? new());
     }
 }
