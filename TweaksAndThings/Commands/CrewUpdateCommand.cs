@@ -2,6 +2,7 @@
 using Game.State;
 using Helpers;
 using Model.Ops;
+using Model.Ops.Timetable;
 using Network;
 using RMROC451.TweaksAndThings.Extensions;
 using RMROC451.TweaksAndThings.Patches;
@@ -46,9 +47,16 @@ public class EchoCommand : IConsoleCommand
         EntityReference loco = new EntityReference(EntityType.Car, car.id);
         if (comps[2] == "+") message = new Hyperlink(entityReference.URI(), string.Format(message, OpsController.Shared.ClosestArea(car)?.name ?? "???"));
 
-        if (StateManager.IsHost) car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared._playersManager.LocalPlayer}");
-        ExpandedConsole_Add_Patch.SendMs(null, $"{Hyperlink.To(car)} {message}");
-        if (!StateManager.IsHost) Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {Hyperlink.To(car)}: \"{message}\"");
+        string hlt = Hyperlink.To(car);
+        hlt = car.TryGetTimetableTrain(out Timetable.Train t) ? hlt.Replace(car.DisplayName, t.DisplayStringLong) : hlt;
+
+        if (StateManager.IsHost)
+        {
+            car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared._playersManager.LocalPlayer}");
+
+            ExpandedConsole_Add_Patch.SendMs(null, $"{StateManager.Shared._playersManager.LocalPlayer} {hlt} {message}");
+        }
+        if (!StateManager.IsHost) Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {hlt}: \"{message}\"");
 
         return string.Empty;
     }

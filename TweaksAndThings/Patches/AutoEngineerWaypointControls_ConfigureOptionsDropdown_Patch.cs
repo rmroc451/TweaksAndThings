@@ -1,9 +1,13 @@
-﻿using Game.State;
+﻿using GalaSoft.MvvmLight.Messaging;
+using Game.Events;
+using Game.Messages;
+using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
 using Model.AI;
 using Model.Ops;
+using Model.Ops.Timetable;
 using Model.Physics;
 using Network;
 using Network.Messages;
@@ -27,51 +31,93 @@ namespace RMROC451.TweaksAndThings.Patches;
 internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
 {
     private static Serilog.ILogger _log => Log.ForContext<AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch>();
-
-    private static readonly HashSet<IDisposable> _keyChangeObservers = new();
-    private static readonly Dictionary<string, Dictionary<string, OpsCarPosition>> locoConsistDestinations = new();
-    private static string _lastSelectedLoco = string.Empty;
-
+    private static readonly HashSet<IDisposable> _keyChangeObservers = [];
+    private static HashSet<OpsCarPosition?> locoConsistDestinations = [];
+    private static Game.GameDateTime? timetableSaveTime = null;
     static string getDictKey(Car car) => car.DisplayName;
+    static Car placeholder = new();
 
     static void Postfix(AutoEngineerWaypointControls __instance, ref OptionsDropdownConfiguration __result)
     {
-        PrepLocoUsage(out BaseLocomotive selectedLoco, out int numberOfCars);
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled() || (locoConsistDestinations.TryGetValue(getDictKey(selectedLoco), out Dictionary<string, OpsCarPosition> cars) && cars != null && _lastSelectedLoco == getDictKey(selectedLoco))) return;
+        try
+        {
+            PrepLocoUsage(__instance, out BaseLocomotive selectedLoco, out int numberOfCars);
+            TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+            if (!tweaksAndThings.IsEnabled() || !ShouldRecalc(selectedLoco)) return;
 
-        _lastSelectedLoco = getDictKey(selectedLoco);
+            timetableSaveTime = TimetableController.Shared.CurrentDocument.Modified;
+            Messenger.Default.Unregister(placeholder);
 
-        IterateCarsDetectDestinations(
-            __instance,
-            __result,
-            selectedLoco,
-            numberOfCars,
-            out List<DropdownMenu.RowData> rowDatas,
-            out Action<int> func,
-            out int origCount,
-            out int maxRowOrig,
-            out AutoEngineerOrdersHelper aeoh
-        );
+            Messenger.Default.Register(placeholder, delegate (TimetableDidChange evt)
+            {
+                _log.Debug("Received {evt}, rebuilding.", evt);
+                Rebuild(__instance, selectedLoco, evt.GetType().Name);
+            });
+            Messenger.Default.Register(placeholder, delegate (CarTrainCrewChanged evt)
+            {
+                _log.Debug("Received {evt}, rebuilding {1} - {2}.", evt, selectedLoco.id, evt.CarId);
+                Rebuild(__instance, selectedLoco, evt.GetType().Name);
+            });
+            Messenger.Default.Register(placeholder, delegate (TrainCrewsDidChange evt)
+            {
+                _log.Debug("Received {evt}, rebuilding.", evt);
+                Rebuild(__instance, selectedLoco, evt.GetType().Name);
+            });
+            Messenger.Default.Register(placeholder, delegate (UpdateTrainCrews evt)
+            {
+                _log.Debug("Received {evt}, rebuilding.", evt);
+                Rebuild(__instance, selectedLoco, evt.GetType().Name);
+            });
 
-        List<(string destinationId, string destination, float? distance, Location? location)> jumpTos = BuildJumpToOptions(__instance, selectedLoco);
+            IterateCarsDetectDestinations(
+                __instance,
+                __result,
+                selectedLoco,
+                numberOfCars,
+                out List<DropdownMenu.RowData> rowDatas,
+                out Action<int> func,
+                out int origCount,
+                out int maxRowOrig,
+                out AutoEngineerOrdersHelper aeoh
+            );
 
-        __result = WireUpJumpTosToSettingMenu(
-            __instance, 
-            selectedLoco, 
-            rowDatas, 
-            func, 
-            origCount, 
-            maxRowOrig, 
-            aeoh, 
-            ref jumpTos
-        );
+            List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos = BuildJumpToOptions(__instance, selectedLoco);
+
+            __result = WireUpJumpTosToSettingMenu(
+                __instance,
+                selectedLoco,
+                rowDatas,
+                func,
+                origCount,
+                maxRowOrig,
+                aeoh,
+                ref jumpTos
+            );
+        } catch(Exception ex)
+        {
+            _log.Error(ex, "I have a very unique set of skills; I will find you and I will squash you.");
+        }        
     }
 
-    private static OptionsDropdownConfiguration WireUpJumpTosToSettingMenu(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco, List<DropdownMenu.RowData> rowDatas, Action<int> func, int origCount, int maxRowOrig, AutoEngineerOrdersHelper aeoh, ref List<(string destinationId, string destination, float? distance, Location? location)> jumpTos)
+    private static bool ShouldRecalc(BaseLocomotive selectedLoco)
+    {
+        bool output = false;
+        string locoKey = getDictKey(selectedLoco);
+        List<Car> consist = new List<Car>();
+        consist = selectedLoco.EnumerateCoupled().ToList();
+        HashSet<OpsCarPosition?> destinations = consist.Where(c => GetCarDestinationIdentifier(c).HasValue).Select(GetCarDestinationIdentifier).ToHashSet();
+
+        output |= !locoConsistDestinations.Equals(destinations);
+        output |= !(_keyChangeObservers?.Any() ?? false);
+        output |= selectedLoco.TryGetTimetableTrain(out _) && TimetableController.Shared.CurrentDocument.Modified != timetableSaveTime;
+
+        return output;
+    }
+
+    private static OptionsDropdownConfiguration WireUpJumpTosToSettingMenu(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco, List<DropdownMenu.RowData> rowDatas, Action<int> func, int origCount, int maxRowOrig, AutoEngineerOrdersHelper aeoh, ref List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos)
     {
         OptionsDropdownConfiguration __result;
-        jumpTos = jumpTos?.OrderBy(c => c.distance ?? float.MaxValue)?.ToList() ?? [];
+        jumpTos = jumpTos?.OrderBy(c => c.sortDistance)?.ToList() ?? default;
         var localJumpTos = jumpTos.ToList();
         var safetyFirst = AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch.SafetyFirstGoverningApplies() && jumpTos.Any();
 
@@ -86,7 +132,7 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
             rowDatas
             , delegate (int row)
             {
-                _log.Debug($"{TrainController.Shared.SelectedLocomotive.DisplayName} row {row}/{localJumpTos.Count}/{rowDatas.Count}");
+                _log.Debug($"{__instance.Locomotive.DisplayName} row {row}/{localJumpTos.Count}/{rowDatas.Count}");
                 if (row <= maxRowOrig)
                 {
                     func(row);
@@ -123,15 +169,15 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
         return __result;
     }
 
-    private static List<(string destinationId, string destination, float? distance, Location? location)> BuildJumpToOptions(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco)
+    private static List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> BuildJumpToOptions(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco)
     {
-        List<(string destinationId, string destination, float? distance, Location? location)> jumpTos = new();
-        foreach (var ocp in locoConsistDestinations[getDictKey(selectedLoco)].Values.Distinct())
+        List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos = new();
+        foreach (OpsCarPosition ocp in locoConsistDestinations)
         {
             string destName = ocp.DisplayName;
             string destId = ocp.Identifier;
             float? distance = null;
-
+            float sortdistance = 0f;
             if (
                 Graph.Shared.TryGetLocationFromPoint(
                     ocp.Spans?.FirstOrDefault().GetSegments().FirstOrDefault(),
@@ -149,14 +195,70 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
                 distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum)
                 ? metrics.Distance
                 : null;
+                sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out metrics, checkForCars: false, 0f, trainMomentum)
+                ? metrics.Distance
+                : float.MaxValue;
             };
             _log.Debug($"{getDictKey(selectedLoco)} ->  {destName} {destId} {distance?.ToString()}");
             jumpTos.Add((
                 destinationId: destId,
                 destination: $"WP> {destName}"
                 , distance: distance
+                , sortdistance: sortdistance
                 , location: (Location?)destLoc
             ));
+        }
+
+        if (selectedLoco.TryGetTimetableTrain(out Timetable.Train t))
+        {
+            _log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong}");
+            foreach (var e in t.Entries)
+            {
+                var stp = TimetableController.Shared.GetAllStations().FirstOrDefault(ps => ps.code == e.Station);
+                _log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong} -> {e.Station} {stp}");
+                if (stp != null)
+                {
+                    try
+                    {
+                        string destName = t.TrainType == Timetable.TrainType.Passenger ? stp.passengerStop.DisplayName : stp.DisplayName;
+                        string destId = t.TrainType == Timetable.TrainType.Passenger ? stp.passengerStop.identifier : stp.code;
+                        float? distance = null;
+                        float sortdistance = 0f;
+                        if (
+                            Graph.Shared.TryGetLocationFromPoint(
+                                stp.passengerStop.TrackSpans?.FirstOrDefault().GetSegments().FirstOrDefault(),
+                                stp.passengerStop.TrackSpans?.FirstOrDefault()?.GetCenterPoint() ?? default,
+                                200f,
+                                out Location destLoc
+                            )
+                        )
+                        {
+                            float trainMomentum = 0f;
+                            Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
+                            HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
+                            List<RouteSearch.Step> list = new List<RouteSearch.Step>();
+                            var totLen = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength() : CalculateTotalLength(selectedLoco);
+                            distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum)
+                            ? metrics.Distance
+                            : null;
+                            sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out metrics, checkForCars: false, 0f, trainMomentum)
+                            ? metrics.Distance
+                            : float.MaxValue;
+                        };
+                        _log.Debug($"{getDictKey(selectedLoco)} ->  {destName} {destId} {distance?.ToString()}");
+                        jumpTos.Add((
+                            destinationId: destId,
+                            destination: $"{t.DisplayStringLong} > {destName}"
+                            , distance: distance
+                            , sortdistance: sortdistance
+                            , location: (Location?)destLoc
+                        ));
+                    } catch (Exception ex)
+                    {
+                        _log.Warning(ex, $"Timetable entry not added to AE gear cog options {stp}");
+                    }
+                }
+            }
         }
 
         return jumpTos;
@@ -168,54 +270,42 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
         func = __result.OnRowSelected;
         origCount = rowDatas.Count;
         maxRowOrig = origCount - 1;
-        if (!locoConsistDestinations.ContainsKey(getDictKey(selectedLoco))) locoConsistDestinations.Add(getDictKey(selectedLoco), new());
-
-        Dictionary<string, OpsCarPosition> seen = new();
+        locoConsistDestinations = [];
+        HashSet<OpsCarPosition?> seen = [];
         aeoh = new AutoEngineerOrdersHelper(persistence: new AutoEngineerPersistence(selectedLoco.KeyValueObject), locomotive: selectedLoco);
         Car.LogicalEnd logicalEnd = ((selectedLoco.set.IndexOfCar(selectedLoco).GetValueOrDefault(0) >= numberOfCars / 2) ? Car.LogicalEnd.B : Car.LogicalEnd.A);
         Car.LogicalEnd end = ((logicalEnd == Car.LogicalEnd.A) ? Car.LogicalEnd.B : Car.LogicalEnd.A);
         bool stop = false;
         int carIndex = selectedLoco.set.StartIndexForConnected(selectedLoco, logicalEnd, IntegrationSet.EnumerationCondition.Coupled);
         Car car;
+        string locoKey = getDictKey(selectedLoco);
         while (!stop && (car = selectedLoco.set.NextCarConnected(ref carIndex, logicalEnd, IntegrationSet.EnumerationCondition.Coupled, out stop)) != null)
         {
             AddObserversToCar(__instance, car);
             var ocp = GetCarDestinationIdentifier(car);
-            _log.Debug($"{getDictKey(selectedLoco)} --> {getDictKey(car)} -> {ocp.HasValue} {ocp?.DisplayName}");
+            _log.Debug($"{locoKey} --> {getDictKey(car)} -> {ocp.HasValue} {ocp?.DisplayName}");
 
             if (ocp.HasValue)
             {
-                seen.Add(getDictKey(car), ocp.Value);
-                if (locoConsistDestinations[getDictKey(selectedLoco)].TryGetValue(getDictKey(car), out _))
-                    locoConsistDestinations[getDictKey(selectedLoco)][getDictKey(car)] = ocp.Value;
-                else
-                    locoConsistDestinations[getDictKey(selectedLoco)].Add(getDictKey(car), ocp.Value);
+                seen.Add(ocp.Value);
+                locoConsistDestinations.Add(ocp.Value);
             }
         }
 
-        _log.Debug($"{getDictKey(selectedLoco)} --> [{seen.Keys.Count}] -> Seen -> {string.Join(Environment.NewLine, seen.Select(k => $"{k.Key}:{k.Value.DisplayName}"))}");
-        _log.Debug($"{getDictKey(selectedLoco)} --> [{locoConsistDestinations[getDictKey(selectedLoco)].Keys.Count}] -> Cache -> {string.Join(Environment.NewLine, locoConsistDestinations[getDictKey(selectedLoco)].Select(k => $"{k.Key}:{k.Value.DisplayName}"))}");
-
         var dropped =
-            locoConsistDestinations[getDictKey(selectedLoco)].Keys.Except(seen.Keys).ToDictionary(
-                t => t,
-                t => locoConsistDestinations[getDictKey(selectedLoco)][t]
-            ); //are no longer here
+            locoConsistDestinations.Except(seen).ToHashSet(); //are no longer here
 
-        _log.Debug($"{getDictKey(selectedLoco)} --> [{dropped.Keys.Count}] -> removed -> {string.Join(Environment.NewLine, dropped.Select(k => $"{k.Key}:{k.Value.DisplayName}"))}");
-
-        locoConsistDestinations[getDictKey(selectedLoco)] =
-            locoConsistDestinations[getDictKey(selectedLoco)].Keys.Intersect(seen.Keys).ToDictionary(
-                t => t,
-                t => locoConsistDestinations[getDictKey(selectedLoco)][t]
-            ); //remove ones that are no longer here
+        _log.Debug($"{locoKey} --> [{seen.Count}] -> Seen -> {string.Join(Environment.NewLine, seen.Select(k => k.Value.DisplayName))}");
+        _log.Debug($"{locoKey} --> [{locoConsistDestinations.Count}] -> Cache -> {string.Join(Environment.NewLine, locoConsistDestinations.Select(k => $"{locoKey}:{k.Value.DisplayName}"))}");
+        _log.Debug($"{locoKey} --> [{dropped.Count}] -> removed -> {string.Join(Environment.NewLine, dropped.Select(k => k.Value.DisplayName))}");
+        locoConsistDestinations = locoConsistDestinations.Intersect(seen).ToHashSet(); //remove ones that are no longer here
         seen.Clear();
     }
 
-    private static void PrepLocoUsage(out BaseLocomotive selectedLoco, out int numberOfCars)
+    private static void PrepLocoUsage(AutoEngineerWaypointControls __instance, out BaseLocomotive selectedLoco, out int numberOfCars)
     {
         //wire up that loco
-        selectedLoco = TrainController.Shared.SelectedLocomotive;
+        selectedLoco = __instance.Locomotive;
         numberOfCars = selectedLoco.set.NumberOfCars;
         _log.Debug($"{getDictKey(selectedLoco)} --> HI BOB[{numberOfCars}]");
         foreach (var o in _keyChangeObservers) o.Dispose();
@@ -262,6 +352,7 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
     {
         AddObserver(__instance, c, Car.KeyOpsWaybill);
         AddObserver(__instance, c, Car.KeyOpsRepairDestination);
+        AddObserver(__instance, c, nameof(Car.trainCrewId));
         foreach (Car.LogicalEnd logicalEnd in CarInspector_PopulateCarPanel_Patch.ends)
         {
             AddObserver(__instance, c, Car.KeyValueKeyFor(Car.EndGearStateKey.IsCoupled, c.LogicalToEnd(logicalEnd)), true);
@@ -278,67 +369,53 @@ internal class AutoEngineerWaypointControls_ConfigureOptionsDropdown_Patch
 
                     _log.Debug($"{getDictKey(car)} OBSV {key}: {value}");
 
-                    if (locoConsistDestinations.TryGetValue(getDictKey(TrainController.Shared.SelectedLocomotive), out Dictionary<string, OpsCarPosition> cars) && cars == null) return;
+                    if (!(locoConsistDestinations?.Any() ?? false)) return;
 
                     bool waybillChng = (new[] { Car.KeyOpsWaybill, Car.KeyOpsRepairDestination }).Contains(key);
-                    string? destId = 
-                        waybillChng ? 
-                        GetCarDestinationIdentifier(car)?.Identifier ?? null : 
+                    string? destId =
+                        waybillChng ?
+                        GetCarDestinationIdentifier(car)?.Identifier ?? null :
                         null;
                     if (waybillChng)
                     {
-                        if (cars.TryGetValue(getDictKey(car), out OpsCarPosition pos)
-                            && pos.Identifier == destId)
+                        if (locoConsistDestinations.Contains(GetCarDestinationIdentifier(car)))
                         {
                             return;
-                        } else
+                        }
+                        else
                         {
                             _log.Debug($"{getDictKey(car)} OBSV {key}: destNew; {destId}; reload");
                         }
-                    } else
+                    }
+                    else
                     {
                         _log.Debug($"{getDictKey(car)} OBSV {key}: {value}");
                     }
 
-                    try
-                    {
-                        foreach(var o in _keyChangeObservers)
-                        {
-                            o.Dispose();
-                        }
-                        var loco = TrainController.Shared.SelectedLocomotive;
-                        if (!TrainController.Shared.SelectRecall()) TrainController.Shared.SelectedCar = null;
-                        _keyChangeObservers.Clear();
-                        if (locoConsistDestinations.TryGetValue(getDictKey(TrainController.Shared.SelectedLocomotive), out _)) locoConsistDestinations[getDictKey(TrainController.Shared.SelectedLocomotive)] = null;
-                        TrainController.Shared.SelectedCar = loco;
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.ForContext("car", car).Warning(ex, $"{nameof(AddObserver)} {car} Exception logged for {key}");
-                    }
+                    Rebuild(__instance, car, key);
                 },
                 false
             )
         );
     }
 
-    private static Waybill? GetWaybill(Car car, Value waybillValue)
+    private static void Rebuild(AutoEngineerWaypointControls __instance, Car car, string key)
     {
-        Waybill? _waybill = null;
         try
         {
-            _waybill = Model.Ops.Waybill.FromPropertyValue(waybillValue, OpsController.Shared);
+            foreach (var o in _keyChangeObservers)
+            {
+                o.Dispose();
+            }
+            var loco = __instance.Locomotive;
+            if (!TrainController.Shared.SelectRecall()) TrainController.Shared.SelectedCar = null;
+            _keyChangeObservers.Clear();
+            locoConsistDestinations = [];
+            TrainController.Shared.SelectedCar = loco;
         }
-        catch (OpsController.InvalidOpsCarPositionException ex)
+        catch (Exception ex)
         {
-            Log.Error(ex, "Waybill for car {car} contains an invalid ops position: {pos}", car, ex.Identifier);
-            _waybill = null;
+            _log.ForContext("car", car).Warning(ex, $"{nameof(AddObserver)} {car} Exception logged for {key}");
         }
-        catch (Exception exception)
-        {
-            Log.Warning(exception, "{car} Exception in Waybill.FromPropertyValue", car);
-            _waybill = null;
-        }
-        return _waybill;
     }
 }
