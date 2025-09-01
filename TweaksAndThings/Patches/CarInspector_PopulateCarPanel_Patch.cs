@@ -88,7 +88,7 @@ internal class CarInspector_PopulateCarPanel_Patch
                     int consistLength = consist.Count();
                     int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(consist);
                     int lengthInMeters = UnityEngine.Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(consist.ToList()) * 3.28084f);
-                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:0.0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
+                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:N0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
 
                     field.AddLabel(() => newSubTitle(), UIPanelBuilder.Frequency.Fast)
                     .Tooltip("Consist Info", "Reflects info about consist.").FlexibleWidth();
