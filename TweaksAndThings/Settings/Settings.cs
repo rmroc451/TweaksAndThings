@@ -28,6 +28,7 @@ public class Settings
         bool cabooseRequiredForLocoTagOilIndication,
         bool servicingFundPenalty,
         bool safetyFirst,
+        bool safetyFirstClientEnforce,
         CrewHourLoadMethod loadCrewHoursMethod,
         float cabeeseSearchRadiusFtInMeters,
         bool trainBrakeDisplayShowsColorsInCalloutMode
@@ -42,6 +43,7 @@ public class Settings
         CabooseRequiredForLocoTagOilIndication = cabooseRequiredForLocoTagOilIndication;
         ServicingFundPenalty = servicingFundPenalty;
         SafetyFirst = safetyFirst;
+        SafetyFirstClientEnforce = safetyFirstClientEnforce;
         LoadCrewHoursMethod = loadCrewHoursMethod;
         CabeeseSearchRadiusFtInMeters = cabeeseSearchRadiusFtInMeters;
         TrainBrakeDisplayShowsColorsInCalloutMode = trainBrakeDisplayShowsColorsInCalloutMode;
@@ -57,6 +59,7 @@ public class Settings
     public bool CabooseRequiredForLocoTagOilIndication;
     public bool ServicingFundPenalty;
     public bool SafetyFirst;
+    public bool SafetyFirstClientEnforce;
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
@@ -136,6 +139,8 @@ public static class SettingsExtensions
         input?.settings?.ServicingFundPenalty ?? false;
     public static bool SafetyFirst(this TweaksAndThingsPlugin input) =>
         input?.settings?.SafetyFirst ?? false;
+    public static bool SafetyFirstClientEnforce(this TweaksAndThingsPlugin input) =>
+        input?.settings?.SafetyFirstClientEnforce ?? true;
     public static bool DayLoadCrewHours(this TweaksAndThingsPlugin input) =>
         (input?.settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks) == CrewHourLoadMethod.Daily;
     public static bool TrainBrakeDisplayShowsColorsInCalloutMode(this TweaksAndThingsPlugin input) =>

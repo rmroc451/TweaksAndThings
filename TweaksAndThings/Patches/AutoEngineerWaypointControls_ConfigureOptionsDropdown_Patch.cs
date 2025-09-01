@@ -61,7 +61,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
         while (true)
         {
-            if (__instance._persistence.Orders.Mode != AutoEngineerMode.Waypoint) yield return wait;
+            if (__instance._persistence.Orders.Mode != AutoEngineerMode.Waypoint || ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null) yield return wait;
 
             PrepLocoUsage((AutoEngineerWaypointControls)__instance.aiWaypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
             HashSet<OpsCarPosition?> destinations = [];
@@ -117,14 +117,14 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         //_log.Information($"{locoKey} --> [{locoConsistDestinations.Count}] -> Cache -> {string.Join(Environment.NewLine, locoConsistDestinations.Select(k => $"{locoKey}:{k.Value.DisplayName}"))}");
 
         output |= !locoConsistDestinations.SetEquals(destinations);
-        _log.Information($"{locoKey} 1-> {output}");
+        //_log.Information($"{locoKey} 1-> {output}");
         if (output) lastSeenIntegrationSetCount = default;
         output |= lastSeenIntegrationSetCount != selectedLoco.set.NumberOfCars;
-        _log.Information($"{locoKey} 2-> {output}");
+        //_log.Information($"{locoKey} 2-> {output}");
         //output |= __instance.optionsDropdown.scrollRect.content.childCount != (destinations.Count + timetableDestinations.Count + 1); //+1 for the default "JumpTo" entry)
         //_log.Information($"{locoKey} 2.5-> {output} {__instance.optionsDropdown.scrollRect.content.childCount} {(destinations.Count)} {timetableDestinations.Count}");
         output |= selectedLoco.TryGetTimetableTrain(out _) && TimetableController.Shared.CurrentDocument.Modified != timetableSaveTime;
-        _log.Information($"{locoKey} 3-> {output}");
+        //_log.Information($"{locoKey} 3-> {output}");
 
         return output;
     }
@@ -134,7 +134,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         OptionsDropdownConfiguration __result;
         jumpTos = jumpTos?.OrderBy(c => c.sortDistance)?.ToList() ?? default;
         var localJumpTos = jumpTos.ToList();
-        var safetyFirst = AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch.SafetyFirstGoverningApplies() && jumpTos.Any();
+        var safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco) && jumpTos.Any();
 
         rowDatas.AddRange(jumpTos.Select(j =>
             new DropdownMenu.RowData(
@@ -227,11 +227,11 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
         if (selectedLoco.TryGetTimetableTrain(out Timetable.Train t))
         {
-            _log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong}");
+            //_log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong}");
             foreach (var e in t.Entries)
             {
                 var stp = TimetableController.Shared.GetAllStations().FirstOrDefault(ps => ps.code == e.Station);
-                _log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong} -> {e.Station} {stp}");
+                //_log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong} -> {e.Station} {stp}");
                 if (stp != null)
                 {
                     try
@@ -315,8 +315,8 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     {
         //wire up that loco
         selectedLoco = __instance.Locomotive;
-        numberOfCars = selectedLoco.set.NumberOfCars;
-        _log.Debug($"{selectedLoco.id} --> HI BOB[{numberOfCars}]");
+        numberOfCars = selectedLoco?.set.NumberOfCars ?? -1;
+        _log.Debug($"{selectedLoco?.id} --> HI BOB[{numberOfCars}]");
     }
 
     private static OpsCarPosition? GetCarDestinationIdentifier(Car c)

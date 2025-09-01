@@ -203,6 +203,23 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
         ).Tooltip("Safety First", $@"On non-express timetabled consists, a caboose is required in the consist increase AE max speed > 20 in {Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Road)}/{Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Waypoint)} mode.");
         #endregion
 
+        #region SafetyFirstClient
+        if (settings?.SafetyFirst ?? false)
+        {
+            builder.Spacer(spacing);
+            builder.AddFieldToggle(
+                "Safety First! (Enforce Client Speed Restrictions)",
+                () => settings?.SafetyFirstClientEnforce ?? false,
+                delegate (bool enabled)
+                {
+                    if (settings == null) settings = new();
+                    settings.SafetyFirstClientEnforce = enabled;
+                    builder.Rebuild();
+                }
+            ).Tooltip("Safety First! (Enforce Client Speed Restrictions)", $@"Enforce cabeese dominance on clients; uncheck to allow clients to override the 20mph restriction.");
+        }
+        #endregion
+
     }
 
     private void UiUpdates(UIPanelBuilder builder)

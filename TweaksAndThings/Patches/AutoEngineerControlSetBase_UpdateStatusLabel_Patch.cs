@@ -13,7 +13,7 @@ internal class AutoEngineerControlSetBase_UpdateStatusLabel_Patch
     static void Postfix(AutoEngineerControlSetBase __instance)
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
-        if (!tweaksAndThings.IsEnabled() || !AutoEngineerOrdersHelper_SendAutoEngineerCommand_Patch.SafetyFirstGoverningApplies()) return;
+        if (!tweaksAndThings.IsEnabled() || !AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(__instance.Locomotive)) return;
 
         string orig = __instance.statusLabel.text;
         __instance.statusLabel.text = $"{orig}; <b>Safety</b>";
