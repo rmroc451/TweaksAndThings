@@ -34,8 +34,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
     {
         TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.SafetyFirst() || (sender.IsRemote && !tweaksAndThings.SafetyFirstClientEnforce()) || command.MaxSpeedMph <= governedSpeed) return true;
-        BaseLocomotive loco = TrainController.Shared.SelectedLocomotive;
-        if (TrainController.Shared.TryGetCarForId(command.LocomotiveId, out Car c)) loco = (BaseLocomotive)c;
+        BaseLocomotive loco = __instance._locomotive;
 
         if (SafetyFirstGoverningApplies(loco))
         {
