@@ -1,16 +1,14 @@
 ﻿using HarmonyLib;
 using Helpers;
-using Model.AI;
 using Railloader;
 using Serilog;
 using System.Collections;
 using Track;
 using UI;
 using UnityEngine;
-using static Game.Messages.RequestOps;
 using static UI.AutoEngineerDestinationPicker;
 
-namespace RMROC451.TweaksAndThings;
+namespace RMROC451.TweaksAndThings.Patches;
 
 [HarmonyPatch(typeof(AutoEngineerDestinationPicker))]
 [HarmonyPatch(nameof(AutoEngineerDestinationPicker.Loop))]
@@ -31,7 +29,7 @@ internal class AutoEngineerDestinationPicker_Loop_Patch
     {
         Hit valueOrDefault;
         Location location;
-        WaitForSecondsRealtime wait = new WaitForSecondsRealtime(.1f);
+        WaitForSecondsRealtime wait = new WaitForSecondsRealtime(1/60);
         while (true)
         {
             Location? currentOrdersGotoLocation = __instance.GetCurrentOrdersGotoLocation();

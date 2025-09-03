@@ -15,6 +15,7 @@ using UI.EngineRoster;
 using UI.Tooltips;
 using UnityEngine;
 using Game.State;
+using Game;
 
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -34,6 +35,8 @@ internal class EngineRosterRow_Refresh_Patch
         string fuelInfoText = string.Empty;
         string fuelInfoTooltip = string.Empty;
 
+        TweakyTweakTweakers(__instance);
+
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 
             !tweaksAndThings.IsEnabled() ||
@@ -52,7 +55,7 @@ internal class EngineRosterRow_Refresh_Patch
             bool cabooseRequirementFulfilled = 
                 !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() 
                 || consist.ConsistNoFreight() 
-                ||  (bool)engineOrTender.FindMyCabooseSansLoadRequirement();
+                || (bool)engineOrTender.FindMyCabooseSansLoadRequirement();
             float offendingPercentage = 100f;
 
             foreach (Car loco in locos)
@@ -131,11 +134,52 @@ internal class EngineRosterRow_Refresh_Patch
                 default:
                     break;
             }
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
             rosterFuelColumnSettings.EngineRosterFuelStatusColumn = EngineRosterFuelDisplayColumn.None;
             Log.Error(ex, "Error Detecting fuel status for engine roster");
         }
+    }
+
+    private static void TweakyTweakTweakers(EngineRosterRow __instance)
+    {
+        var helperData = EngineTextHelper(__instance._engine);
+
+        if (helperData.HasValue)
+        {
+            __instance.nameLabel.text = helperData.Value.nameLabel;
+            __instance.nameTooltip.tooltipText += helperData.Value.nameTooltip;
+        }
+
+        __instance.crewLabel.text = string.Empty;
+        for (int i = __instance._crewComponents.Count - 1; i >= 0; i--)
+        {
+            string str = __instance._crewComponents[i];
+            if ((new[] { "MU", "AE" }).Contains(str))
+                str = $"<sup>{str} </sup>";
+            __instance.crewLabel.text = $"{str}{__instance.crewLabel.text}";
+        }
+    }
+
+    internal static (string nameLabel, string nameTooltip, int selectedCount)? EngineTextHelper(Car loco, bool mapIcon = false)
+    {
+        (string nameLabel, string nameTooltip, int selectedCount)? output = null;
+        int selectedCount = 0;
+        Dictionary<PlayerId, IPlayer> dictionary = StateManager.Shared.PlayersManager.AllPlayers.ToDictionary((IPlayer p) => p.PlayerId, (IPlayer p) => p);
+        List<string> usersSelected = new();
+        foreach (var kvp in dictionary)
+        {
+            if (new PlayerProperties(PlayerPropertiesManager.Shared._object[kvp.Key.ToString()]).SelectedCarId == loco.id)
+            {
+                usersSelected.Add(kvp.Value.Name);
+                selectedCount++;
+            }
+        }
+
+        if (selectedCount > 0 && dictionary.Count > 1) 
+            output = ($"{(mapIcon && loco is BaseLocomotive ? loco.Ident.RoadNumber : loco.DisplayName)}<sub>{selectedCount}</sub>", $"{Environment.NewLine}Selected by: {string.Join(", ", usersSelected)}", selectedCount);
+        return output;
     }
 
     private static void SetLabelAndTooltip(ref TMP_Text label, ref UITooltipProvider tooltip, string fuelInfoText, string fuelInfoTooltip)
