@@ -24,7 +24,7 @@ internal class CarExtensions_LoadString_Patch
 {
     public static bool Prefix(CarLoadInfo info, Load load, ref string __result)
     {
-        bool output = load.id == OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad().id;
+        bool output = load.id == OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours.id;
         if (output) __result = info.Quantity.FormatCrewHours(load.description);
 
         return !output;
@@ -38,7 +38,7 @@ internal class CarPrototypeLibrary_LoadForId_Patch
 {
     public static bool Prefix(string loadId, ref Load __result)
     {
-        Load load = OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad();
+        Load load = OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours;
         if (loadId == load.id) __result = load;
 
         return __result == null;
@@ -70,7 +70,9 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
         typeof(RepairTrack)
         };
 
-    public static Load CrewHoursLoad()
+    private static Load _crewLoadHours;
+    internal static Load CrewLoadHours => _crewLoadHours ?? CrewHoursLoad();
+    private static Load CrewHoursLoad()
     {
         Load load = (Load)ScriptableObject.CreateInstance(typeof(Load));
         load.name = "crew-hours";
@@ -96,6 +98,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             var data = car.QuantityCapacityOfLoad(CrewHoursLoad());
             if ((data.quantity + quantityToLoad > data.capacity) && data.quantity < data.capacity)
             {
+                quantityToLoad = data.capacity; //ensure topping off
                 Multiplayer.Broadcast($"{Hyperlink.To(car)}: \"Caboose crew topped off.\"");
                 CrewCarDict[car.id] = (CrewCarDict[car.id].spotted, false);
             }
@@ -113,18 +116,18 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
 
             var passengerStops = OpsController.Shared.AllIndustries
                 .SelectMany(i => i.TrackDisplayables.Where(t => refillLocations.Contains(t.GetType())));
-            //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
+            //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
 
             var cabeese = passengerStops
                 .SelectMany(t => t.TrackSpans?.Select(s => (tc.CarsOnSpan(s) ?? Enumerable.Empty<Car>()).Where(c => c.IsCaboose()))?.SelectMany(c => c?.Select(c2 => (t, c2))));
-            //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
+            //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
 
             CrewCarDict = CrewCarDict.Where(kvp => cabeese.Select(c => c.c2.id).Contains(kvp.Key)).ToDictionary(k => k.Key, v => v.Value);
 
             var deltaTime = (float)(TimeWeather.Now.TotalSeconds - dateTime.TotalSeconds);
             foreach (var caboose in cabeese)
             {
-                //Log.Information($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
+                //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
                 CarLoadCrewHelper(caboose.c2, deltaTime);
             }
             dateTime = TimeWeather.Now;

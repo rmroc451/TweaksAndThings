@@ -28,7 +28,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 internal class CarInspector_PopulateCarPanel_Patch
 {
     private static ILogger _log => Log.ForContext<CarInspector_PopulateCarPanel_Patch>();
-    private static IEnumerable<LogicalEnd> ends = Enum.GetValues(typeof(LogicalEnd)).Cast<LogicalEnd>();
+    internal static IEnumerable<LogicalEnd> ends = Enum.GetValues(typeof(LogicalEnd)).Cast<LogicalEnd>();
 
     /// <summary>
     /// If a caboose inspector is opened, it will auto set Anglecocks, gladhands and hand brakes
@@ -88,7 +88,7 @@ internal class CarInspector_PopulateCarPanel_Patch
                     int consistLength = consist.Count();
                     int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(consist);
                     int lengthInMeters = UnityEngine.Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(consist.ToList()) * 3.28084f);
-                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:0.0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
+                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:N0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
 
                     field.AddLabel(() => newSubTitle(), UIPanelBuilder.Frequency.Fast)
                     .Tooltip("Consist Info", "Reflects info about consist.").FlexibleWidth();
@@ -181,7 +181,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 
             case MrocHelperType.BleedAirSystem:
                 consist = consist.Where(c => !c.MotivePower());
-                _log.ForContext("car", car).Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+                _log.ForContext("car", car).Debug($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                 foreach (Model.Car bleed in consist)
                 {
                     StateManager.ApplyLocal(new PropertyChange(bleed.id, PropertyChange.Control.Bleed, 1));
@@ -190,7 +190,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 
             case MrocHelperType.Oil:
                 consist = consist.Where(c => c.NeedsOiling || c.HasHotbox);
-                _log.ForContext("car", car).Information($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
+                _log.ForContext("car", car).Debug($"{car} => {mrocHelperType} => {string.Join("/", consist.Select(c => c.ToString()))}");
                 foreach (Model.Car oil in consist)
                 {
                     StateManager.ApplyLocal(new PropertyChange(oil.id, nameof(Car.Oiled).ToLower(), new FloatPropertyValue(1)));
@@ -227,12 +227,12 @@ internal class CarInspector_PopulateCarPanel_Patch
             float originalTimeCost = consist.CalculateCostForAutoEngineerEndGearSetting();
             float timeCost = originalTimeCost;
             float crewCost = timeCost / 3600; //hours of time deducted from caboose.
-            var tsString = crewCost.FormatCrewHours(OpsController_AnnounceCoalescedPayments_Patch.CrewHoursLoad().description);
-            Car? cabooseWithAvailCrew = car.FindMyCaboose(crewCost, buttonsHaveCost);
+            var tsString = crewCost.FormatCrewHours(OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours.description);
+            Car? cabooseWithAvailCrew = car.FindMyCabooseWithLoadRequirement(crewCost, buttonsHaveCost);
             if (cabooseWithAvailCrew == null) timeCost *= 1.5f;
             var cabooseFoundDisplay = cabooseWithAvailCrew?.DisplayName ?? "No caboose";
 
-            _log.ForContext("car", car).Information($"{nameof(MrocConsistHelper)} {mrocHelperType} : [VACINITY CABEESE FOUND:{cabooseWithAvailCrew?.ToString() ?? "NONE"}] => Consist Length {consist.Count()} => costs {timeCost / 60} minutes  of AI Engineer time, $5 per hour = ~${Math.Ceiling((decimal)(timeCost / 3600) * 5)} (*2 if no caboose nearby)");
+            _log.ForContext("car", car).Debug($"{nameof(MrocConsistHelper)} {mrocHelperType} : [VACINITY CABEESE FOUND:{cabooseWithAvailCrew?.ToString() ?? "NONE"}] => Consist Length {consist.Count()} => costs {timeCost / 60} minutes  of AI Engineer time, $5 per hour = ~${Math.Ceiling((decimal)(timeCost / 3600) * 5)} (*2 if no caboose nearby)");
 
 
             Multiplayer.SendError(StateManager.Shared._playersManager.LocalPlayer, $"{(cabooseWithAvailCrew != null ? $"{cabooseWithAvailCrew.DisplayName} Hours Adjusted: ({tsString})\n" : string.Empty)}Wages: ~(${Math.Ceiling((decimal)(timeCost / 3600) * 5)})");

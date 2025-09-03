@@ -43,3 +43,89 @@ internal class BaseLocomotive_FindSourceLocomotive_Patch
         return null;
     }
 }
+
+//[HarmonyPatch(typeof(LocomotiveAirSystem))]
+//[HarmonyPatch(nameof(LocomotiveAirSystem._ShouldDeferToLocomotiveAir))]
+//[HarmonyPatchCategory("RMROC451TweaksAndThings")]
+//internal class LocomotiveAirSystem__ShouldDeferToLocomotiveAir_Patch
+//{
+//    private static void Postfix(LocomotiveAirSystem __instance, ref LocomotiveAirSystem locomotiveAirSystem, ref bool __result)
+//    {
+//        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+//        if (!tweaksAndThings.IsEnabled()) return;
+
+//        __result = _ShouldDeferToLocomotiveAir(__instance, out locomotiveAirSystem);
+//    }
+//    public static bool _ShouldDeferToLocomotiveAir(LocomotiveAirSystem __instance, out LocomotiveAirSystem locomotiveAirSystem)
+//    {
+//        locomotiveAirSystem = null;
+//        if (__instance.car.set == null)
+//        {
+//            return false;
+//        }
+//        if (!(__instance.car.air is LocomotiveAirSystem locomotiveAirSystem2) || !(__instance.car is BaseLocomotive baseLocomotive))
+//        {
+//            return false;
+//        }
+//        if (!locomotiveAirSystem2.IsCutOut || locomotiveAirSystem2.IsMuEnabled)
+//        {
+//            return false;
+//        }
+//        BaseLocomotive baseLocomotive2 = baseLocomotive.FindMuSourceLocomotive();
+//        if (baseLocomotive2 == null)
+//        {
+//            return false;
+//        }
+//        if (!(baseLocomotive2.air is LocomotiveAirSystem locomotiveAirSystem3))
+//        {
+//            return false;
+//        }
+//        locomotiveAirSystem = locomotiveAirSystem3;
+//        return true;
+//    }
+//}
+
+//[HarmonyPatch(typeof(CarAirSystem))]
+//[HarmonyPatch(nameof(CarAirSystem.ShouldDeferToLocomotiveAir))]
+//[HarmonyPatchCategory("RMROC451TweaksAndThings")]
+//internal class CarAirSystem_ShouldDeferToLocomotiveAir_Patch
+//{
+//    private static void Postfix(CarAirSystem __instance, ref LocomotiveAirSystem locomotiveAirSystem, ref bool __result)
+//    {
+//        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+//        if (!tweaksAndThings.IsEnabled()) return;
+
+//        __result = ShouldDeferToLocomotiveAir(__instance, out locomotiveAirSystem);
+//    }
+
+//    public static bool ShouldDeferToLocomotiveAir(CarAirSystem __instance, out LocomotiveAirSystem locomotiveAirSystem)
+//    {
+//        locomotiveAirSystem = null;
+//        if (__instance.car.set == null)
+//        {
+//            return false;
+//        }
+//        if (__instance.car.Archetype != CarArchetype.Tender)
+//        {
+//            return false;
+//        }
+//        if (!__instance.car.TryGetAdjacentCar(__instance.car.EndToLogical(Car.End.F), out var adjacent) || !adjacent.IsLocomotive)
+//        {
+//            return false;
+//        }
+//        if (!(adjacent.air is LocomotiveAirSystem locomotiveAirSystem2))
+//        {
+//            return false;
+//        }
+//        locomotiveAirSystem = locomotiveAirSystem2;
+//        if (locomotiveAirSystem.IsMuEnabled)
+//        {
+//            return true;
+//        }
+//        if (!locomotiveAirSystem.IsCutOut)
+//        {
+//            return true;
+//        }
+//        return locomotiveAirSystem.ShouldDeferToLocomotiveAir(out locomotiveAirSystem);
+//    }
+//}

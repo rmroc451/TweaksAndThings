@@ -28,8 +28,10 @@ public class Settings
         bool cabooseRequiredForLocoTagOilIndication,
         bool servicingFundPenalty,
         bool safetyFirst,
+        bool safetyFirstClientEnforce,
         CrewHourLoadMethod loadCrewHoursMethod,
-        float cabeeseSearchRadiusFtInMeters
+        float cabeeseSearchRadiusFtInMeters,
+        bool trainBrakeDisplayShowsColorsInCalloutMode
     )
     {
         WebhookSettingsList = webhookSettingsList;
@@ -41,8 +43,10 @@ public class Settings
         CabooseRequiredForLocoTagOilIndication = cabooseRequiredForLocoTagOilIndication;
         ServicingFundPenalty = servicingFundPenalty;
         SafetyFirst = safetyFirst;
+        SafetyFirstClientEnforce = safetyFirstClientEnforce;
         LoadCrewHoursMethod = loadCrewHoursMethod;
         CabeeseSearchRadiusFtInMeters = cabeeseSearchRadiusFtInMeters;
+        TrainBrakeDisplayShowsColorsInCalloutMode = trainBrakeDisplayShowsColorsInCalloutMode;
     }
 
     public readonly UIState<string> _selectedTabState = new UIState<string>(null);
@@ -55,8 +59,10 @@ public class Settings
     public bool CabooseRequiredForLocoTagOilIndication;
     public bool ServicingFundPenalty;
     public bool SafetyFirst;
+    public bool SafetyFirstClientEnforce;
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
+    public bool TrainBrakeDisplayShowsColorsInCalloutMode;
 
     internal void AddAnotherRow()
     {
@@ -64,7 +70,7 @@ public class Settings
         if (!string.IsNullOrEmpty(WebhookSettingsList.OrderByDescending(wsl => wsl.WebhookUrl).Last().WebhookUrl))
         {
             WebhookSettingsList.Add(new());
-            Log.Information($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
+            Log.Debug($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
         }
     }
 }
@@ -126,16 +132,18 @@ public static class SettingsExtensions
     public static bool RequireConsistCabooseForOilerAndHotboxSpotter(this TweaksAndThingsPlugin input) =>
         input?.settings?.RequireConsistCabooseForOilerAndHotboxSpotter ?? false;
     public static bool CabooseNonMotiveAllowedSetting(this TweaksAndThingsPlugin input, Car car) =>
-        input.EndGearHelpersRequirePayment() && !car.MotivePower() && (bool)car.FindMyCaboose(0.0f, false);
+        input.EndGearHelpersRequirePayment() && !car.MotivePower() && (bool)car.FindMyCabooseSansLoadRequirement();
     public static bool CabooseRequiredForLocoOilIndicator(this TweaksAndThingsPlugin input) =>
         input?.settings?.CabooseRequiredForLocoTagOilIndication ?? false;
     public static bool ServiceFundPenalties(this TweaksAndThingsPlugin input) =>
         input?.settings?.ServicingFundPenalty ?? false;
     public static bool SafetyFirst(this TweaksAndThingsPlugin input) =>
         input?.settings?.SafetyFirst ?? false;
+    public static bool SafetyFirstClientEnforce(this TweaksAndThingsPlugin input) =>
+        input?.settings?.SafetyFirstClientEnforce ?? true;
     public static bool DayLoadCrewHours(this TweaksAndThingsPlugin input) =>
         (input?.settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks) == CrewHourLoadMethod.Daily;
-    public static float CabeeseSearchRadiusInMeters(this TweaksAndThingsPlugin input) =>
-        input?.settings?.CabeeseSearchRadiusFtInMeters ?? 21f;
+    public static bool TrainBrakeDisplayShowsColorsInCalloutMode(this TweaksAndThingsPlugin input) =>
+        input?.settings?.TrainBrakeDisplayShowsColorsInCalloutMode ?? false;
 
 }

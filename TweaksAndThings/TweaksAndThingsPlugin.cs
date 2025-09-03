@@ -40,7 +40,6 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
     static TweaksAndThingsPlugin()
     {
-        Log.Information("Hello! Static Constructor was called!");
     }
 
     public TweaksAndThingsPlugin(IModdingContext moddingContext, IModDefinition self)
@@ -49,7 +48,7 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
         this.moddingContext = moddingContext;
 
-        logger.Information("Hello! Constructor was called for {modId}/{modVersion}!", self.Id, self.Version);
+        logger.Debug("Hello! Constructor was called for {modId}/{modVersion}!", self.Id, self.Version);
 
         moddingContext.RegisterConsoleCommand(new EchoCommand());
 
@@ -58,7 +57,6 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
     public override void OnEnable()
     {
-        logger.Information("OnEnable() was called!");
         var harmony = new Harmony(modDefinition.Id);
         harmony.PatchCategory(modDefinition.Id.Replace(".", string.Empty));
     }
@@ -72,13 +70,10 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
 
     public void Update()
     {
-        logger.Verbose("UPDATE()");
     }
 
     public void ModTabDidOpen(UIPanelBuilder builder)
     {
-        logger.Information("Daytime!");
-
         if (settings == null) settings = new();
         if (!settings?.WebhookSettingsList?.Any() ?? true) settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
         if (settings?.EngineRosterFuelColumnSettings == null) settings.EngineRosterFuelColumnSettings = new();
@@ -88,7 +83,9 @@ public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>,
             settings?.WebhookSettingsList.SanitizeEmptySettings();
 
         builder.AddSection("Adjustments To Base Game", (UIPanelBuilder builder) => {
-            builder.AddLabel("Repair tracks now require cars to be waybilled, or they will not be serviced/overhauled.\nThey will report on the company window's location section as 'No Work Order Assigned'.");
+            builder.AddLabel("1) Repair tracks now require cars to be waybilled, or they will not be serviced/overhauled.\nThey will report on the company window's location section as 'No Work Order Assigned'.");
+            builder.Spacer(spacing * spacing);
+            builder.AddLabel("2) You now have the same click options on the little car icons in the lower left engine controls ui, as you do with cars in the game. Ctrl click -> open car inspector, etc.");
         });
         builder.Spacer(spacing * spacing);
         builder.AddTabbedPanels(settings._selectedTabState, delegate (UITabbedPanelBuilder tabBuilder)
@@ -206,6 +203,23 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
         ).Tooltip("Safety First", $@"On non-express timetabled consists, a caboose is required in the consist increase AE max speed > 20 in {Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Road)}/{Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Waypoint)} mode.");
         #endregion
 
+        #region SafetyFirstClient
+        if (settings?.SafetyFirst ?? false)
+        {
+            builder.Spacer(spacing);
+            builder.AddFieldToggle(
+                "Safety First! (Enforce Client Speed Restrictions)",
+                () => settings?.SafetyFirstClientEnforce ?? false,
+                delegate (bool enabled)
+                {
+                    if (settings == null) settings = new();
+                    settings.SafetyFirstClientEnforce = enabled;
+                    builder.Rebuild();
+                }
+            ).Tooltip("Safety First! (Enforce Client Speed Restrictions)", $@"Enforce cabeese dominance on clients; uncheck to allow clients to override the 20mph restriction.");
+        }
+        #endregion
+
     }
 
     private void UiUpdates(UIPanelBuilder builder)
@@ -237,6 +251,18 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
         ).Tooltip("Allow Insufficient Funds", $@"Will allow interchange service and repair shops to still function when you are insolvent, at a 20% overdraft fee.");
 
         builder.Spacer(spacing);
+        builder.AddFieldToggle(
+            "Train Brake Color Mode",
+            () => this.TrainBrakeDisplayShowsColorsInCalloutMode(),
+            delegate (bool enabled)
+            {
+                if (settings == null) settings = new();
+                settings.TrainBrakeDisplayShowsColorsInCalloutMode = enabled;
+                builder.Rebuild();
+            }
+        ).Tooltip("Train Brake Color Mode", $@"When enabled/checked and car tag callout mode is enabled (showing car tags hovering over them), the train brake display of the selected locomotive will change the cars/engines to their destination area's color to help you visualize sets of cars at a glance.");
+
+        builder.Spacer(spacing);
         EngineRosterShowsFuelStatusUISection(builder);
     }
 
@@ -256,7 +282,7 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
                         builder.Rebuild();
                     }
                 )
-            ).Tooltip("Enable Fuel Display in Engine Roster", $"Will add reaming fuel indication to Engine Roster (with details in roster row tool tip), Examples : {string.Join(" ", Enumerable.Range(0, 4).Select(i => TextSprites.PiePercent(i, 4)))}");
+            ).Tooltip("Enable Fuel Display in Engine Roster", $"Will add reamaing fuel indication to Engine Roster (with details in roster row tool tip), Examples : {string.Join(" ", Enumerable.Range(0, 4).Select(i => TextSprites.PiePercent(i, 4)))}");
 
             builder.Spacer(spacing);
             builder.AddFieldToggle(
@@ -333,7 +359,6 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
 
     public void ModTabDidClose()
     {
-        logger.Information("Nighttime...");
         this.moddingContext.SaveSettingsData(this.modDefinition.Id, settings ?? new());
     }
 }

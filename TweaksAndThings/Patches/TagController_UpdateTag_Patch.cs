@@ -1,13 +1,17 @@
 ﻿using Game.State;
 using HarmonyLib;
+using KeyValue.Runtime;
 using Model;
 using Model.Ops;
 using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
+using RollingStock;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UI.Tags;
+using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -28,7 +32,7 @@ internal class TagController_UpdateTag_Patch
             return;
         }
 
-        ProceedWithPostFix(car, tagCallout, tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() || !tweaksAndThings.CabooseRequiredForLocoOilIndicator());
+        ProceedWithPostFix(car, tagCallout, tweaksAndThings.CabooseRequiredForLocoOilIndicator());
 
         return;
     }
@@ -43,7 +47,7 @@ internal class TagController_UpdateTag_Patch
         //if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : $"<cspace=-1em>{TextSprites.Warning}{car.Oiled.TriColorPiePercent(1)}</cspace>");
         if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : car.Oiled.TriColorPiePercent(1, oilSpriteName));
         IEnumerable<Car> consist = car.EnumerateCoupled().Where(c => c.EnableOiling);
-        Func<bool> cabooseRequirementFulfilled = () => (!cabooseRequired || consist.ConsistNoFreight() || car.FindMyCaboose(0.0f, false)); 
+        Func<bool> cabooseRequirementFulfilled = () => (!cabooseRequired || consist.ConsistNoFreight() || (bool)car.FindMyCabooseSansLoadRequirement()); 
         if (StateManager.Shared.Storage.OilFeature
             && car.IsLocomotive 
             && !car.NeedsOiling 
@@ -53,6 +57,18 @@ internal class TagController_UpdateTag_Patch
             tags.Add(consist.Any(c => c.HasHotbox) ? TextSprites.Hotbox : consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled.TriColorPiePercent(1, oilSpriteName));
         if (car.EndAirSystemIssue()) tags.Add(TextSprites.CycleWaybills);
         if (car.HandbrakeApplied()) tags.Add(TextSprites.HandbrakeWheel);
+
+        if (car.IsPassengerCar())
+        {
+            PassengerMarker? passengerMarker = car.GetPassengerMarker();
+            if (passengerMarker.HasValue)
+            {
+                IEnumerable<string> loadInfo = car.PassengerCountString(passengerMarker).Split('/');
+                //string item4 = CarPickable.PassengerString(car, passengerMarker.Value);
+                string val = TextSprites.PiePercent(float.Parse(loadInfo.First()), float.Parse(loadInfo.Last())) + $" {car.PassengerCountString(passengerMarker)} Passengers";
+                tagCallout.callout.Text = tagCallout.callout.Text.Contains("Empty") ? tagCallout.callout.Text.Replace("Empty", val) : tagCallout.callout.Text + $"\n{val}";
+            }
+        }
 
         tagCallout.callout.Title =
             tags.Any() switch

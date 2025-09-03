@@ -20,7 +20,7 @@ internal class EngineRosterPanel_Populate_Patch
         __instance._window.Title = __instance._window.Title.Split(':')[0].Trim();
         if (!tweaksAndThings.IsEnabled()) return true;
 
-        var hiddenEntries = rows.Where(r => r.Engine.IsMuEnabled && !r.IsSelected && !r.IsFavorite).Select(r => r.Engine.id) ?? Enumerable.Empty<string>();
+        var hiddenEntries = rows.Where(r => r.Engine.locomotiveControl.air.IsCutOut && !r.IsSelected && !r.IsFavorite).Select(r => r.Engine.id) ?? Enumerable.Empty<string>();
 
         if (hiddenEntries.Any()) __instance._window.Title =string.Format("{0} : {1}", __instance._window.Title, $"Hidden MU Count [{hiddenEntries.Count()}]");
 
