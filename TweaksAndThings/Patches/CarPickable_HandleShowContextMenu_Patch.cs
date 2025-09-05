@@ -34,39 +34,34 @@ internal class CarPickable_HandleShowContextMenu_Patch
         {
             trainController.SelectedCar = ((trainController.SelectedCar == car) ? null : car);
         });
-        if (GameInput.IsShiftDown)
+        if (!car.EnumerateCoupled().Any(c => !c.SupportsBleed()))
         {
-            if (!car.EnumerateCoupled().Any(c => !c.SupportsBleed()))
+            shared.AddButton(ContextMenuQuadrant.Brakes, $"Bleed Consist", SpriteName.Bleed, delegate
             {
-                shared.AddButton(ContextMenuQuadrant.Brakes, $"Bleed Consist", SpriteName.Bleed, delegate
-                {
-                    CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.BleedAirSystem, buttonsHaveCost);
-                });
-            }
-
-            shared.AddButton(ContextMenuQuadrant.Brakes, $"{(car.EnumerateCoupled().Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} Consist", SpriteName.Handbrake, delegate
-            {
-                CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.Handbrake, buttonsHaveCost);
+                CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.BleedAirSystem, buttonsHaveCost);
             });
+        }
+        if (car.SupportsBleed())
+        {
+            shared.AddButton(ContextMenuQuadrant.Brakes, "Bleed", SpriteName.Bleed, car.SetBleed);
+        }
 
-            if (car.EnumerateCoupled().Any(c => c.EndAirSystemIssue()))
-            {
-                shared.AddButton(ContextMenuQuadrant.General, $"Air Up Consist", SpriteName.Select, delegate
+        shared.AddButton(ContextMenuQuadrant.Brakes, $"{(car.EnumerateCoupled().Any(c => c.HandbrakeApplied()) ? "Release " : "Set ")} Consist", SpriteName.Handbrake, delegate
+        {
+            CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.Handbrake, buttonsHaveCost);
+        });
+
+        shared.AddButton(ContextMenuQuadrant.Brakes, car.air.handbrakeApplied ? "Release Handbrake" : "Apply Handbrake", SpriteName.Handbrake, delegate
+        {
+            bool apply = !car.air.handbrakeApplied;
+            car.SetHandbrake(apply);
+        });
+
+        if (car.EnumerateCoupled().Any(c => c.EndAirSystemIssue()))
+        {
+            shared.AddButton(ContextMenuQuadrant.General, $"Air Up Consist", SpriteName.Select, delegate
             {
                 CarInspector_PopulateCarPanel_Patch.MrocConsistHelper(car, MrocHelperType.GladhandAndAnglecock, buttonsHaveCost);
-            });
-            }
-        }
-        else
-        {
-            if (car.SupportsBleed())
-            {
-                shared.AddButton(ContextMenuQuadrant.Brakes, "Bleed", SpriteName.Bleed, car.SetBleed);
-            }
-            shared.AddButton(ContextMenuQuadrant.Brakes, car.air.handbrakeApplied ? "Release Handbrake" : "Apply Handbrake", SpriteName.Handbrake, delegate
-            {
-                bool apply = !car.air.handbrakeApplied;
-                car.SetHandbrake(apply);
             });
         }
 
@@ -76,7 +71,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
         });
 
         string secondaryLine = car.Waybill.HasValue ? $"{Environment.NewLine}{car.Waybill.Value.Destination.DisplayName}" : string.Empty;
-        secondaryLine = secondaryLine.Length > 10 + Environment.NewLine.Length ? $"{secondaryLine.Substring(0, 7+ Environment.NewLine.Length)}..." : secondaryLine;
+        secondaryLine = secondaryLine.Length > 10 + Environment.NewLine.Length ? $"{secondaryLine.Substring(0, 7 + Environment.NewLine.Length)}..." : secondaryLine;
         shared.Show($"{car.DisplayName}{secondaryLine}");
         shared.BuildItemAngles();
         shared.StartCoroutine(shared.AnimateButtonsShown());
