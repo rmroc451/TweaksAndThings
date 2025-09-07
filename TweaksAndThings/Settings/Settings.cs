@@ -31,7 +31,8 @@ public class Settings
         bool safetyFirstClientEnforce,
         CrewHourLoadMethod loadCrewHoursMethod,
         float cabeeseSearchRadiusFtInMeters,
-        bool trainBrakeDisplayShowsColorsInCalloutMode
+        bool trainBrakeDisplayShowsColorsInCalloutMode,
+        bool shiftPaginationOnContextMenu
     )
     {
         WebhookSettingsList = webhookSettingsList;
@@ -47,6 +48,7 @@ public class Settings
         LoadCrewHoursMethod = loadCrewHoursMethod;
         CabeeseSearchRadiusFtInMeters = cabeeseSearchRadiusFtInMeters;
         TrainBrakeDisplayShowsColorsInCalloutMode = trainBrakeDisplayShowsColorsInCalloutMode;
+        ShiftPaginationOnContextMenu = shiftPaginationOnContextMenu;
     }
 
     public readonly UIState<string> _selectedTabState = new UIState<string>(null);
@@ -63,6 +65,7 @@ public class Settings
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
+    public bool ShiftPaginationOnContextMenu;
 
     internal void AddAnotherRow()
     {
@@ -145,5 +148,7 @@ public static class SettingsExtensions
         (input?.settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks) == CrewHourLoadMethod.Daily;
     public static bool TrainBrakeDisplayShowsColorsInCalloutMode(this TweaksAndThingsPlugin input) =>
         input?.settings?.TrainBrakeDisplayShowsColorsInCalloutMode ?? false;
+    public static bool ShiftForPagination(this TweaksAndThingsPlugin input) => 
+        input?.settings?.ShiftPaginationOnContextMenu ?? false;
 
 }

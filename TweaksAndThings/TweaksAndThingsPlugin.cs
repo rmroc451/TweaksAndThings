@@ -263,6 +263,18 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
         ).Tooltip("Train Brake Color Mode", $@"When enabled/checked and car tag callout mode is enabled (showing car tags hovering over them), the train brake display of the selected locomotive will change the cars/engines to their destination area's color to help you visualize sets of cars at a glance.");
 
         builder.Spacer(spacing);
+        builder.AddFieldToggle(
+            "Context Menu Shift Modifier",
+            () => this.ShiftForPagination(),
+            delegate (bool enabled)
+            {
+                if (settings == null) settings = new();
+                settings.ShiftPaginationOnContextMenu = enabled;
+                builder.Rebuild();
+            }
+        ).Tooltip("Context Menu Shift Modifier", $@"When enabled/checked, utilizing `SHIFT` while initiating the context menu of a car will show consist level options, and without shows only car level. If this is unchecked, all car/consist options show up in a happy goulash!");
+
+        builder.Spacer(spacing);
         EngineRosterShowsFuelStatusUISection(builder);
     }
 

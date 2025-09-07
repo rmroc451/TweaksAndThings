@@ -34,6 +34,11 @@ internal class MapWindow_OnClick_Patch
     public static Sprite? LoadTexture(string fileName, string name)
     {
         string path = Path.Combine(SingletonPluginBase<TweaksAndThingsPlugin>.Shared.ModDirectory, fileName);
+        if (!File.Exists(path))
+        {
+            _log.Debug($"Unable to find {name} icon at {path}!");
+            return null;
+        }
         Texture2D texture2D = new Texture2D(128, 128, TextureFormat.DXT5, mipChain: false);
         texture2D.name = name;
         texture2D.wrapMode = TextureWrapMode.Clamp;
