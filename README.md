@@ -6,6 +6,18 @@ This is a mod for Railroader which is available on Steam.
 
 This mod requires Railloader by Zamu.
 
+## Credits & Project History
+
+This project was originally created and developed by RMROC451.
+
+I have created fixes and additional features which maybe pulled to main project over time.
+
+The goal of this repository is to preserve, maintain, and continue improving the mod for the Railroader community while respecting and crediting the original work and vision of RMROC451.
+
+Special thanks to:
+- RMROC451 — original creator of Tweaks and Things
+- Zamu
+
 ## Usage
 1. Download and install Railloader by Zamu from here: https://railroader.stelltis.ch/
     * Verify you have a Mods folder in the root of your railroader directory. If You do NOT have a Mods folder, you didn't complete this step successfully.

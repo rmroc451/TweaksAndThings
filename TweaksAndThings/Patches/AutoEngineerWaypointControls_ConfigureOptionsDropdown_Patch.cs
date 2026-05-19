@@ -1,4 +1,5 @@
 ﻿using Game.Messages;
+using Game.Notices;
 using Game.State;
 using HarmonyLib;
 using Model;
@@ -41,12 +42,22 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     {
         try
         {
+            if (lastLocoSeenCarId != null &&
+                lastLocoSeenCarId.Equals(TrainController.Shared?.SelectedLocomotive.id) &&
+                watchyWatchy != null)
+                return;
 
-            if (lastLocoSeenCarId != null && lastLocoSeenCarId.Equals(TrainController.Shared?.SelectedLocomotive.id) && watchyWatchy != null) return;
-            if (watchyWatchy != null) ((MonoBehaviour)__instance).StopCoroutine(watchyWatchy);
+            if (watchyWatchy != null)
+                ((MonoBehaviour)__instance).StopCoroutine(watchyWatchy);
+
             watchyWatchy = null;
 
-            if (__instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint) watchyWatchy = ((MonoBehaviour)__instance).StartCoroutine(UpdateCogCoroutine(__instance));
+            if (__instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint)
+            {
+                watchyWatchy =
+                    ((MonoBehaviour)__instance)
+                    .StartCoroutine(UpdateCogCoroutine(__instance));
+            }
         }
         catch (Exception ex)
         {
@@ -61,11 +72,19 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
         while (true)
         {
-            if (__instance._persistence.Orders.Mode != AutoEngineerMode.Waypoint || ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null) yield return wait;
+            if (__instance._persistence.Orders.Mode != AutoEngineerMode.Waypoint || ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null)
+            {
+                yield return wait;
+                continue;
+            }
 
             PrepLocoUsage((AutoEngineerWaypointControls)__instance.aiWaypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
             HashSet<OpsCarPosition?> destinations = [];
-            if (!tweaksAndThings.IsEnabled() || !ShouldRecalc(__instance, selectedLoco, out destinations)) yield return wait;
+            if (!tweaksAndThings.IsEnabled() || tweaksAndThings.DisableWaypointControls() || !ShouldRecalc(__instance, selectedLoco, out destinations))
+            {
+                yield return wait;
+                continue;
+            }
             timetableSaveTime = TimetableController.Shared.CurrentDocument.Modified;
             lastSeenIntegrationSetCount = selectedLoco.set.NumberOfCars;
 
@@ -132,7 +151,18 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static OptionsDropdownConfiguration WireUpJumpTosToSettingMenu(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco, List<DropdownMenu.RowData> rowDatas, Action<int> func, int origCount, int maxRowOrig, AutoEngineerOrdersHelper aeoh, ref List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos)
     {
         OptionsDropdownConfiguration __result;
-        jumpTos = jumpTos?.OrderBy(c => c.sortDistance)?.ToList() ?? default;
+        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        
+        // Check if waypoint controls are disabled
+        if (tweaksAndThings.DisableWaypointControls())
+        {
+            jumpTos = new List<(string, string, float?, float, Location?)>();
+        }
+        else
+        {
+            jumpTos = jumpTos?.OrderBy(c => c.sortDistance)?.ToList() ?? default;
+        }
+        
         var localJumpTos = jumpTos.ToList();
         var safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco) && jumpTos.Any();
 
@@ -364,6 +394,12 @@ internal class LocomotiveControlsUIAdapter_UpdateOptionsDropdown_Prefix
 {
     static bool Prefix(LocomotiveControlsUIAdapter __instance)
     {
-        return false;
+        TweaksAndThingsPlugin tweaksAndThings =
+            SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+
+        if (!tweaksAndThings.IsEnabled())
+            return true;
+
+        return tweaksAndThings.DisableWaypointControls();
     }
 }

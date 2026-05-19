@@ -263,6 +263,18 @@ AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 -
         ).Tooltip("Train Brake Color Mode", $@"When enabled/checked and car tag callout mode is enabled (showing car tags hovering over them), the train brake display of the selected locomotive will change the cars/engines to their destination area's color to help you visualize sets of cars at a glance.");
 
         builder.Spacer(spacing);
+        builder.AddFieldToggle(
+            "Disable Waypoint Controls",
+            () => settings?.DisableWaypointControls ?? false,
+            delegate (bool enabled)
+            {
+                if (settings == null) settings = new();
+                settings.DisableWaypointControls = enabled;
+                builder.Rebuild();
+            }
+        ).Tooltip("Disable Waypoint Controls", @"When enabled, removes the waypoint set/jump options from the engine control menu. This disables the option to jump to waypoints or set waypoints based on consist car destinations, allowing only default engine controls.");
+
+        builder.Spacer(spacing);
         EngineRosterShowsFuelStatusUISection(builder);
     }
 

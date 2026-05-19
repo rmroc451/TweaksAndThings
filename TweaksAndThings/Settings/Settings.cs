@@ -31,7 +31,8 @@ public class Settings
         bool safetyFirstClientEnforce,
         CrewHourLoadMethod loadCrewHoursMethod,
         float cabeeseSearchRadiusFtInMeters,
-        bool trainBrakeDisplayShowsColorsInCalloutMode
+        bool trainBrakeDisplayShowsColorsInCalloutMode,
+        bool disableWaypointControls
     )
     {
         WebhookSettingsList = webhookSettingsList;
@@ -47,6 +48,7 @@ public class Settings
         LoadCrewHoursMethod = loadCrewHoursMethod;
         CabeeseSearchRadiusFtInMeters = cabeeseSearchRadiusFtInMeters;
         TrainBrakeDisplayShowsColorsInCalloutMode = trainBrakeDisplayShowsColorsInCalloutMode;
+        DisableWaypointControls = disableWaypointControls;
     }
 
     public readonly UIState<string> _selectedTabState = new UIState<string>(null);
@@ -63,6 +65,7 @@ public class Settings
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
+    public bool DisableWaypointControls;
 
     internal void AddAnotherRow()
     {
@@ -145,5 +148,7 @@ public static class SettingsExtensions
         (input?.settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks) == CrewHourLoadMethod.Daily;
     public static bool TrainBrakeDisplayShowsColorsInCalloutMode(this TweaksAndThingsPlugin input) =>
         input?.settings?.TrainBrakeDisplayShowsColorsInCalloutMode ?? false;
+    public static bool DisableWaypointControls(this TweaksAndThingsPlugin input) =>
+        input?.settings?.DisableWaypointControls ?? false;
 
 }
