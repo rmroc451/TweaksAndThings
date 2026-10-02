@@ -18,4 +18,7 @@ internal static class FeaturePolicies
 
     internal static bool IsWaypointDestinationSelectable(bool locationResolved, string? destinationId, string? destinationName) =>
         locationResolved && !string.IsNullOrWhiteSpace(destinationId) && !string.IsNullOrWhiteSpace(destinationName);
+
+    internal static bool ShouldAcceptWaypointPickerHit(bool mouseClicked, bool escapePressed, bool locationChanged) =>
+        mouseClicked && !escapePressed && locationChanged;
 }

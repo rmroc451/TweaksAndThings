@@ -26,10 +26,10 @@ internal class AutoEngineerDestinationPicker_Loop_Patch
 
     private static IEnumerator Loop(AutoEngineerDestinationPicker __instance)
     {
-        Hit valueOrDefault;
-        Location location;
-        WaitForSecondsRealtime wait = new WaitForSecondsRealtime(1/60);
-        while (true)
+        Hit valueOrDefault = default;
+        Location location = default;
+        WaitForSecondsRealtime wait = new WaitForSecondsRealtime(1f / 60f);
+        while (!__instance.DidEscape())
         {
             Location? currentOrdersGotoLocation = __instance.GetCurrentOrdersGotoLocation();
             Hit? hit = __instance.HitLocation();
@@ -41,7 +41,10 @@ internal class AutoEngineerDestinationPicker_Loop_Patch
                 __instance.destinationMarker.position = WorldTransformer.GameToWorld(positionRotation.Position);
                 __instance.destinationMarker.rotation = positionRotation.Rotation;
                 __instance.destinationMarker.gameObject.SetActive(value: true);
-                if (!currentOrdersGotoLocation.Equals(location) && __instance.MouseClicked)
+                if (FeaturePolicies.ShouldAcceptWaypointPickerHit(
+                    __instance.MouseClicked,
+                    escapePressed: __instance.DidEscape(),
+                    locationChanged: !currentOrdersGotoLocation.Equals(location)))
                 {
                     break;
                 }
@@ -52,6 +55,12 @@ internal class AutoEngineerDestinationPicker_Loop_Patch
             }
             yield return wait;
         }
+        if (__instance.DidEscape() || !__instance.MouseClicked)
+        {
+            __instance.StopLoop();
+            yield break;
+        }
+
         Log.Debug("DestinationPicker Hit: {hit} {car} {end}", valueOrDefault.Location, valueOrDefault.CarInfo?.car, valueOrDefault.CarInfo?.end);
         __instance._ordersHelper.SetWaypoint(location, valueOrDefault.CarInfo?.car.id);
         __instance.StopLoop();

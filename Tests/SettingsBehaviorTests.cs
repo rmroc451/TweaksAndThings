@@ -155,6 +155,16 @@ public sealed class SettingsBehaviorTests
         Assert.That(FeaturePolicies.IsWaypointDestinationSelectable(locationResolved, destinationId, destinationName), Is.EqualTo(expected));
     }
 
+    [TestCase(true, false, true, true)]
+    [TestCase(true, true, true, false)]
+    [TestCase(false, false, true, false)]
+    [TestCase(true, false, false, false)]
+    public void WaypointPicker_OnlyAcceptsClickedNonCancelledNewLocation(
+        bool clicked, bool escaped, bool locationChanged, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldAcceptWaypointPickerHit(clicked, escaped, locationChanged), Is.EqualTo(expected));
+    }
+
     [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {
