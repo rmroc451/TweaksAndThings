@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using Railloader;
 using System.Collections.Generic;
 using System.Linq;
 using UI;
@@ -15,7 +14,7 @@ internal class EngineRosterPanel_Populate_Patch
 {
     private static bool Prefix(EngineRosterPanel __instance, ref List<RosterRowData> rows)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
 
         __instance._window.Title = __instance._window.Title.Split(':')[0].Trim();
         if (!tweaksAndThings.IsEnabled()) return true;

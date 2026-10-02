@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using Model;
-using Railloader;
 using UI;
 using UI.Tags;
 using UnityEngine;
@@ -15,7 +14,7 @@ internal class TrainBrakeDisplay_Update_Patch()
     private static bool Prefix(TrainBrakeDisplay __instance)
     {
 
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
         TweakedOriginalMethods.TrainBrakeDisplay.Update(__instance);
@@ -31,7 +30,7 @@ internal class TrainBrakeDisplay_ColorForCar_Patch
 {
     private static bool Prefix(TrainBrakeDisplay __instance, Car car, ref Color __result)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.TrainBrakeDisplayShowsColorsInCalloutMode() || !TagController.Shared.TagsVisible) return true;
 
         TweakedOriginalMethods.TrainBrakeDisplay.ColorForCar(__instance, car, ref __result);

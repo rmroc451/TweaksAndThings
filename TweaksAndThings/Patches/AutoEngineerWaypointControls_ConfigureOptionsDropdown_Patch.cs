@@ -8,7 +8,6 @@ using Model.Ops;
 using Model.Ops.Timetable;
 using Network;
 using Network.Messages;
-using Railloader;
 using Serilog;
 using System;
 using System.Collections;
@@ -67,7 +66,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
     public static IEnumerator UpdateCogCoroutine(LocomotiveControlsUIAdapter __instance)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         WaitForSecondsRealtime wait = new WaitForSecondsRealtime(3f);
 
         while (true)
@@ -151,7 +150,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static OptionsDropdownConfiguration WireUpJumpTosToSettingMenu(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco, List<DropdownMenu.RowData> rowDatas, Action<int> func, int origCount, int maxRowOrig, AutoEngineerOrdersHelper aeoh, ref List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos)
     {
         OptionsDropdownConfiguration __result;
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         
         // Check if waypoint controls are disabled
         if (tweaksAndThings.DisableWaypointControls())
@@ -395,7 +394,7 @@ internal class LocomotiveControlsUIAdapter_UpdateOptionsDropdown_Prefix
     static bool Prefix(LocomotiveControlsUIAdapter __instance)
     {
         TweaksAndThingsPlugin tweaksAndThings =
-            SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+            TweaksAndThingsPlugin.Instance!;
 
         if (!tweaksAndThings.IsEnabled())
             return true;

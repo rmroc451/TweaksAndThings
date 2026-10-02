@@ -1,0 +1,10 @@
+{
+  "Id": "RMROC451.TweaksAndThings",
+  "DisplayName": "RMROC451's Tweaks and Things",
+  "Author": "RMROC451",
+  "Version": "2.1.8",
+  "ManagerVersion": "0.20.0",
+  "AssemblyName": "RMROC451.TweaksAndThings.dll",
+  "EntryMethod": "RMROC451.TweaksAndThings.TweaksAndThingsPlugin.Load",
+  "Repository": "https://github.com/rmroc451/TweaksAndThings"
+}

@@ -3,7 +3,6 @@ using Helpers;
 using Map.Runtime;
 using Model;
 using Model.AI;
-using Railloader;
 using Serilog;
 using System.Collections.Generic;
 using System.IO;
@@ -33,7 +32,7 @@ internal class MapWindow_OnClick_Patch
 
     public static Sprite? LoadTexture(string fileName, string name)
     {
-        string path = Path.Combine(SingletonPluginBase<TweaksAndThingsPlugin>.Shared.ModDirectory, fileName);
+        string path = Path.Combine(TweaksAndThingsPlugin.Instance!.ModDirectory, fileName);
         Texture2D texture2D = new Texture2D(128, 128, TextureFormat.DXT5, mipChain: false);
         texture2D.name = name;
         texture2D.wrapMode = TextureWrapMode.Clamp;
@@ -93,7 +92,7 @@ internal class MapWindow_OnClick_Patch
 
     static bool Prefix(MapWindow __instance, Vector2 viewportNormalizedPoint)
     {
-        if (GameInput.IsControlDown && GameInput.IsAltDown)
+        if (HotkeyBindings.ControlDown && HotkeyBindings.AltDown)
         {
             Ray ray = RayForViewportNormalizedPoint(__instance, viewportNormalizedPoint);
             Vector3 gamePoint = MapManager.Instance.FindTerrainPointForXZ(WorldTransformer.WorldToGame(ray.origin));

@@ -1,12 +1,10 @@
 ﻿<Project>
   <PropertyGroup>
     <!-- Try to find the directory on our own -->
-    <GameManagedDir Condition="'$(GameManagedDir)' == ''">$([System.IO.Directory]::GetDirectories(`$(GameDir)`, `*_Data`)[0])\Managed</GameManagedDir>
 
     <!-- Copy the mod to the game directory -->
     <GameModDir Condition="'$(GameModDir)' == ''">$(GameDir)/Mods/$(AssemblyName)</GameModDir>
     <OutDir Condition="'$(Configuration)' == 'Debug'">$(GameModDir)/</OutDir>
-    <VersionTimestamp>$([System.DateTime]::UtcNow.ToString(`o`))</VersionTimestamp>
   </PropertyGroup>
 
   <!-- Replace the default version if something was set for it -->
@@ -30,9 +28,6 @@
 
   <!-- Publish the mod as a neat zip file -->
   <Target Name="PrepareForPublishing" AfterTargets="AfterBuild" Condition="'$(Configuration)' == 'Release'">
-    <!-- Replace $(AssemblyVersion) with the actual version -->
-    <Exec Command="powershell -Command &quot;(Get-Content '$(OutputPath)Definition.json') -replace '\$\(AssemblyVersion\)', '$(AssemblyVersion)_$(VersionTimestamp)' | Set-Content '$(OutputPath)Definition.json'&quot;" />
-
     <PropertyGroup>
       <ModsDirectory>$(OutputPath)/Mods</ModsDirectory>
       <ModDirectory>$(ModsDirectory)/$(AssemblyName)</ModDirectory>
@@ -64,7 +59,7 @@
     <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(ModDirectory)" />
 
     <!-- Zip it up -->
-    <Exec Command="powershell -Command &quot;Compress-Archive -Path '$(ModsDirectory)' -Destination '$(ZipName)'&quot;" />
+    <Exec Command="powershell -Command &quot;Compress-Archive -Path '$(ModDirectory)' -Destination '$(ZipName)'&quot;" />
 
     <!-- Move them to the game directory -->
     <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(GameModDir)" />

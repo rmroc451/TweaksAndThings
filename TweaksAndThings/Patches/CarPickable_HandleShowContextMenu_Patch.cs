@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using Model;
-using Railloader;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
@@ -18,7 +17,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
 {
     private static bool Prefix(Car car)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
@@ -34,7 +33,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
         {
             trainController.SelectedCar = ((trainController.SelectedCar == car) ? null : car);
         });
-        if (GameInput.IsShiftDown)
+        if (HotkeyBindings.ShiftDown)
         {
             if (!car.EnumerateCoupled().Any(c => !c.SupportsBleed()))
             {

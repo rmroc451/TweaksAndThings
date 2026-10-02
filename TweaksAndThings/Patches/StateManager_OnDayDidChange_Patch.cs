@@ -4,7 +4,6 @@ using HarmonyLib;
 using KeyValue.Runtime;
 using Model.Ops;
 using Network;
-using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
 using System.Linq;
 using UnityEngine;
@@ -20,7 +19,7 @@ internal class StateManager_OnDayDidChange_Patch
 
     private static void Postfix(StateManager __instance)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return;
 
         if (StateManager.IsHost) DoNewDayActivites(tweaksAndThings, __instance);

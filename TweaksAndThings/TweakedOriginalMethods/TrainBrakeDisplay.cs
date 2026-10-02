@@ -1,7 +1,6 @@
 ﻿using Model;
 using Model.Ops;
 using Model.Physics;
-using Railloader;
 using RMROC451.TweaksAndThings.Patches;
 using UI;
 using UI.CarInspector;
@@ -57,7 +56,7 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
             Image output = null;
             if (__instance._carImages.Count - 1 < index)
             {
-                var tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+                var tweaksAndThings = TweaksAndThingsPlugin.Instance!;
                 GameObject val = new GameObject();
                 val.transform.SetParent(((Component)__instance).transform, false);
                 ((Object)val).name = $"Car {index}";
@@ -72,7 +71,7 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
                     if (ped.button == PointerEventData.InputButton.Right) pa = PickableActivation.Secondary;
 
                     bool checkFurther = ped.button == PointerEventData.InputButton.Middle ? true : CarPickable_Activate_Patch.HandleCarOrTrainBrakeDisplayClick(car, tweaksAndThings, pa);
-                    if (checkFurther & GameInput.IsControlDown) CarInspector.Show(car);
+                    if (checkFurther & HotkeyBindings.ControlDown) CarInspector.Show(car);
                 });
                 trigger.triggers.Add(entry);
                 output = val.AddComponent<Image>();

@@ -1,15 +1,14 @@
-﻿using Serilog;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using RMROC451.TweaksAndThings.Enums;
-using UI.Builder;
 using Model;
 using RMROC451.TweaksAndThings.Extensions;
-using UnityEngine.InputSystem;
+using UnityEngine;
+using UnityModManagerNet;
 
 namespace RMROC451.TweaksAndThings;
 
-public class Settings
+public class Settings : UnityModManager.ModSettings
 {
 
     public Settings()
@@ -51,7 +50,6 @@ public class Settings
         DisableWaypointControls = disableWaypointControls;
     }
 
-    public readonly UIState<string> _selectedTabState = new UIState<string>(null);
     public List<WebhookSettings>? WebhookSettingsList;
     public bool HandBrakeAndAirTagModifiers;
     public RosterFuelColumnSettings? EngineRosterFuelColumnSettings;
@@ -66,6 +64,9 @@ public class Settings
     public float CabeeseSearchRadiusFtInMeters;
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
     public bool DisableWaypointControls;
+    public KeyBinding ClickAltBinding = new KeyBinding { keyCode = KeyCode.LeftAlt };
+    public KeyBinding ClickControlBinding = new KeyBinding { keyCode = KeyCode.LeftControl };
+    public KeyBinding ClickShiftBinding = new KeyBinding { keyCode = KeyCode.LeftShift };
 
     internal void AddAnotherRow()
     {
@@ -73,9 +74,10 @@ public class Settings
         if (!string.IsNullOrEmpty(WebhookSettingsList.OrderByDescending(wsl => wsl.WebhookUrl).Last().WebhookUrl))
         {
             WebhookSettingsList.Add(new());
-            Log.Debug($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
         }
     }
+
+    public override void Save(UnityModManager.ModEntry modEntry) => Save(this, modEntry);
 }
 
 public class WebhookSettings

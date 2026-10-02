@@ -2,5 +2,7 @@
   <PropertyGroup>
     <!-- Directory that the game (Railroader.exe) is in -->
     <GameDir></GameDir>
+    <!-- Optional override; defaults to Railroader_Data/Managed/UnityModManager -->
+    <UnityModManagerDir></UnityModManagerDir>
   </PropertyGroup>
 </Project>

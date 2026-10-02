@@ -12,22 +12,11 @@
     <Compile Remove="Patches\BindingsWindow_Patches.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="mroc-cabeese.json" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="mroc-cabeese.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <GameAssembly Include="Assembly-CSharp" />
-    <GameAssembly Include="Railloader.Interchange" />
     <GameAssembly Include="Serilog" />
-    <GameAssembly Include="0Harmony" />
     <GameAssembly Include="KeyValue.Runtime" />
     <GameAssembly Include="Definition" />
     <GameAssembly Include="Ops" />
-    <GameAssembly Include="StrangeCustoms" />
 
     <GameAssembly Include="Unity.InputSystem" />
     <GameAssembly Include="UnityEngine.CoreModule" />
@@ -43,6 +32,16 @@
 
     <GameAssembly Include="System.Net.Http" />
     <GameAssembly Include="Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(UnityModManagerDir)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityModManager">
+      <HintPath>$(UnityModManagerDir)\UnityModManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Krafs.Publicizer" Version="2.2.1">

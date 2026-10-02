@@ -4,7 +4,6 @@ using HarmonyLib;
 using Model;
 using Model.Ops;
 using Network;
-using Railloader;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -29,7 +28,7 @@ internal class RepairTrack_DailyPayables_Patch
 
     public static bool Prefix(RepairTrack __instance, GameDateTime now, IIndustryContext ctx)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.ServiceFundPenalties()) return true;
 
 
@@ -67,7 +66,7 @@ internal class RepairTrack_NeedsRepair_Patch
     private static Serilog.ILogger _log => Log.ForContext<RepairTrack_NeedsRepair_Patch>();
     public static void Postfix(RepairTrack __instance, ref IEnumerable<Car> __result)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return;
 
         __result = EnumerateCarsActualPatched(__result);
@@ -90,7 +89,7 @@ internal class RepairTrack_BuildCars_Patch
 {
     public static bool Prefix(RepairTrack __instance, UIPanelBuilder builder)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
         BuildCarsPatched(__instance, builder);

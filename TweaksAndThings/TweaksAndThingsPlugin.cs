@@ -1,376 +1,225 @@
-﻿// Ignore Spelling: RMROC
+// Ignore Spelling: RMROC
 
-using GalaSoft.MvvmLight.Messaging;
-using Game;
-using Game.Messages;
-using Game.State;
 using HarmonyLib;
-using Railloader;
+using Game;
+using Game.State;
 using RMROC451.TweaksAndThings.Commands;
 using RMROC451.TweaksAndThings.Enums;
-using Serilog;
 using System;
-using System.Linq;
 using System.Net.Http;
-using UI.Builder;
 using UnityEngine;
-using ILogger = Serilog.ILogger;
+using UnityModManagerNet;
 
 namespace RMROC451.TweaksAndThings;
 
-public class TweaksAndThingsPlugin : SingletonPluginBase<TweaksAndThingsPlugin>, IUpdateHandler, IModTabHandler
+public sealed class TweaksAndThingsPlugin
 {
-    private HttpClient client;
-    internal HttpClient Client
-    {
-        get
-        {
-            if (client == null)
-                client = new HttpClient();
+    private static Harmony? harmony;
+    private static UnityModManager.ModEntry? modEntry;
+    private static HttpClient? client;
 
-            return client;
+    public static TweaksAndThingsPlugin? Instance { get; private set; }
+
+    internal HttpClient Client => client ??= new HttpClient();
+    internal Settings? settings { get; private set; }
+    internal bool IsEnabled { get; private set; }
+    public string ModDirectory => modEntry?.Path ?? string.Empty;
+
+    internal static void LogException(string message, Exception exception) =>
+        modEntry?.Logger.LogException(message, exception);
+
+    private TweaksAndThingsPlugin() { }
+
+    public static bool Load(UnityModManager.ModEntry entry)
+    {
+        try
+        {
+            modEntry = entry;
+            Instance = new TweaksAndThingsPlugin
+            {
+                settings = UnityModManager.ModSettings.Load<Settings>(entry) ?? new Settings()
+            };
+            Instance.NormalizeSettings();
+
+            harmony = new Harmony(entry.Info.Id);
+            entry.OnToggle = OnToggle;
+            entry.OnGUI = OnGUI;
+            entry.OnSaveGUI = OnSaveGUI;
+
+            if (entry.Enabled)
+            {
+                harmony.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
+                Instance.IsEnabled = true;
+            }
+
+            entry.Logger.Log("Tweaks and Things loaded for UnityModManager.");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            entry.Logger.LogException("Failed to load Tweaks and Things", exception);
+            return false;
         }
     }
-    internal Settings? settings { get; private set; } = null;
-    readonly ILogger logger = Log.ForContext<TweaksAndThingsPlugin>();
-    IModdingContext moddingContext { get; set; }
-    IModDefinition modDefinition { get; set; }
 
-    public string ModDirectory => modDefinition.Directory;
-
-    static TweaksAndThingsPlugin()
+    private void NormalizeSettings()
     {
+        settings ??= new Settings();
+        settings.WebhookSettingsList = SettingsExtensions.SanitizeEmptySettings(settings.WebhookSettingsList);
+        settings.EngineRosterFuelColumnSettings ??= new RosterFuelColumnSettings();
     }
 
-    public TweaksAndThingsPlugin(IModdingContext moddingContext, IModDefinition self)
+    private static bool OnToggle(UnityModManager.ModEntry entry, bool value)
     {
-        this.modDefinition = self;
-
-        this.moddingContext = moddingContext;
-
-        logger.Debug("Hello! Constructor was called for {modId}/{modVersion}!", self.Id, self.Version);
-
-        moddingContext.RegisterConsoleCommand(new EchoCommand());
-
-        settings = moddingContext.LoadSettingsData<Settings>(self.Id) ?? new();
-    }
-
-    public override void OnEnable()
-    {
-        var harmony = new Harmony(modDefinition.Id);
-        harmony.PatchCategory(modDefinition.Id.Replace(".", string.Empty));
-    }
-
-    public override void OnDisable()
-    {
-        var harmony = new Harmony(modDefinition.Id);
-        harmony.UnpatchAll(modDefinition.Id);
-        Messenger.Default.Unregister(this);
-    }
-
-    public void Update()
-    {
-    }
-
-    public void ModTabDidOpen(UIPanelBuilder builder)
-    {
-        if (settings == null) settings = new();
-        if (!settings?.WebhookSettingsList?.Any() ?? true) settings.WebhookSettingsList = new[] { new WebhookSettings() }.ToList();
-        if (settings?.EngineRosterFuelColumnSettings == null) settings.EngineRosterFuelColumnSettings = new();
-
-
-        settings.WebhookSettingsList =
-            settings?.WebhookSettingsList.SanitizeEmptySettings();
-
-        builder.AddSection("Adjustments To Base Game", (UIPanelBuilder builder) => {
-            builder.AddLabel("1) Repair tracks now require cars to be waybilled, or they will not be serviced/overhauled.\nThey will report on the company window's location section as 'No Work Order Assigned'.");
-            builder.Spacer(spacing * spacing);
-            builder.AddLabel("2) You now have the same click options on the little car icons in the lower left engine controls ui, as you do with cars in the game. Ctrl click -> open car inspector, etc.");
-        });
-        builder.Spacer(spacing * spacing);
-        builder.AddTabbedPanels(settings._selectedTabState, delegate (UITabbedPanelBuilder tabBuilder)
+        try
         {
-            tabBuilder.AddTab("Caboose Mods", "cabooseUpdates", CabooseMods);
-            tabBuilder.AddTab("UI", "rosterUi", UiUpdates);
-            tabBuilder.AddTab("Webhooks", "webhooks", WebhooksListUISection);
-        });
-    }
-
-    private static string cabooseUse => "Caboose Use";
-    private static string autoAiRequirment => "AutoAI Requirement";
-    private static string locoConsistOilIndication => "Consist Oil Indication";
-    private static float spacing => 2f;
-
-    private void CabooseMods(UIPanelBuilder builder)
-    {
-        //UI.GameInput
-        //builder.AddField("Meow", 
-        //    builder.AddInputBindingControl(
-
-        //        )
-        //)
-
-        //        InputAction a = new InputAction("connectCarsAndGladhands", InputActionType.Button)
-
-        //var connectCarsAndGladhands = new InputAction("connectCarsAndGladhands");
-        //connectCarsAndGladhands.AddCompositeBinding("connectCarsAndGladhandsComposite")
-        //    .With("modifier", "<Keyboard>/leftCtrl")
-        //    .With("modifier", "<Keyboard>/leftAlt");
-
-        //builder.AddField("meow", builder.AddInputBindingControl(connectCarsAndGladhands, conflict: true, ()=>))
-        #region EndGearHelperCost
-        builder.AddFieldToggle(
-            cabooseUse,
-            () => this.EndGearHelpersRequirePayment(),
-                delegate (bool enabled)
-                {
-                    if (settings == null) settings = new();
-                    settings.EndGearHelpersRequirePayment = enabled;
-                    builder.Rebuild();
-                }
-        ).Tooltip("Enable End Gear Helper Cost", @$"Will cost 1 minute of AI Brake Crew & Caboose Crew time per car in the consist when the new inspector buttons are utilized.
-
-1.5x multiplier penalty to AI Brake Crew cost if no sufficiently crewed caboose nearby.
-
-Caboose starts reloading `Crew Hours` at any Team or Repair track (no waybill), after being stationary for 30 seconds.
-
-AutoOiler Update: Increases limit that crew will oiling a car from 75% -> 99%, also halves the time it takes (simulating crew from lead end and caboose handling half the train).
-
-AutoOiler Update: if `{cabooseUse}` & `{autoAiRequirment.Replace("\n", " ")}` checked, then when a caboose is present, the AutoOiler will repair hotboxes afer oiling them to 100%.
-
-AutoHotboxSpotter Update: decrease the random wait from 30 - 300 seconds to 15 - 30 seconds (Safety Is Everyone's Job)");
-        #endregion
-
-        #region CabeeseLoadOptions
-        if (this.EndGearHelpersRequirePayment())
-        {
-            var columns = Enum.GetValues(typeof(CrewHourLoadMethod)).Cast<CrewHourLoadMethod>().Select(i => i.ToString()).ToList();
-            builder.Spacer(spacing);
-            builder.AddField("Refill Option",
-                builder.AddDropdown(
-                    columns,
-                    (int)(settings?.LoadCrewHoursMethod ?? CrewHourLoadMethod.Tracks),
-                    delegate (int column)
-                    {
-                        if (settings == null) settings = new();
-                        settings.LoadCrewHoursMethod = (CrewHourLoadMethod)column;
-                        builder.Rebuild();
-                    }
-                )
-            ).Tooltip("Crew Hours Load Option", "Select whether you want to manually reload cabeese via:\n\ntrack method - (team/repair/passenger stop/interchange)\n\ndaily caboose top off - refill to 8h at new day.");
+            var plugin = Instance;
+            if (plugin == null || harmony == null) return false;
+            if (plugin.IsEnabled == value) return true;
+            if (value)
+            {
+                harmony.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
+            }
+            else
+            {
+                harmony.UnpatchAll(entry.Info.Id);
+            }
+            plugin.IsEnabled = value;
+            return true;
         }
-        #endregion
-
-        #region RequireCabeeseForOiler/HotboxDetection
-        builder.Spacer(spacing);
-        builder.AddFieldToggle(
-            autoAiRequirment,
-            () => this.RequireConsistCabooseForOilerAndHotboxSpotter(),
-                delegate (bool enabled)
-                {
-                    if (settings == null) settings = new();
-                    settings.RequireConsistCabooseForOilerAndHotboxSpotter = enabled;
-                    builder.Rebuild();
-                }
-        ).Tooltip("AI Hotbox\\Oiler Requires Caboose", $@"A caboose is required in the consist to check for Hotboxes and perform Auto Oiler, if checked.");
-        #endregion
-
-        #region ShowLocomotiveConsistOilIndicator
-        builder.Spacer(spacing);
-        builder.AddFieldToggle(
-            locoConsistOilIndication,
-            () => settings?.CabooseRequiredForLocoTagOilIndication ?? false,
-            delegate (bool enabled)
-            {
-                if (settings == null) settings = new();
-                settings.CabooseRequiredForLocoTagOilIndication = enabled;
-                builder.Rebuild();
-            }
-        ).Tooltip(locoConsistOilIndication, $@"A caboose is required in the consist to report the lowest oil level in the consist in the locomotive's tag & roster entry.");
-        #endregion
-
-        #region SafetyFirst
-        builder.Spacer(spacing);
-        builder.AddFieldToggle(
-            "Safety First!",
-            () => settings?.SafetyFirst ?? false,
-            delegate (bool enabled)
-            {
-                if (settings == null) settings = new();
-                settings.SafetyFirst = enabled;
-                builder.Rebuild();
-            }
-        ).Tooltip("Safety First", $@"On non-express timetabled consists, a caboose is required in the consist increase AE max speed > 20 in {Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Road)}/{Enum.GetName(typeof(AutoEngineerMode), AutoEngineerMode.Waypoint)} mode.");
-        #endregion
-
-        #region SafetyFirstClient
-        if (settings?.SafetyFirst ?? false)
+        catch (Exception exception)
         {
-            builder.Spacer(spacing);
-            builder.AddFieldToggle(
-                "Safety First! (Enforce Client Speed Restrictions)",
-                () => settings?.SafetyFirstClientEnforce ?? false,
-                delegate (bool enabled)
-                {
-                    if (settings == null) settings = new();
-                    settings.SafetyFirstClientEnforce = enabled;
-                    builder.Rebuild();
-                }
-            ).Tooltip("Safety First! (Enforce Client Speed Restrictions)", $@"Enforce cabeese dominance on clients; uncheck to allow clients to override the 20mph restriction.");
+            entry.Logger.LogException(value ? "Failed to enable Tweaks and Things" : "Failed to disable Tweaks and Things", exception);
+            return false;
         }
-        #endregion
-
     }
 
-    private void UiUpdates(UIPanelBuilder builder)
+    private static void OnSaveGUI(UnityModManager.ModEntry entry)
     {
-        builder.AddFieldToggle(
-            "Enable Tag Updates",
-                () => settings?.HandBrakeAndAirTagModifiers ?? false,
-                delegate (bool enabled)
-                {
-                    if (settings == null) settings = new();
-                    settings.HandBrakeAndAirTagModifiers = enabled;
-                    builder.Rebuild();
-                }
-        ).Tooltip("Enable Tag Updates", $@"Will suffix tag title with:
-{TextSprites.CycleWaybills} if Air System issue.
-{TextSprites.HandbrakeWheel} if there is a handbrake set.
-{TextSprites.Hotbox} if a hotbox.");
-
-        builder.Spacer(spacing);
-        builder.AddFieldToggle(
-            "Debt Allowance",
-            () => settings?.ServicingFundPenalty ?? false,
-            delegate (bool enabled)
-            {
-                if (settings == null) settings = new();
-                settings.ServicingFundPenalty = enabled;
-                builder.Rebuild();
-            }
-        ).Tooltip("Allow Insufficient Funds", $@"Will allow interchange service and repair shops to still function when you are insolvent, at a 20% overdraft fee.");
-
-        builder.Spacer(spacing);
-        builder.AddFieldToggle(
-            "Train Brake Color Mode",
-            () => this.TrainBrakeDisplayShowsColorsInCalloutMode(),
-            delegate (bool enabled)
-            {
-                if (settings == null) settings = new();
-                settings.TrainBrakeDisplayShowsColorsInCalloutMode = enabled;
-                builder.Rebuild();
-            }
-        ).Tooltip("Train Brake Color Mode", $@"When enabled/checked and car tag callout mode is enabled (showing car tags hovering over them), the train brake display of the selected locomotive will change the cars/engines to their destination area's color to help you visualize sets of cars at a glance.");
-
-        builder.Spacer(spacing);
-        builder.AddFieldToggle(
-            "Disable Waypoint Controls",
-            () => settings?.DisableWaypointControls ?? false,
-            delegate (bool enabled)
-            {
-                if (settings == null) settings = new();
-                settings.DisableWaypointControls = enabled;
-                builder.Rebuild();
-            }
-        ).Tooltip("Disable Waypoint Controls", @"When enabled, removes the waypoint set/jump options from the engine control menu. This disables the option to jump to waypoints or set waypoints based on consist car destinations, allowing only default engine controls.");
-
-        builder.Spacer(spacing);
-        EngineRosterShowsFuelStatusUISection(builder);
+        var plugin = Instance;
+        if (plugin?.settings == null) return;
+        plugin.NormalizeSettings();
+        plugin.settings.Save(entry);
     }
 
-    private void EngineRosterShowsFuelStatusUISection(UIPanelBuilder builder)
+    private static int selectedTab;
+    private static readonly string[] Tabs = { "Caboose Mods", "UI", "Webhooks", "Crew Update", "Keybindings" };
+    private static readonly string[] CrewLoadMethods = { "Tracks", "Daily" };
+    private static readonly string[] FuelColumns = { "None", "Engine", "Crew", "Status" };
+    private static string crewUpdateMessage = string.Empty;
+    private static bool includeCrewUpdateArea = true;
+
+    private static void OnGUI(UnityModManager.ModEntry entry)
     {
-        var columns = Enum.GetValues(typeof(EngineRosterFuelDisplayColumn)).Cast<EngineRosterFuelDisplayColumn>().Select(i => i.ToString()).ToList();
-        builder.AddSection("Fuel Display in Engine Roster", delegate (UIPanelBuilder builder)
+        var settings = Instance?.settings;
+        if (settings == null) return;
+        Instance!.NormalizeSettings();
+
+        GUILayout.Label("Adjustments to the base game");
+        GUILayout.Label("Repair tracks only service waybilled cars. Cars without a work order show 'No Work Order Assigned'.");
+        GUILayout.Label("Car icons in the engine controls support the same modifier-click actions as cars in the world.");
+        GUILayout.Space(8f);
+        selectedTab = GUILayout.Toolbar(selectedTab, Tabs);
+        GUILayout.Space(8f);
+
+        switch (selectedTab)
         {
-            builder.Spacer(spacing);
-            builder.AddField(
-                "Enable",
-                builder.AddDropdown(columns, (int)(settings?.EngineRosterFuelColumnSettings?.EngineRosterFuelStatusColumn ?? EngineRosterFuelDisplayColumn.None),
-                    delegate (int column)
-                    {
-                        if (settings == null) settings = new();
-                        settings.EngineRosterFuelColumnSettings.EngineRosterFuelStatusColumn = (EngineRosterFuelDisplayColumn)column;
-                        builder.Rebuild();
-                    }
-                )
-            ).Tooltip("Enable Fuel Display in Engine Roster", $"Will add reamaing fuel indication to Engine Roster (with details in roster row tool tip), Examples : {string.Join(" ", Enumerable.Range(0, 4).Select(i => TextSprites.PiePercent(i, 4)))}");
-
-            builder.Spacer(spacing);
-            builder.AddFieldToggle(
-                "Always Visible?",
-                    () => settings?.EngineRosterFuelColumnSettings?.EngineRosterShowsFuelStatusAlways ?? false,
-                    delegate (bool enabled)
-                    {
-                        if (settings == null) settings = new();
-                        settings.EngineRosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways = enabled;
-                        builder.Rebuild();
-                    }
-            ).Tooltip("Fuel Display in Engine Roster Always Visible", $"Always displayed, if you want it hidden and only shown when you care to see, uncheck this, and then you can press ALT for it to populate on the next UI refresh cycle.");
-        });
+            case 0: DrawCabooseSettings(settings); break;
+            case 1: DrawUiSettings(settings); break;
+            case 2: DrawWebhookSettings(settings); break;
+            case 3: DrawCrewUpdate(); break;
+            case 4: DrawKeybindings(settings); break;
+        }
     }
 
-    private void WebhooksListUISection(UIPanelBuilder builder)
+    private static void DrawCrewUpdate()
     {
-        builder.AddSection("Webhooks List", delegate (UIPanelBuilder builder)
+        GUILayout.Label("Compose and send the same formatted locomotive status update provided by /cu.");
+        crewUpdateMessage = GUILayout.TextField(crewUpdateMessage, 512);
+        includeCrewUpdateArea = GUILayout.Toggle(includeCrewUpdateArea, "Include the current area in the message");
+        if (string.IsNullOrWhiteSpace(crewUpdateMessage))
+            GUILayout.Label("Enter a message before sending.");
+        else if (GUILayout.Button("Send crew update"))
         {
-            for (int i = 1; i <= settings.WebhookSettingsList.Count; i++)
-            {
-                int z = i - 1;
-                builder.AddSection($"Webhook {i}", delegate (UIPanelBuilder builder)
-                {
-                    builder.AddField(
-                        "Webhook Enabled",
-                        builder.AddToggle(
-                            () => settings?.WebhookSettingsList[z]?.WebhookEnabled ?? false,
-                            delegate (bool enabled)
-                            {
-                                if (settings == null) settings = new();
-                                settings.WebhookSettingsList[z].WebhookEnabled = enabled;
-                                settings.AddAnotherRow();
-                                builder.Rebuild();
-                            }
-                        )
-                    ).Tooltip("Webhook Enabled", "Will parse the console messages and transmit to a Discord webhook.");
-
-                    builder.AddField(
-                        "Reporting Mark",
-                        builder.HStack(delegate (UIPanelBuilder field)
-                        {
-                            field.AddInputField(
-                                settings?.WebhookSettingsList[z]?.RailroadMark,
-                                delegate (string railroadMark)
-                                {
-                                    if (settings == null) settings = new();
-                                    settings.WebhookSettingsList[z].RailroadMark = railroadMark;
-                                    settings.AddAnotherRow();
-                                    builder.Rebuild();
-                                }, characterLimit: GameStorage.ReportingMarkMaxLength).FlexibleWidth();
-                        })
-                    ).Tooltip("Reporting Mark", "Reporting mark of the company this Discord webhook applies to..");
-
-                    builder.AddField(
-                        "Webhook Url",
-                        builder.HStack(delegate (UIPanelBuilder field)
-                        {
-                            field.AddInputField(
-                                settings?.WebhookSettingsList[z]?.WebhookUrl,
-                                delegate (string webhookUrl)
-                                {
-                                    if (settings == null) settings = new();
-                                    settings.WebhookSettingsList[z].WebhookUrl = webhookUrl;
-                                    settings.AddAnotherRow();
-                                    builder.Rebuild();
-                                }).FlexibleWidth();
-                        })
-                    ).Tooltip("Webhook Url", "Url of Discord webhook to publish messages to.");
-                });
-            }
-        });
+            var command = new EchoCommand();
+            command.Execute(new[] { "/cu", ".", includeCrewUpdateArea ? "+" : "-", crewUpdateMessage });
+        }
     }
 
-    public void ModTabDidClose()
+    private static void DrawKeybindings(Settings settings)
     {
-        this.moddingContext.SaveSettingsData(this.modDefinition.Id, settings ?? new());
+        GUILayout.Label("These bindings replace the hard-coded click modifiers. Hold the binding while clicking a car or map location.");
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Alt action modifier", GUILayout.Width(160f));
+        UnityModManager.UI.DrawKeybinding(ref settings.ClickAltBinding);
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Control action modifier", GUILayout.Width(160f));
+        UnityModManager.UI.DrawKeybinding(ref settings.ClickControlBinding);
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Shift action modifier", GUILayout.Width(160f));
+        UnityModManager.UI.DrawKeybinding(ref settings.ClickShiftBinding);
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Defaults are Left Alt, Left Control, and Left Shift. The existing click combinations still work by holding multiple action modifiers together.");
+    }
+
+    private static void DrawCabooseSettings(Settings settings)
+    {
+        settings.EndGearHelpersRequirePayment = GUILayout.Toggle(settings.EndGearHelpersRequirePayment, "Caboose Use / Charge crew for end-gear helpers");
+        GUILayout.Label("Charges one minute of AI brake crew and caboose crew time per car. A missing sufficiently crewed caboose adds a 1.5x time cost. Crew hours refill at tracks after 30 seconds stopped, or once per day, depending on the refill option.");
+        if (settings.EndGearHelpersRequirePayment)
+        {
+            GUILayout.Label("Crew hours refill method");
+            var loadMethod = GUILayout.SelectionGrid((int)settings.LoadCrewHoursMethod, CrewLoadMethods, CrewLoadMethods.Length);
+            if (Enum.IsDefined(typeof(CrewHourLoadMethod), loadMethod)) settings.LoadCrewHoursMethod = (CrewHourLoadMethod)loadMethod;
+        }
+
+        settings.RequireConsistCabooseForOilerAndHotboxSpotter = GUILayout.Toggle(settings.RequireConsistCabooseForOilerAndHotboxSpotter, "Require a caboose for Auto Oiler and Hotbox Spotter");
+        settings.CabooseRequiredForLocoTagOilIndication = GUILayout.Toggle(settings.CabooseRequiredForLocoTagOilIndication, "Require a caboose for locomotive consist oil indication");
+        settings.SafetyFirst = GUILayout.Toggle(settings.SafetyFirst, "Safety First: require a caboose for higher Auto Engineer speeds");
+        if (settings.SafetyFirst)
+            settings.SafetyFirstClientEnforce = GUILayout.Toggle(settings.SafetyFirstClientEnforce, "Enforce Safety First speed limits for remote clients");
+        settings.CabooseAllowsConsistInfo = GUILayout.Toggle(settings.CabooseAllowsConsistInfo, "Allow caboose consist information");
+    }
+
+    private static void DrawUiSettings(Settings settings)
+    {
+        settings.HandBrakeAndAirTagModifiers = GUILayout.Toggle(settings.HandBrakeAndAirTagModifiers, "Enable tag updates for air, handbrake, oil, and hotbox status");
+        settings.ServicingFundPenalty = GUILayout.Toggle(settings.ServicingFundPenalty, "Allow repair-track servicing with insufficient funds (20% overdraft fee)");
+        settings.TrainBrakeDisplayShowsColorsInCalloutMode = GUILayout.Toggle(settings.TrainBrakeDisplayShowsColorsInCalloutMode, "Show train brake colors in callout mode");
+        settings.DisableWaypointControls = GUILayout.Toggle(settings.DisableWaypointControls, "Disable waypoint controls");
+
+        GUILayout.Space(6f);
+        GUILayout.Label("Fuel display in engine roster");
+        var current = (int)(settings.EngineRosterFuelColumnSettings?.EngineRosterFuelStatusColumn ?? EngineRosterFuelDisplayColumn.None);
+        var selected = GUILayout.SelectionGrid(current, FuelColumns, FuelColumns.Length);
+        if (Enum.IsDefined(typeof(EngineRosterFuelDisplayColumn), selected))
+            settings.EngineRosterFuelColumnSettings!.EngineRosterFuelStatusColumn = (EngineRosterFuelDisplayColumn)selected;
+        settings.EngineRosterFuelColumnSettings!.EngineRosterShowsFuelStatusAlways = GUILayout.Toggle(
+            settings.EngineRosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways,
+            "Always show fuel status (otherwise hold Alt to display)");
+    }
+
+    private static void DrawWebhookSettings(Settings settings)
+    {
+        GUILayout.Label("Webhook messages are sent for the currently loaded railroad reporting mark.");
+        var rows = settings.WebhookSettingsList!;
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            GUILayout.Label($"Webhook {i + 1}");
+            row.WebhookEnabled = GUILayout.Toggle(row.WebhookEnabled, "Enabled");
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Reporting mark", GUILayout.Width(110f));
+            row.RailroadMark = GUILayout.TextField(row.RailroadMark ?? string.Empty, GameStorage.ReportingMarkMaxLength);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Webhook URL", GUILayout.Width(110f));
+            row.WebhookUrl = GUILayout.TextField(row.WebhookUrl ?? string.Empty);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(4f);
+        }
+        settings.WebhookSettingsList = SettingsExtensions.SanitizeEmptySettings(rows);
     }
 }

@@ -2,7 +2,6 @@
 using Model;
 using Model.Definition;
 using Model.Physics;
-using Railloader;
 using System;
 using static Model.Car;
 
@@ -15,7 +14,7 @@ internal class BaseLocomotive_FindSourceLocomotive_Patch
 {
     private static bool Prefix(BaseLocomotive __instance, LogicalEnd searchDirection, ref BaseLocomotive __result)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
         __result = FindSourceLocomotive(__instance, searchDirection);
@@ -51,7 +50,7 @@ internal class BaseLocomotive_FindSourceLocomotive_Patch
 //{
 //    private static void Postfix(LocomotiveAirSystem __instance, ref LocomotiveAirSystem locomotiveAirSystem, ref bool __result)
 //    {
-//        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+//        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
 //        if (!tweaksAndThings.IsEnabled()) return;
 
 //        __result = _ShouldDeferToLocomotiveAir(__instance, out locomotiveAirSystem);
@@ -92,7 +91,7 @@ internal class BaseLocomotive_FindSourceLocomotive_Patch
 //{
 //    private static void Postfix(CarAirSystem __instance, ref LocomotiveAirSystem locomotiveAirSystem, ref bool __result)
 //    {
-//        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+//        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
 //        if (!tweaksAndThings.IsEnabled()) return;
 
 //        __result = ShouldDeferToLocomotiveAir(__instance, out locomotiveAirSystem);

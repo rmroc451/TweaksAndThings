@@ -3,7 +3,6 @@ using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
 using Model.Ops;
-using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
 using System;
@@ -25,7 +24,7 @@ internal class TagController_UpdateTag_Patch
 
     private static void Postfix(Car car, TagCallout tagCallout)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
 
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.settings.HandBrakeAndAirTagModifiers)
         {

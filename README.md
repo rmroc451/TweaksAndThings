@@ -4,7 +4,7 @@ Please Read this **ENTIRE** README before continuing.
 
 This is a mod for Railroader which is available on Steam.
 
-This mod requires Railloader by Zamu.
+This version is packaged as a UnityModManager mod.
 
 ## Credits & Project History
 
@@ -19,20 +19,14 @@ Special thanks to:
 - Zamu
 
 ## Usage
-1. Download and install Railloader by Zamu from here: https://railroader.stelltis.ch/
-    * Verify you have a Mods folder in the root of your railroader directory. If You do NOT have a Mods folder, you didn't complete this step successfully.
-2. Download the `RMROC451.TweaksAndThings.x.x.zip` from the Releases Page of this repo.
-3. There are 2 ways to install this mod.
-    * ONLY DO ONE OF THE BELOW STEPS, NOT BOTH
-    1. Open the zip folder, select the entire contents of the folder and drag the contents to the ROOT Railroader directory.
-        * this should put a `RMROC451.TweaksAndThings` folder into the Mods folder created in step 1
-    2. Drag the zip file onto Railloader.exe and have Railloader install the mod.
-        * as with option 1, this will put a `RMROC451.TweaksAndThings` folder into the Mods folder created in step 1
-    * If you DO NOT have the `RMROC451.TweaksAndThings` folder in the Mods folder after completing ONE of the above steps, you didn't complete the step successfully.
-3. Run the game and enjoy all of the tweaks and things!
+1. Install UnityModManager and configure it for Railroader.
+2. Download the `RMROC451.TweaksAndThings.x.x.zip` from the Releases page of this repository.
+3. Install the release ZIP from UnityModManager's **Mods** tab, or manually extract the `RMROC451.TweaksAndThings` folder from the archive into Railroader's `Mods` folder. The folder must contain `Info.json` and `RMROC451.TweaksAndThings.dll`.
+4. Start Railroader, open the UnityModManager menu, and enable **RMROC451's Tweaks and Things**. Its settings and keybindings are available in the mod panel.
+
 
 ## Notes
-1. This mod currently supports Railroader version 2024.4.4. This mod may break in future updates. I will do my best to continue to update this mod.
+1. This mod currently supports Railroader version 2024.6 and later versions may require updates. I will do my best to continue maintaining it.
 2. It is possible that the developers of Railroader will implement their own fix for this issue. At such time this mod will be deprecated and no longer maintained. 
 3. As the saying goes, use mods at your own risk.
 
@@ -60,6 +54,7 @@ Enter Tweaks and Things.
             </li>
             <li><b>A4:</b> Adds a "+" on cabeese tags when on a track span that reloads their crew hours load (see <b>C</b>)</li>
             <li><b>A5 (🟢 NEW v2.0.0):</b> Car Click Hotkey Modifiers 
+               <br/>The original modifier actions default to Alt, Alt+Shift, Ctrl+Shift, and Ctrl+Alt (with Shift optionally held). Rebind the Alt, Control, and Shift action keys from the UnityModManager **Keybindings** tab; combinations remain composable.
                <ul>
                   <li><b>A5a:</b> `alt left click` : toggle car hand brake and connect glad hands on both ends
                      <ul>
@@ -135,7 +130,7 @@ Enter Tweaks and Things.
             <li><b>D2:</b> Locomotive messages grab the locomotive `Ident.RoadNumber` and check the `CTC Panel Markers` if they exist. If found, they will use the red/green color and embed the locomotive as an image in the message.  If no marker is found, it defaults to blue.</li>
             <li><b>D3:</b> Currently, One person per server should have this per discord webhook, otherwise you will get duplicate messages to the webhook.</li>
             <li><b>D4: Multiple hooks</b>: Allows for many different webhooks per client to be setup, and filtered to the `Ident.ReportingMark` so you can get messages to different hooks based on what save/server you are playing on.</li>
-            <li><b>D5: Customizable</b> from the in-game Railloader settings, find <b>RMROC451.TweaksAndThings</b> (see <b>S3</b>)</li>
+            <li><b>D5: Customizable</b> from the UnityModManager settings panel, find <b>RMROC451.TweaksAndThings</b> (see <b>S3</b>)</li>
         </ul>
   </li>
   <li><b>M:</b> Miscellaneous
@@ -159,6 +154,7 @@ Enter Tweaks and Things.
             <li><b>M4 (🟢 NEW v2.0.0):</b> `ctrl alt click` on a track in the map, sets the selected locomotives waypoint there when in waypoint mode.<br/>
                If you have mapenhancer with cars displayed, if you keycombo click on a car icon, it will set the auto couple attempt.
             </li>
+            <li><b>M5:</b> The formatted `/cu` locomotive status message can be sent from the UnityModManager **Crew Update** tab.</li>
         </ul>
   </li>
   <li><b>S:</b> Settings
@@ -190,7 +186,7 @@ Enter Tweaks and Things.
                     <li><b>S2a:</b> Enable Tag Updates<br/>
                     Allows all tag updates from <b>A</b> to display.</li>
                     <li><b>S2b (🟢 NEW v2.0.0):</b> Debt Allowance<br/>
-                    Will allow interchange service and repair shops to still function when you are insolvent, at a 20% overdraft fee.</li>
+                    Allows repair-track servicing to continue when you are insolvent, at a 20% overdraft fee.</li>
                     <li><b>S2c:</b> Engine Roster Fuel/Info
                         <ul>
                             <li><b>S2c1:</b> Enable Fuel Display in Engine Roster<br/>
@@ -225,6 +221,11 @@ Enter Tweaks and Things.
 Yes, these are client side mods. Host doesn't need to have them.
 
 ### What version of Railroader does this mod work with?
-2024.6 -> [Full Requirements](./TweaksAndThings/Definition.json)
+2024.6 or later. The mod must be built against the Railroader and UnityModManager assemblies installed locally.
 
-*Special thanks and credit to Zamu for creating Railloader and for help with making the mod a bit more robust.*
+### Building and tests
+Set `GameDir` in `Paths.user` to the Railroader install folder. By default, the build expects UnityModManager assemblies in `Railroader_Data/Managed/UnityModManager`; set `UnityModManagerDir` in `Paths.user` if your installation uses another directory.
+
+Run the focused settings and hotkey tests with `dotnet test Tests/TweaksAndThings.Tests.csproj`. Build the release archive with `dotnet build TweaksAndThings.sln -c Release`.
+
+*Special thanks to Zamu for the modding tools and guidance that helped make the original project more robust.*

@@ -5,7 +5,6 @@ using HarmonyLib;
 using Model;
 using Model.Ops;
 using Network;
-using Railloader;
 using System;
 using System.Linq;
 using UI.Builder;
@@ -22,7 +21,7 @@ internal static class CarInspector_PopulateEquipmentPanel_Patch
     [HarmonyPrefix]
     private static void Prefix(CarInspector __instance, UIPanelBuilder builder)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return;
 
         builder.HStack(hstack =>

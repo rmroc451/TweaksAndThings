@@ -2,7 +2,6 @@
 using Model;
 using Model.Definition.Data;
 using Model.Ops;
-using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
 using System;
@@ -29,7 +28,7 @@ internal class EngineRosterRow_Refresh_Patch
 
     public static void Postfix(EngineRosterRow __instance)
     {
-        TweaksAndThingsPlugin? tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin? tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         RosterFuelColumnSettings? rosterFuelColumnSettings = tweaksAndThings?.settings?.EngineRosterFuelColumnSettings;
 
         string fuelInfoText = string.Empty;
@@ -40,7 +39,7 @@ internal class EngineRosterRow_Refresh_Patch
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 
             !tweaksAndThings.IsEnabled() ||
-            rosterFuelColumnSettings.EngineRosterFuelStatusColumn == EngineRosterFuelDisplayColumn.None || (!GameInput.IsAltDown && !rosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways) ||
+            rosterFuelColumnSettings.EngineRosterFuelStatusColumn == EngineRosterFuelDisplayColumn.None || (!HotkeyBindings.AltDown && !rosterFuelColumnSettings.EngineRosterShowsFuelStatusAlways) ||
             __instance._engine.IsMuEnabled
             )
         {

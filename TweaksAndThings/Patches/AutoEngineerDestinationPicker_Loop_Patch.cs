@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using Helpers;
-using Railloader;
 using Serilog;
 using System.Collections;
 using Track;
@@ -17,7 +16,7 @@ internal class AutoEngineerDestinationPicker_Loop_Patch
 {
     static bool Prefix(AutoEngineerDestinationPicker __instance, ref IEnumerator __result)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
         __result = Loop(__instance);

@@ -6,7 +6,6 @@ using Model.Definition.Data;
 using Model.Ops.Definition;
 using Model.Ops;
 using Network;
-using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
 using Serilog;
@@ -108,7 +107,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
 
     public static bool Prefix(IndustryComponent __instance)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!StateManager.IsHost || !tweaksAndThings.IsEnabled() || !tweaksAndThings.EndGearHelpersRequirePayment() || tweaksAndThings.DayLoadCrewHours()) return true;
 
         TrainController tc = UnityEngine.Object.FindAnyObjectByType<TrainController>();

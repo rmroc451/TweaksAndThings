@@ -4,7 +4,6 @@ using HarmonyLib;
 using Model;
 using Model.Ops.Timetable;
 using Newtonsoft.Json;
-using Railloader;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -50,7 +49,7 @@ internal class ExpandedConsole_Add_Patch
             if (entry is null && !String.IsNullOrEmpty(text)) entry = new() { Text = text };
             var msgText = entry?.Text ?? string.Empty;
             if (msgText.StartsWith("Usage:")) return;
-            TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+            TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
             StateManager shared = StateManager.Shared;
             GameStorage gameStorage = shared.Storage;
             WebhookSettings settings = tweaksAndThings?.settings?.WebhookSettingsList?.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);

@@ -5,7 +5,6 @@ using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
 using Network;
-using Railloader;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
@@ -39,7 +38,7 @@ internal class CarInspector_PopulateCarPanel_Patch
 	private static bool Prefix(CarInspector __instance, UIPanelBuilder builder)
     {
 
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 

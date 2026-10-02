@@ -8,7 +8,6 @@ using Model.AI;
 using Model.Definition;
 using Network;
 using Network.Messages;
-using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
 using System;
@@ -21,7 +20,6 @@ using UI.EngineControls;
 using UI.EngineRoster;
 using UnityEngine;
 using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
-using static UnityEngine.InputSystem.InputRemoting;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -35,7 +33,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
     static bool Prefix(AutoEngineerPlanner __instance, ref AutoEngineerCommand command, ref IPlayer sender)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         LocoNoticeWPSet(__instance, command, sender);
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.SafetyFirst() || (sender.IsRemote && !tweaksAndThings.SafetyFirstClientEnforce()) || command.MaxSpeedMph <= governedSpeed) return true;
         BaseLocomotive loco = __instance._locomotive;
@@ -115,7 +113,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
         if (loco.EnumerateCoupled().All(c => c.IsCaboose() || c.MotivePower())) return false;
 
-        bool cabooseReq = SingletonPluginBase<TweaksAndThingsPlugin>.Shared.RequireConsistCabooseForOilerAndHotboxSpotter();
+        bool cabooseReq = TweaksAndThingsPlugin.Instance!.RequireConsistCabooseForOilerAndHotboxSpotter();
         string logMessage = $"\n{nameof(SafetyFirstGoverningApplies)}:{Enum.GetName(typeof(AutoEngineerMode), OrdersHelper.Mode)}[{loco.DisplayName}] ";
         Func<bool> firstClass = () =>
         {
@@ -156,4 +154,3 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
         return output;
     }
 }
-
