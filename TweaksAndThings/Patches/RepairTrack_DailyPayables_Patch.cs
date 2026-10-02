@@ -77,8 +77,8 @@ internal class RepairTrack_NeedsRepair_Patch
 
     internal static bool NeedsRepairPatched(Car car)
     {
-        bool result = TryGetRepairDestination(car, out var overrideTag);
-        return result;
+        bool hasRepairWorkOrder = TryGetRepairDestination(car, out var overrideTag);
+        return FeaturePolicies.IsRepairEligible(hasRepairWorkOrder, TweaksAndThingsPlugin.Instance?.settings);
     }
 }
 

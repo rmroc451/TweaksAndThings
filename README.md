@@ -135,7 +135,7 @@ Enter Tweaks and Things.
   </li>
   <li><b>M:</b> Miscellaneous
         <ul>
-            <li><b>M1 (🟢 NEW v2.0.0):</b> Repair tracks now require cars to be waybilled, or they will not be serviced/overhauled.<br/>They will report on the company window's location section as <b>'No Work Order Assigned'</b>.</li>
+            <li><b>M1 (🟢 NEW v2.0.0):</b> Repair tracks service cars without a waybill by default, matching stock Railroader. Turn off <b>Allow repair-track service without a waybill</b> in UMM UI settings to require a work order; cars without one report as <b>'No Work Order Assigned'</b>.</li>
             <li><b>M2:</b> Engine Roster Tweaks<br/>
                 <ul>
                     <li><b>M2a  (🟢 NEW v2.0.0):</b> MU'd locomotives will automatically be hidden unless they are <b>SELECTED</b> or <b>FAVORITED</b>.</li>
@@ -204,6 +204,7 @@ Enter Tweaks and Things.
                             </li>
                         </ul>
                     </li>
+                    <li><b>S2d:</b> Allow repair-track service without a waybill (on by default).</li>
                 </ul>
             </li>
             <li><b>S3:</b> Webhooks

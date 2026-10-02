@@ -91,6 +91,36 @@ public sealed class SettingsBehaviorTests
     }
 
     [Test]
+    public void DefaultSettings_AllowRepairWithoutWorkOrderLikeStockRailroader()
+    {
+        var settings = new Settings();
+
+        Assert.That(settings.AllowRepairsWithoutWaybill, Is.True);
+    }
+
+    [Test]
+    public void RepairPolicy_AllowsWorkOrderCarsRegardlessOfSetting()
+    {
+        var settings = new Settings { AllowRepairsWithoutWaybill = false };
+
+        Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: true, settings), Is.True);
+    }
+
+    [Test]
+    public void RepairPolicy_AllowsUnwaybilledCarsByDefault()
+    {
+        Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: false, new Settings()), Is.True);
+    }
+
+    [Test]
+    public void RepairPolicy_CanRequireWorkOrderForRepair()
+    {
+        var settings = new Settings { AllowRepairsWithoutWaybill = false };
+
+        Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: false, settings), Is.False);
+    }
+
+    [Test]
     public void HotkeyBindings_KeepModifierCombinationsComposable()
     {
         KeyBinding.ControlHeld = true;

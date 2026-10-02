@@ -14,5 +14,6 @@
     <Compile Include="..\TweaksAndThings\Enums\CrewHourLoadMethod.cs" Link="Enums\CrewHourLoadMethod.cs" />
     <Compile Include="..\TweaksAndThings\Enums\EngineRosterFuelDisplayColumn.cs" Link="Enums\EngineRosterFuelDisplayColumn.cs" />
     <Compile Include="..\TweaksAndThings\Settings\HotkeyBindings.cs" Link="Settings\HotkeyBindings.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\FeaturePolicies.cs" Link="Settings\FeaturePolicies.cs" />
   </ItemGroup>
 </Project>

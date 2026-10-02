@@ -116,7 +116,7 @@ public sealed class TweaksAndThingsPlugin
         Instance!.NormalizeSettings();
 
         GUILayout.Label("Adjustments to the base game");
-        GUILayout.Label("Repair tracks only service waybilled cars. Cars without a work order show 'No Work Order Assigned'.");
+        GUILayout.Label("Repair tracks service cars without a waybill by default. Cars without a work order show 'No Work Order Assigned'.");
         GUILayout.Label("Car icons in the engine controls support the same modifier-click actions as cars in the world.");
         GUILayout.Space(8f);
         selectedTab = GUILayout.Toolbar(selectedTab, Tabs);
@@ -186,6 +186,7 @@ public sealed class TweaksAndThingsPlugin
     private static void DrawUiSettings(Settings settings)
     {
         settings.HandBrakeAndAirTagModifiers = GUILayout.Toggle(settings.HandBrakeAndAirTagModifiers, "Enable tag updates for air, handbrake, oil, and hotbox status");
+        settings.AllowRepairsWithoutWaybill = GUILayout.Toggle(settings.AllowRepairsWithoutWaybill, "Allow repair-track service without a waybill (on by default)");
         settings.ServicingFundPenalty = GUILayout.Toggle(settings.ServicingFundPenalty, "Allow repair-track servicing with insufficient funds (20% overdraft fee)");
         settings.TrainBrakeDisplayShowsColorsInCalloutMode = GUILayout.Toggle(settings.TrainBrakeDisplayShowsColorsInCalloutMode, "Show train brake colors in callout mode");
         settings.DisableWaypointControls = GUILayout.Toggle(settings.DisableWaypointControls, "Disable waypoint controls");
