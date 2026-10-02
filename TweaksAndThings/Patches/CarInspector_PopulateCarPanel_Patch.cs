@@ -5,6 +5,9 @@ using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
+using Model.Definition;
+using Model.Definition.Data;
+using Model.Ops;
 using Network;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
@@ -18,6 +21,7 @@ using UI.Builder;
 using UI.CarInspector;
 using UI.ContextMenu;
 using UI.Tags;
+using UnityEngine;
 using static Model.Car;
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -43,7 +47,8 @@ internal class CarInspector_PopulateCarPanel_Patch
         if (!tweaksAndThings.IsEnabled()) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 
-        var consist = __instance._car.EnumerateCoupled();
+        var consist = __instance._car.EnumerateCoupled().ToList();
+        if (__instance._car.IsCaboose()) SynchronizeCabooseTrainCrew(consist);
 
         builder.HStack(delegate (UIPanelBuilder hstack)
         {
@@ -99,16 +104,110 @@ internal class CarInspector_PopulateCarPanel_Patch
                 hstack = AddCarConsistRebuildObservers(hstack, consist, all: false);
                 hstack.AddField("Consist Info", hstack.HStack(delegate (UIPanelBuilder field)
                 {
-                    int consistLength = consist.Count();
-                    int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(consist);
-                    int lengthInMeters = UnityEngine.Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(consist.ToList()) * 3.28084f);
-                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:N0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
-
-                    field.AddLabel(() => newSubTitle(), UIPanelBuilder.Frequency.Fast)
+                    field.AddLabel(() =>
+                    {
+                        var currentConsist = __instance._car.EnumerateCoupled().ToList();
+                        int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(currentConsist);
+                        int feet = Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(currentConsist) * 3.28084f);
+                        return string.Format("{0}, {1:N0}T, {2:N0}ft, {3:N0} mph", currentConsist.Count.Pluralize("car"), tonnage, feet, __instance._car.VelocityMphAbs);
+                    }, UIPanelBuilder.Frequency.Fast)
                     .Tooltip("Consist Info", "Reflects info about consist.").FlexibleWidth();
                 }));
             });
         }
+
+        if (!plugin.CabooseAllowsConsistInfo() || !__instance._car.IsCaboose()) return;
+
+        var consistCars = consist.ToList();
+        builder.HStack(delegate (UIPanelBuilder hstack)
+        {
+            hstack = AddCarConsistRebuildObservers(hstack, consistCars, all: false);
+            hstack.AddField("Waybill Summary", hstack.HStack(delegate (UIPanelBuilder field)
+            {
+                field.AddLabel(
+                    () => BuildWaybillSummary(__instance._car),
+                    UIPanelBuilder.Frequency.Fast)
+                    .Tooltip("Waybill Summary", "Groups freight cars by the destination area color shown on their waybills. Includes car count, loaded and empty cars, tonnage, and footage for each area.")
+                    .FlexibleWidth();
+            }));
+        });
+    }
+
+    private static string BuildWaybillSummary(Car caboose)
+    {
+        var consist = caboose.EnumerateCoupled().ToList();
+        var ops = OpsController.Shared;
+        if (ops == null) return "No waybilled cars in this consist.";
+
+        var groups = consist
+            .Where(car => car.Archetype.IsFreight() && car.Waybill.HasValue && !car.Waybill.Value.Completed)
+            .Select(car => new
+            {
+                Car = car,
+                Area = ops.AreaForCarPosition(car.Waybill.Value.Destination)
+            })
+            .Where(item => item.Area != null)
+            .GroupBy(item => item.Area.identifier)
+            .Select(group => new
+            {
+                Area = group.First().Area,
+                Cars = group.Select(item => item.Car).ToList()
+            })
+            .OrderBy(group => group.Area.name)
+            .ToList();
+
+        if (groups.Count == 0) return "No waybilled cars in this consist.";
+
+        int totalTonnage = LocomotiveControlsHoverArea.CalculateTonnage(consist);
+        int totalFeet = Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(consist) * 3.28084f);
+        var lines = new List<string>
+        {
+            $"Train: {consist.Count} cars, {totalTonnage:N0}T, {totalFeet:N0}ft, {caboose.VelocityMphAbs:N0} mph"
+        };
+
+        foreach (var group in groups)
+        {
+            int loaded = group.Cars.Count(IsLoadedFreightCar);
+            int empty = group.Cars.Count - loaded;
+            int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(group.Cars);
+            int feet = Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(group.Cars) * 3.28084f);
+            string color = ColorUtility.ToHtmlStringRGB(group.Area.tagColor);
+            lines.Add($"<color=#{color}>■</color> {group.Area.name} area: {group.Cars.Count} cars ({loaded} loaded / {empty} empty), {tonnage:N0}T, {feet:N0}ft");
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static bool IsLoadedFreightCar(Car car)
+    {
+        for (int index = 0; index < car.Definition.LoadSlots.Count; index++)
+        {
+            CarLoadInfo? loadInfo = car.GetLoadInfo(index);
+            if (loadInfo.HasValue && loadInfo.Value.Quantity > 0f) return true;
+        }
+
+        return false;
+    }
+
+    private static void SynchronizeCabooseTrainCrew(IEnumerable<Car> consist)
+    {
+        var caboose = consist.FirstOrDefault(car => car.IsCaboose());
+        if (caboose == null) return;
+
+        // A caboose normally trails the consist. Walk forward from it and use
+        // the foremost crew-assigned locomotive as the train's symbol source.
+        var forwardLocomotive = caboose.EnumerateCoupled(Car.End.F)
+            .OfType<BaseLocomotive>()
+            .LastOrDefault(locomotive => !string.IsNullOrWhiteSpace(locomotive.trainCrewId));
+        var reverseLocomotive = forwardLocomotive == null
+            ? caboose.EnumerateCoupled(Car.End.B)
+                .OfType<BaseLocomotive>()
+                .LastOrDefault(locomotive => !string.IsNullOrWhiteSpace(locomotive.trainCrewId))
+            : null;
+        var leadLocomotive = forwardLocomotive ?? reverseLocomotive;
+        if (leadLocomotive == null || caboose.trainCrewId == leadLocomotive.trainCrewId) return;
+
+        StateManager.ApplyLocal(new SetCarTrainCrew(caboose.id, leadLocomotive.trainCrewId));
     }
 
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist, bool all = true)
@@ -138,6 +237,8 @@ internal class CarInspector_PopulateCarPanel_Patch
                     try
                     {
                         builder.Rebuild();
+                        if (key.Contains(nameof(EndGearStateKey.IsCoupled), StringComparison.OrdinalIgnoreCase))
+                            SynchronizeCabooseTrainCrew(car.EnumerateCoupled());
                         if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true);
                         if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                     }
