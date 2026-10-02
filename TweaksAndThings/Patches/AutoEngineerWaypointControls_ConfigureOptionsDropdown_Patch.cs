@@ -234,15 +234,13 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             string destId = ocp.Identifier;
             float? distance = null;
             float sortdistance = 0f;
-            if (
-                Graph.Shared.TryGetLocationFromPoint(
-                    ocp.Spans?.FirstOrDefault().GetSegments().FirstOrDefault(),
-                    ocp.Spans?.FirstOrDefault()?.GetCenterPoint() ?? default,
-                    200f,
-                    out Location destLoc
-                )
-            )
+            Location? resolvedDestination = null;
+            var span = ocp.Spans?.FirstOrDefault();
+            var segment = span?.GetSegments()?.FirstOrDefault();
+            if (span != null && segment != null && Graph.Shared.TryGetLocationFromPoint(
+                    segment, span.GetCenterPoint(), 200f, out Location destLoc))
             {
+                resolvedDestination = destLoc;
                 float trainMomentum = 0f;
                 Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
                 HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
@@ -257,13 +255,9 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             }
             ;
             _log.Debug($"{getDictKey(selectedLoco)} ->  {destName} {destId} {distance?.ToString()}");
-            jumpTos.Add((
-                destinationId: destId,
-                destination: $"WP> {destName}"
-                , distance: distance
-                , sortdistance: sortdistance
-                , location: (Location?)destLoc
-            ));
+            if (FeaturePolicies.IsWaypointDestinationSelectable(resolvedDestination.HasValue, destId, destName))
+                jumpTos.Add((destinationId: destId, destination: $"WP> {destName}", distance: distance,
+                    sortDistance: sortdistance, location: resolvedDestination));
         }
 
         if (selectedLoco.TryGetTimetableTrain(out Timetable.Train t))
@@ -281,15 +275,13 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                         string destId = t.TrainType == Timetable.TrainType.Passenger ? stp.passengerStop.identifier : stp.code;
                         float? distance = null;
                         float sortdistance = 0f;
-                        if (
-                            Graph.Shared.TryGetLocationFromPoint(
-                                stp.passengerStop.TrackSpans?.FirstOrDefault().GetSegments().FirstOrDefault(),
-                                stp.passengerStop.TrackSpans?.FirstOrDefault()?.GetCenterPoint() ?? default,
-                                200f,
-                                out Location destLoc
-                            )
-                        )
+                        Location? resolvedDestination = null;
+                        var timetableSpan = stp.passengerStop?.TrackSpans?.FirstOrDefault();
+                        var timetableSegment = timetableSpan?.GetSegments()?.FirstOrDefault();
+                        if (timetableSpan != null && timetableSegment != null &&
+                            Graph.Shared.TryGetLocationFromPoint(timetableSegment, timetableSpan.GetCenterPoint(), 200f, out Location destLoc))
                         {
+                            resolvedDestination = destLoc;
                             float trainMomentum = 0f;
                             Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
                             HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
@@ -304,13 +296,9 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                         }
                         ;
                         _log.Debug($"{getDictKey(selectedLoco)} ->  {destName} {destId} {distance?.ToString()}");
-                        jumpTos.Add((
-                            destinationId: destId,
-                            destination: $"{t.DisplayStringLong} > {destName}"
-                            , distance: distance
-                            , sortdistance: sortdistance
-                            , location: (Location?)destLoc
-                        ));
+                        if (FeaturePolicies.IsWaypointDestinationSelectable(resolvedDestination.HasValue, destId, destName))
+                            jumpTos.Add((destinationId: destId, destination: $"{t.DisplayStringLong} > {destName}",
+                                distance: distance, sortDistance: sortdistance, location: resolvedDestination));
                     }
                     catch (Exception ex)
                     {

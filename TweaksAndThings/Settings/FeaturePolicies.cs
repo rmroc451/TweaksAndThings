@@ -15,4 +15,7 @@ internal static class FeaturePolicies
 
     internal static bool IsWaypointCacheForDifferentLocomotive(string? cachedLocomotiveId, string currentLocomotiveId) =>
         !string.Equals(cachedLocomotiveId, currentLocomotiveId, StringComparison.Ordinal);
+
+    internal static bool IsWaypointDestinationSelectable(bool locationResolved, string? destinationId, string? destinationName) =>
+        locationResolved && !string.IsNullOrWhiteSpace(destinationId) && !string.IsNullOrWhiteSpace(destinationName);
 }

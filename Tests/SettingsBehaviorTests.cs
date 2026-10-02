@@ -145,6 +145,16 @@ public sealed class SettingsBehaviorTests
         Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive(null, "loco-a"), Is.True);
     }
 
+    [TestCase(true, "destination", "Mill", true)]
+    [TestCase(false, "destination", "Mill", false)]
+    [TestCase(true, "", "Mill", false)]
+    [TestCase(true, "destination", " ", false)]
+    public void WaypointDestinationPolicy_OnlyExposesResolvedNamedDestinations(
+        bool locationResolved, string destinationId, string destinationName, bool expected)
+    {
+        Assert.That(FeaturePolicies.IsWaypointDestinationSelectable(locationResolved, destinationId, destinationName), Is.EqualTo(expected));
+    }
+
     [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {
