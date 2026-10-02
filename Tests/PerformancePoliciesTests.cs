@@ -26,4 +26,25 @@ public sealed class PerformancePoliciesTests
         Assert.That(result["moved"], Is.EqualTo((false, true)));
         Assert.That(result.ContainsKey("removed"), Is.False);
     }
+
+
+    [Test]
+    public void SelectIds_CollectsOnlyMatchingIdsInOnePass()
+    {
+        var visits = 0;
+        var rows = new[]
+        {
+            (id: "visible", hidden: false),
+            (id: "hidden-a", hidden: true),
+            (id: "hidden-b", hidden: true)
+        };
+
+        var result = PerformancePolicies.SelectIds(
+            rows,
+            row => { visits++; return row.hidden; },
+            row => row.id);
+
+        Assert.That(visits, Is.EqualTo(rows.Length));
+        Assert.That(result, Is.EquivalentTo(new[] { "hidden-a", "hidden-b" }));
+    }
 }

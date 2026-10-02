@@ -17,4 +17,19 @@ internal static class PerformancePolicies
 
         return retained;
     }
+
+    internal static HashSet<string> SelectIds<TItem>(
+        IEnumerable<TItem> items,
+        Func<TItem, bool> shouldSelect,
+        Func<TItem, string> getId)
+    {
+        var selected = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in items)
+        {
+            if (shouldSelect(item))
+                selected.Add(getId(item));
+        }
+
+        return selected;
+    }
 }
