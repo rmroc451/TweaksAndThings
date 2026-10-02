@@ -144,17 +144,11 @@ public sealed class PerformancePoliciesTests
     public void CollectDistinctWhen_InvokesSelectorOncePerItemAndKeepsUniqueIncludedValues()
     {
         var visits = 0;
-        var items = new[]
-        {
-            (Destination: (int?)4),
-            (Destination: (int?)null),
-            (Destination: (int?)4),
-            (Destination: (int?)9)
-        };
+        var items = new int?[] { 4, null, 4, 9 };
 
         var result = PerformancePolicies.CollectDistinctWhen(
             items,
-            item => { visits++; return item.Destination; },
+            destination => { visits++; return destination; },
             destination => destination.HasValue);
 
         Assert.That(visits, Is.EqualTo(items.Length));
