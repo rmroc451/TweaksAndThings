@@ -74,12 +74,18 @@ internal class CarInspector_PopulateCarPanel_Patch
             {
                 hstack.AddButtonCompact("Add Consist to Switch List", delegate
                 {
-                    if (SwitchListAccess.TryAddConsist(__instance._car, out int addedCount))
+                    var trainCrew = StateManager.Shared.PlayersManager.MyTrainCrew;
+                    if (trainCrew == null)
+                    {
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            "Join a Train Crew to add cars to your switch list.", AlertLevel.Error);
+                    }
+                    else if (SwitchListAccess.TryAddConsist(__instance._car, trainCrew.Id, out int addedCount))
                         Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
                             $"Added {addedCount.Pluralize("car")} to the current switch list.", AlertLevel.Info);
                     else
-                        TweaksAndThingsPlugin.LogException("Unable to locate the game's switch-list add API",
-                            new InvalidOperationException("No compatible switch-list add method was found."));
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            "This consist has no cars to add to the switch list.", AlertLevel.Error);
                     hstack.Rebuild();
                 }).Tooltip("Add Consist to Switch List", "Adds the cars in this consist, even when no locomotive is attached, to the current switch list.");
             }

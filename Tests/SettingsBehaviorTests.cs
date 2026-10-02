@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
+using Game.Messages;
+using Game.State;
 using NUnit.Framework;
 using RMROC451.TweaksAndThings;
 using RMROC451.TweaksAndThings.Patches;
@@ -136,48 +138,67 @@ public sealed class SettingsBehaviorTests
     }
 
     [Test]
-    public void SwitchListAccess_AddsEveryCarToTheDiscoveredSwitchListApi()
+    public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {
-        SwitchListTestController.Shared.AddedIds.Clear();
+        StateManager.LocalMessages.Clear();
         var cars = new[] { new Model.Car { id = "A" }, new Model.Car { id = "B" } };
+        cars[0].Consist = cars;
 
-        var succeeded = SwitchListAccess.TryAddCars(cars, out var addedCount);
+        var succeeded = SwitchListAccess.TryAddConsist(cars[0], "crew-1", out var addedCount);
 
         Assert.That(succeeded, Is.True);
         Assert.That(addedCount, Is.EqualTo(2));
-        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+        var message = (SwitchListToggleCarIds)StateManager.LocalMessages.Single();
+        Assert.That(message.TrainCrewId, Is.EqualTo("crew-1"));
+        Assert.That(message.CarIds, Is.EqualTo(new[] { "A", "B" }));
+        Assert.That(message.On, Is.True);
     }
 
     [Test]
     public void SwitchListAccess_AddsRollingStockAndSkipsLocomotivesAndTenders()
     {
-        SwitchListTestController.Shared.AddedIds.Clear();
+        StateManager.LocalMessages.Clear();
         var locomotive = new Model.Car { id = "LOCO", IsMotivePower = true };
         var tender = new Model.Car { id = "TENDER", Archetype = Model.Definition.CarArchetype.Tender };
         var firstCar = new Model.Car { id = "A" };
         var duplicate = new Model.Car { id = "A" };
         locomotive.Consist = new[] { locomotive, tender, firstCar, duplicate };
 
-        var succeeded = SwitchListAccess.TryAddConsist(locomotive, out var addedCount);
+        var succeeded = SwitchListAccess.TryAddConsist(locomotive, "crew-1", out var addedCount);
 
         Assert.That(succeeded, Is.True);
         Assert.That(addedCount, Is.EqualTo(1));
-        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A" }));
+        var message = (SwitchListToggleCarIds)StateManager.LocalMessages.Single();
+        Assert.That(message.CarIds, Is.EqualTo(new[] { "A" }));
     }
 
     [Test]
     public void SwitchListAccess_AddsCarsWhenSelectedConsistHasNoLocomotive()
     {
-        SwitchListTestController.Shared.AddedIds.Clear();
+        StateManager.LocalMessages.Clear();
         var firstCar = new Model.Car { id = "A" };
         var secondCar = new Model.Car { id = "B" };
         firstCar.Consist = new[] { firstCar, secondCar };
 
-        var succeeded = SwitchListAccess.TryAddConsist(firstCar, out var addedCount);
+        var succeeded = SwitchListAccess.TryAddConsist(firstCar, "crew-1", out var addedCount);
 
         Assert.That(succeeded, Is.True);
         Assert.That(addedCount, Is.EqualTo(2));
-        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+        var message = (SwitchListToggleCarIds)StateManager.LocalMessages.Single();
+        Assert.That(message.CarIds, Is.EqualTo(new[] { "A", "B" }));
+    }
+
+    [Test]
+    public void SwitchListAccess_DoesNotSendRequestWithoutCrewOrRollingStock()
+    {
+        StateManager.LocalMessages.Clear();
+        var locomotive = new Model.Car { id = "LOCO", IsMotivePower = true };
+
+        Assert.That(SwitchListAccess.TryAddConsist(locomotive, "crew-1", out var emptyCount), Is.False);
+        Assert.That(emptyCount, Is.Zero);
+        Assert.That(SwitchListAccess.TryAddConsist(new Model.Car { id = "A" }, "", out var carCount), Is.False);
+        Assert.That(carCount, Is.EqualTo(1));
+        Assert.That(StateManager.LocalMessages, Is.Empty);
     }
 
     [Test]
@@ -233,11 +254,4 @@ public sealed class SettingsBehaviorTests
             KeyBinding.ControlHeld = false;
         }
     }
-}
-
-internal sealed class SwitchListTestController
-{
-    public static readonly SwitchListTestController Shared = new();
-    public readonly List<string> AddedIds = new();
-    public void AddCar(Model.Car car) => AddedIds.Add(car.id);
 }

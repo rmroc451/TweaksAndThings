@@ -62,6 +62,32 @@ namespace Model.Definition
     public enum CarArchetype { Tender, Freight }
 }
 
+namespace Game.Messages
+{
+    public sealed class SwitchListToggleCarIds
+    {
+        public SwitchListToggleCarIds(string trainCrewId, System.Collections.Generic.List<string> carIds, bool on)
+        {
+            TrainCrewId = trainCrewId;
+            CarIds = carIds;
+            On = on;
+        }
+
+        public string TrainCrewId { get; }
+        public System.Collections.Generic.List<string> CarIds { get; }
+        public bool On { get; }
+    }
+}
+
+namespace Game.State
+{
+    public static class StateManager
+    {
+        public static readonly System.Collections.Generic.List<object> LocalMessages = new();
+        public static void ApplyLocal(object message) => LocalMessages.Add(message);
+    }
+}
+
 namespace Model
 {
     public sealed class Car
