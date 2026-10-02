@@ -173,6 +173,18 @@ public sealed class SettingsBehaviorTests
         Assert.That(FeaturePolicies.CanSetWaypointFromMap(routeFound, safetyFirst), Is.EqualTo(expected));
     }
 
+    [TestCase(true, true, false, true, false, true)]
+    [TestCase(false, true, false, true, false, false)]
+    [TestCase(true, false, false, true, false, false)]
+    [TestCase(true, true, true, true, false, false)]
+    [TestCase(true, true, false, false, false, false)]
+    [TestCase(true, true, false, true, true, false)]
+    public void SafetyFirstPolicy_GovernsOnlyEnabledNonExpressAllFreightWithoutCaboose(
+        bool enabled, bool hasCars, bool express, bool freight, bool caboose, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldSafetyFirstGovern(enabled, hasCars, express, freight, caboose), Is.EqualTo(expected));
+    }
+
     [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {

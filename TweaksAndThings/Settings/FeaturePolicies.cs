@@ -24,4 +24,8 @@ internal static class FeaturePolicies
 
     internal static bool CanSetWaypointFromMap(bool routeFound, bool safetyFirstApplies) =>
         routeFound && !safetyFirstApplies;
+
+    internal static bool ShouldSafetyFirstGovern(bool safetyFirstEnabled, bool hasNonMotiveCars, bool expressTrain,
+        bool allCarsFreight, bool hasCaboose) =>
+        safetyFirstEnabled && hasNonMotiveCars && !expressTrain && allCarsFreight && !hasCaboose;
 }
