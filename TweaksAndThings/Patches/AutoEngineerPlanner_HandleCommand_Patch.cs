@@ -6,6 +6,7 @@ using HarmonyLib;
 using Model;
 using Model.AI;
 using Model.Definition;
+using Model.Ops.Timetable;
 using Network;
 using Network.Messages;
 using RMROC451.TweaksAndThings.Extensions;
