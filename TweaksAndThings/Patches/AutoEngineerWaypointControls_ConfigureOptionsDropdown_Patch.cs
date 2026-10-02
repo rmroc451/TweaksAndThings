@@ -157,9 +157,10 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             timetableSaveTime = null;
             output = true;
         }
-        List<Car> consist = new List<Car>();
-        consist = selectedLoco.EnumerateCoupled().ToList();
-        destinations = consist.Where(c => GetCarDestinationIdentifier(c).HasValue).Select(GetCarDestinationIdentifier).ToHashSet();
+        destinations = PerformancePolicies.CollectDistinctWhen(
+            selectedLoco.EnumerateCoupled(),
+            GetCarDestinationIdentifier,
+            destination => destination.HasValue);
 
         //_log.Information($"{locoKey} --> [{destinations.Count}] -> Seen -> {string.Join(Environment.NewLine, destinations.Select(k => k.Value.DisplayName))}");
         //_log.Information($"{locoKey} --> [{locoConsistDestinations.Count}] -> Cache -> {string.Join(Environment.NewLine, locoConsistDestinations.Select(k => $"{locoKey}:{k.Value.DisplayName}"))}");
@@ -261,6 +262,14 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> BuildJumpToOptions(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco)
     {
         List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos = new();
+        float trainMomentum = 0f;
+        Location start = StateManager.IsHost
+            ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum)
+            : RouteStartLocation(__instance, selectedLoco);
+        float totalLength = StateManager.IsHost
+            ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength()
+            : CalculateTotalLength(selectedLoco);
+        HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
         foreach (OpsCarPosition ocp in locoConsistDestinations)
         {
             string destName = ocp.DisplayName;
@@ -274,15 +283,10 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                     segment, span.GetCenterPoint(), 200f, out Location destLoc))
             {
                 resolvedDestination = destLoc;
-                float trainMomentum = 0f;
-                Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
-                HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
-                List<RouteSearch.Step> list = new List<RouteSearch.Step>();
-                var totLen = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength() : CalculateTotalLength(selectedLoco);
-                distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum)
+                distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out var metrics, checkForCars: false, totalLength, trainMomentum)
                 ? metrics.Distance
                 : null;
-                sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out metrics, checkForCars: false, 0f, trainMomentum)
+                sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out metrics, checkForCars: false, 0f, trainMomentum)
                 ? metrics.Distance
                 : float.MaxValue;
             }
@@ -296,9 +300,11 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         if (selectedLoco.TryGetTimetableTrain(out Timetable.Train t))
         {
             //_log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong}");
+            var stationsByCode = TimetableController.Shared.GetAllStations()
+                .ToLookup(station => station.code, StringComparer.Ordinal);
             foreach (var e in t.Entries)
             {
-                var stp = TimetableController.Shared.GetAllStations().FirstOrDefault(ps => ps.code == e.Station);
+                var stp = stationsByCode[e.Station].FirstOrDefault();
                 //_log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong} -> {e.Station} {stp}");
                 if (stp != null)
                 {
@@ -315,15 +321,10 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                             Graph.Shared.TryGetLocationFromPoint(timetableSegment, timetableSpan.GetCenterPoint(), 200f, out Location destLoc))
                         {
                             resolvedDestination = destLoc;
-                            float trainMomentum = 0f;
-                            Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
-                            HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
-                            List<RouteSearch.Step> list = new List<RouteSearch.Step>();
-                            var totLen = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength() : CalculateTotalLength(selectedLoco);
-                            distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum)
+                            distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out var metrics, checkForCars: false, totalLength, trainMomentum)
                             ? metrics.Distance
                             : null;
-                            sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out metrics, checkForCars: false, 0f, trainMomentum)
+                            sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out metrics, checkForCars: false, 0f, trainMomentum)
                             ? metrics.Distance
                             : float.MaxValue;
                         }

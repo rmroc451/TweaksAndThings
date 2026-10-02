@@ -66,6 +66,22 @@ internal static class PerformancePolicies
         return (playerCount, selectedNames);
     }
 
+    internal static HashSet<TValue> CollectDistinctWhen<TItem, TValue>(
+        IEnumerable<TItem> items,
+        Func<TItem, TValue> selectValue,
+        Func<TValue, bool> shouldInclude)
+    {
+        var values = new HashSet<TValue>();
+        foreach (var item in items)
+        {
+            TValue value = selectValue(item);
+            if (shouldInclude(value))
+                values.Add(value);
+        }
+
+        return values;
+    }
+
     internal static bool ShouldReportConsistOiling(
         bool hasNeedsOiling,
         bool hasHotbox,

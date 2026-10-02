@@ -138,4 +138,26 @@ public sealed class PerformancePoliciesTests
             yield return player;
         }
     }
+
+
+    [Test]
+    public void CollectDistinctWhen_InvokesSelectorOncePerItemAndKeepsUniqueIncludedValues()
+    {
+        var visits = 0;
+        var items = new[]
+        {
+            (Destination: (int?)4),
+            (Destination: (int?)null),
+            (Destination: (int?)4),
+            (Destination: (int?)9)
+        };
+
+        var result = PerformancePolicies.CollectDistinctWhen(
+            items,
+            item => { visits++; return item.Destination; },
+            destination => destination.HasValue);
+
+        Assert.That(visits, Is.EqualTo(items.Length));
+        Assert.That(result, Is.EquivalentTo(new int?[] { 4, 9 }));
+    }
 }
