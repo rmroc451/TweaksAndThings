@@ -1,5 +1,6 @@
 ﻿using Core;
 using Game.Messages;
+using Game.Notices;
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
@@ -68,6 +69,20 @@ internal class CarInspector_PopulateCarPanel_Patch
                 MrocConsistHelper(__instance._car, MrocHelperType.BleedAirSystem, buttonsHaveCost);
                 hstack.Rebuild();
             }).Tooltip("Bleed Air Lines", "Iterates over each car in this consist and bleeds the air out of the lines.");
+
+            if (consist.Any(c => !c.MotivePower() && c.Archetype != Model.Definition.CarArchetype.Tender))
+            {
+                hstack.AddButtonCompact("Add Consist to Switch List", delegate
+                {
+                    if (SwitchListAccess.TryAddConsist(__instance._car, out int addedCount))
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            $"Added {addedCount.Pluralize("car")} to the current switch list.", AlertLevel.Info);
+                    else
+                        TweaksAndThingsPlugin.LogException("Unable to locate the game's switch-list add API",
+                            new InvalidOperationException("No compatible switch-list add method was found."));
+                    hstack.Rebuild();
+                }).Tooltip("Add Consist to Switch List", "Adds the cars in this consist, even when no locomotive is attached, to the current switch list.");
+            }
         });
 
         CabooseUiEnhancer(__instance, builder, consist, tweaksAndThings);

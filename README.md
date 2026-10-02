@@ -155,6 +155,7 @@ Enter Tweaks and Things.
                If you have mapenhancer with cars displayed, if you keycombo click on a car icon, it will set the auto couple attempt.
             </li>
             <li><b>M5:</b> The formatted `/cu` locomotive status message can be sent from the UnityModManager **Crew Update** tab.</li>
+            <li><b>M6:</b> The car inspector's <b>Add Consist to Switch List</b> button adds the connected cars to the current switch list even when the consist has no locomotive.</li>
         </ul>
   </li>
   <li><b>S:</b> Settings

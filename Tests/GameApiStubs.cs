@@ -57,10 +57,21 @@ namespace UnityEngine
     }
 }
 
+namespace Model.Definition
+{
+    public enum CarArchetype { Tender, Freight }
+}
+
 namespace Model
 {
     public sealed class Car
     {
+        public string id = string.Empty;
+        public Model.Definition.CarArchetype Archetype = Model.Definition.CarArchetype.Freight;
+        public bool IsMotivePower;
+        public System.Collections.Generic.IEnumerable<Car>? Consist;
+        public System.Collections.Generic.IEnumerable<Car> EnumerateCoupled() => Consist ?? new[] { this };
+        public bool MotivePower() => IsMotivePower;
         public static implicit operator bool(Car? car) => car != null;
     }
 }

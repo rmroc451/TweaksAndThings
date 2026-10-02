@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RMROC451.TweaksAndThings;
+using RMROC451.TweaksAndThings.Patches;
 using UnityEngine;
 using UnityModManagerNet;
 
@@ -135,6 +136,51 @@ public sealed class SettingsBehaviorTests
     }
 
     [Test]
+    public void SwitchListAccess_AddsEveryCarToTheDiscoveredSwitchListApi()
+    {
+        SwitchListTestController.Shared.AddedIds.Clear();
+        var cars = new[] { new Model.Car { id = "A" }, new Model.Car { id = "B" } };
+
+        var succeeded = SwitchListAccess.TryAddCars(cars, out var addedCount);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(addedCount, Is.EqualTo(2));
+        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+    }
+
+    [Test]
+    public void SwitchListAccess_AddsRollingStockAndSkipsLocomotivesAndTenders()
+    {
+        SwitchListTestController.Shared.AddedIds.Clear();
+        var locomotive = new Model.Car { id = "LOCO", IsMotivePower = true };
+        var tender = new Model.Car { id = "TENDER", Archetype = Model.Definition.CarArchetype.Tender };
+        var firstCar = new Model.Car { id = "A" };
+        var duplicate = new Model.Car { id = "A" };
+        locomotive.Consist = new[] { locomotive, tender, firstCar, duplicate };
+
+        var succeeded = SwitchListAccess.TryAddConsist(locomotive, out var addedCount);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(addedCount, Is.EqualTo(1));
+        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A" }));
+    }
+
+    [Test]
+    public void SwitchListAccess_AddsCarsWhenSelectedConsistHasNoLocomotive()
+    {
+        SwitchListTestController.Shared.AddedIds.Clear();
+        var firstCar = new Model.Car { id = "A" };
+        var secondCar = new Model.Car { id = "B" };
+        firstCar.Consist = new[] { firstCar, secondCar };
+
+        var succeeded = SwitchListAccess.TryAddConsist(firstCar, out var addedCount);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(addedCount, Is.EqualTo(2));
+        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+    }
+
+    [Test]
     public void HotkeyBindings_KeepModifierCombinationsComposable()
     {
         KeyBinding.ControlHeld = true;
@@ -187,4 +233,11 @@ public sealed class SettingsBehaviorTests
             KeyBinding.ControlHeld = false;
         }
     }
+}
+
+internal sealed class SwitchListTestController
+{
+    public static readonly SwitchListTestController Shared = new();
+    public readonly List<string> AddedIds = new();
+    public void AddCar(Model.Car car) => AddedIds.Add(car.id);
 }
