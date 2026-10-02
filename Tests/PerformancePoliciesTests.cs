@@ -92,7 +92,7 @@ public sealed class PerformancePoliciesTests
     }
 
 
-    [TestCase(true, false, false)]
+    [TestCase(true, false, true)]
     [TestCase(false, false, false)]
     [TestCase(false, true, true)]
     public void ShouldReportConsistOiling_EvaluatesCabooseRuleOnlyForHotboxOnlyCase(
