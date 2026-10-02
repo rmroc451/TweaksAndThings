@@ -90,4 +90,22 @@ public sealed class PerformancePoliciesTests
             yield return car;
         }
     }
+
+
+    [TestCase(true, false, false)]
+    [TestCase(false, false, false)]
+    [TestCase(false, true, true)]
+    public void ShouldReportConsistOiling_EvaluatesCabooseRuleOnlyForHotboxOnlyCase(
+        bool needsOil, bool hasHotbox, bool expected)
+    {
+        var cabooseCheckCount = 0;
+
+        var result = PerformancePolicies.ShouldReportConsistOiling(
+            needsOil,
+            hasHotbox,
+            () => { cabooseCheckCount++; return true; });
+
+        Assert.That(result, Is.EqualTo(expected));
+        Assert.That(cabooseCheckCount, Is.EqualTo(!needsOil && hasHotbox ? 1 : 0));
+    }
 }

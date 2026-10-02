@@ -50,4 +50,10 @@ internal static class PerformancePolicies
 
         return (hasNeedsOiling, hasHotbox, lowestOil);
     }
+
+    internal static bool ShouldReportConsistOiling(
+        bool hasNeedsOiling,
+        bool hasHotbox,
+        Func<bool> hotboxRequirementIsFulfilled) =>
+        hasNeedsOiling || (hasHotbox && hotboxRequirementIsFulfilled());
 }

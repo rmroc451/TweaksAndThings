@@ -50,10 +50,10 @@ internal class TagController_UpdateTag_Patch
             var consist = car.EnumerateCoupled().Where(c => c.EnableOiling).ToList();
             var summary = PerformancePolicies.SummarizeOilingConsist(
                 consist.Select(c => (NeedsOiling: c.NeedsOiling, HasHotbox: c.HasHotbox, Oiled: c.Oiled)));
-            bool cabooseRequirementFulfilled =
-                !cabooseRequired || consist.ConsistNoFreight() || (bool)car.FindMyCabooseSansLoadRequirement();
-
-            if (summary.HasNeedsOiling || (summary.HasHotbox && cabooseRequirementFulfilled))
+            if (PerformancePolicies.ShouldReportConsistOiling(
+                summary.HasNeedsOiling,
+                summary.HasHotbox,
+                () => !cabooseRequired || consist.ConsistNoFreight() || (bool)car.FindMyCabooseSansLoadRequirement()))
             {
                 float lowestOil = summary.LowestOil ?? 0f;
                 tags.Add(summary.HasHotbox
