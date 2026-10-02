@@ -53,6 +53,10 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
             if (__instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint)
             {
+                lastLocoSeenCarId = TrainController.Shared?.SelectedLocomotive?.id;
+                locoConsistDestinations.Clear();
+                lastSeenIntegrationSetCount = default;
+                timetableSaveTime = null;
                 watchyWatchy =
                     ((MonoBehaviour)__instance)
                     .StartCoroutine(UpdateCogCoroutine(__instance));
@@ -126,7 +130,15 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static bool ShouldRecalc(LocomotiveControlsUIAdapter __instance, BaseLocomotive selectedLoco, out HashSet<OpsCarPosition?> destinations)
     {
         bool output = false;
-        string locoKey = getDictKey(selectedLoco);
+        string locoKey = selectedLoco.id;
+        if (FeaturePolicies.IsWaypointCacheForDifferentLocomotive(lastLocoSeenCarId, locoKey))
+        {
+            lastLocoSeenCarId = locoKey;
+            locoConsistDestinations.Clear();
+            lastSeenIntegrationSetCount = default;
+            timetableSaveTime = null;
+            output = true;
+        }
         List<Car> consist = new List<Car>();
         consist = selectedLoco.EnumerateCoupled().ToList();
         destinations = consist.Where(c => GetCarDestinationIdentifier(c).HasValue).Select(GetCarDestinationIdentifier).ToHashSet();

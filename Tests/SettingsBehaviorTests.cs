@@ -138,6 +138,14 @@ public sealed class SettingsBehaviorTests
     }
 
     [Test]
+    public void WaypointDestinationCache_IsInvalidatedWhenSelectedLocomotiveChanges()
+    {
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive("loco-a", "loco-a"), Is.False);
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive("loco-a", "loco-b"), Is.True);
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive(null, "loco-a"), Is.True);
+    }
+
+    [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {
         StateManager.LocalMessages.Clear();

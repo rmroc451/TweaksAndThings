@@ -12,4 +12,7 @@ internal static class FeaturePolicies
 
     internal static int CalculateServicingOverdraftFee(int servicingCost, bool canAfford) =>
         servicingCost > 0 && !canAfford ? (int)Math.Ceiling(servicingCost * 0.2d) : 0;
+
+    internal static bool IsWaypointCacheForDifferentLocomotive(string? cachedLocomotiveId, string currentLocomotiveId) =>
+        !string.Equals(cachedLocomotiveId, currentLocomotiveId, StringComparison.Ordinal);
 }
