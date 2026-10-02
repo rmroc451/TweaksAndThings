@@ -47,4 +47,47 @@ public sealed class PerformancePoliciesTests
         Assert.That(visits, Is.EqualTo(rows.Length));
         Assert.That(result, Is.EquivalentTo(new[] { "hidden-a", "hidden-b" }));
     }
+
+
+    [Test]
+    public void SummarizeOilingConsist_ReportsFlagsAndLowestOilInOnePass()
+    {
+        var visits = 0;
+        var cars = new[]
+        {
+            (NeedsOiling: false, HasHotbox: false, Oiled: 0.8f),
+            (NeedsOiling: true, HasHotbox: true, Oiled: 0.35f),
+            (NeedsOiling: false, HasHotbox: false, Oiled: 0.6f)
+        };
+
+        var result = PerformancePolicies.SummarizeOilingConsist(
+            CountVisits(cars, () => visits++));
+
+        Assert.That(visits, Is.EqualTo(cars.Length));
+        Assert.That(result.HasNeedsOiling, Is.True);
+        Assert.That(result.HasHotbox, Is.True);
+        Assert.That(result.LowestOil, Is.EqualTo(0.35f).Within(0.0001f));
+    }
+
+    [Test]
+    public void SummarizeOilingConsist_EmptyInputHasNoFlagsOrMinimum()
+    {
+        var result = PerformancePolicies.SummarizeOilingConsist(
+            new (bool NeedsOiling, bool HasHotbox, float Oiled)[0]);
+
+        Assert.That(result.HasNeedsOiling, Is.False);
+        Assert.That(result.HasHotbox, Is.False);
+        Assert.That(result.LowestOil, Is.Null);
+    }
+
+    private static IEnumerable<(bool NeedsOiling, bool HasHotbox, float Oiled)> CountVisits(
+        IEnumerable<(bool NeedsOiling, bool HasHotbox, float Oiled)> cars,
+        System.Action visited)
+    {
+        foreach (var car in cars)
+        {
+            visited();
+            yield return car;
+        }
+    }
 }

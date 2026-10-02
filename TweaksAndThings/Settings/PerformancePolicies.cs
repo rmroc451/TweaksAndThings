@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 
 namespace RMROC451.TweaksAndThings;
 
@@ -31,5 +32,22 @@ internal static class PerformancePolicies
         }
 
         return selected;
+    }
+
+    internal static (bool HasNeedsOiling, bool HasHotbox, float? LowestOil) SummarizeOilingConsist(
+        IEnumerable<(bool NeedsOiling, bool HasHotbox, float Oiled)> cars)
+    {
+        bool hasNeedsOiling = false;
+        bool hasHotbox = false;
+        float? lowestOil = null;
+        foreach (var car in cars)
+        {
+            hasNeedsOiling |= car.NeedsOiling;
+            hasHotbox |= car.HasHotbox;
+            if (!lowestOil.HasValue || car.Oiled < lowestOil.Value)
+                lowestOil = car.Oiled;
+        }
+
+        return (hasNeedsOiling, hasHotbox, lowestOil);
     }
 }
