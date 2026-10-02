@@ -1,3 +1,5 @@
+using System;
+
 namespace RMROC451.TweaksAndThings;
 
 internal static class FeaturePolicies
@@ -7,4 +9,7 @@ internal static class FeaturePolicies
 
     internal static bool ShouldShowWaypointSetNotification(Settings? settings) =>
         settings?.ShowWaypointSetNotifications ?? true;
+
+    internal static int CalculateServicingOverdraftFee(int servicingCost, bool canAfford) =>
+        servicingCost > 0 && !canAfford ? (int)Math.Ceiling(servicingCost * 0.2d) : 0;
 }

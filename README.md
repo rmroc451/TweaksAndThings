@@ -187,7 +187,7 @@ Enter Tweaks and Things.
                     <li><b>S2a:</b> Enable Tag Updates<br/>
                     Allows all tag updates from <b>A</b> to display.</li>
                     <li><b>S2b (🟢 NEW v2.0.0):</b> Debt Allowance<br/>
-                    Allows repair-track servicing to continue when you are insolvent, at a 20% overdraft fee.</li>
+                    Allows repair-track servicing and interchange orders for parts or fuel to continue when you are insolvent, with a 20% overdraft fee.</li>
                     <li><b>S2c:</b> Engine Roster Fuel/Info
                         <ul>
                             <li><b>S2c1:</b> Enable Fuel Display in Engine Roster<br/>
