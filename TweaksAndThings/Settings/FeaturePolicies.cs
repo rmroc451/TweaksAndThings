@@ -30,4 +30,11 @@ internal static class FeaturePolicies
         safetyFirstEnabled && hasNonMotiveCars && !expressTrain && allCarsFreight && !hasCaboose;
 
     internal static bool ShouldRunWaypointRefresh(bool waypointMode, bool hasLocomotive) => waypointMode && hasLocomotive;
+
+    internal static bool CanBeginRunaround(bool locomotiveStopped, bool oneMotiveBoundary, bool oneTailCoupler,
+        bool destinationResolved) =>
+        locomotiveStopped && oneMotiveBoundary && oneTailCoupler && destinationResolved;
+
+    internal static bool ShouldCompleteRunaround(bool runaroundPending, bool tailCarRecoupled) =>
+        runaroundPending && tailCarRecoupled;
 }

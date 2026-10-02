@@ -29,6 +29,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 {
+    private const string RunaroundDestinationPrefix = "__RUNAROUND__:";
     private static Serilog.ILogger _log => Log.ForContext<LocomotiveControlsUIAdapter_UpdateCarText_Postfix>();
     private static int lastSeenIntegrationSetCount = default;
     private static string? lastLocoSeenCarId = default;
@@ -191,10 +192,16 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             jumpTos = jumpTos?.OrderBy(c => c.sortDistance)?.ToList() ?? default;
         }
         
-        var localJumpTos = jumpTos.ToList();
+        var localJumpTos = new List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)>();
+        foreach (var jumpTo in jumpTos)
+        {
+            localJumpTos.Add(jumpTo);
+            localJumpTos.Add((RunaroundDestinationPrefix + jumpTo.destinationId,
+                $"Run around, then {jumpTo.destination}", jumpTo.distance, jumpTo.sortDistance, jumpTo.location));
+        }
         var safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco) && jumpTos.Any();
 
-        rowDatas.AddRange(jumpTos.Select(j =>
+        rowDatas.AddRange(localJumpTos.Select(j =>
             new DropdownMenu.RowData(
                 $"{j.destination} <b>({(j.distance.HasValue ? Units.DistanceText(j.distance.Value) : "N/A")})</b>",
                 !safetyFirst ? null : "<i>Disabled; Safety First!</i>"
@@ -232,6 +239,15 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                     }
                     else
                     {
+                        var selectedDestination = localJumpTos[row - origCount];
+                        if (selectedDestination.destinationId.StartsWith(RunaroundDestinationPrefix, StringComparison.Ordinal))
+                        {
+                            if (!AutoEngineerRunaround.TryStart(selectedLoco, end, string.Empty))
+                                Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                                    "Run-around needs a stopped locomotive, one locomotive-to-car connection, and a single free tail coupler.", AlertLevel.Error);
+                            return;
+                        }
+
                         var mw = (location: end, carId: string.Empty);
                         aeoh.SetWaypoint(mw.location, mw.carId);
                         aeoh.SetOrdersValue(maybeWaypoint: mw);

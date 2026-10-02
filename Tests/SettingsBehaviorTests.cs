@@ -193,6 +193,25 @@ public sealed class SettingsBehaviorTests
         Assert.That(FeaturePolicies.ShouldRunWaypointRefresh(waypointMode, hasLocomotive), Is.EqualTo(expected));
     }
 
+    [TestCase(true, true, true, true, true)]
+    [TestCase(false, true, true, true, false)]
+    [TestCase(true, false, true, true, false)]
+    [TestCase(true, true, false, true, false)]
+    [TestCase(true, true, true, false, false)]
+    public void RunaroundPolicy_RequiresStoppedLocoSingleBoundaryTailCouplerAndDestination(
+        bool stopped, bool oneBoundary, bool oneTailCoupler, bool destinationResolved, bool expected)
+    {
+        Assert.That(FeaturePolicies.CanBeginRunaround(stopped, oneBoundary, oneTailCoupler, destinationResolved), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public void RunaroundPolicy_ContinuesOnlyAfterSavedTailCarRecouples(bool pending, bool tailRecoupled, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldCompleteRunaround(pending, tailRecoupled), Is.EqualTo(expected));
+    }
+
     [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {
