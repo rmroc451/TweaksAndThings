@@ -33,6 +33,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
     static bool Prefix(AutoEngineerPlanner __instance, ref AutoEngineerCommand command, ref IPlayer sender)
     {
+        if (ThroughTrafficGuard.BlockInteraction(__instance._locomotive)) return false;
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         LocoNoticeWPSet(__instance, command, sender);
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.SafetyFirst() || (sender.IsRemote && !tweaksAndThings.SafetyFirstClientEnforce()) || command.MaxSpeedMph <= governedSpeed) return true;

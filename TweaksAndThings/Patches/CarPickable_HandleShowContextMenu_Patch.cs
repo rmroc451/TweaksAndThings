@@ -17,6 +17,7 @@ internal class CarPickable_HandleShowContextMenu_Patch
 {
     private static bool Prefix(Car car)
     {
+        if (ThroughTrafficGuard.BlockInteraction(car)) return false;
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 

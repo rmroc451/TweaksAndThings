@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RMROC451.TweaksAndThings;
@@ -103,6 +103,17 @@ public sealed class SettingsBehaviorTests
     public void DefaultSettings_ShowWaypointSetNotifications()
     {
         Assert.That(new Settings().ShowWaypointSetNotifications, Is.True);
+    }
+
+    [Test]
+    public void DefaultSettings_UseTheThroughTrafficSymbolConventionAndGracePeriod()
+    {
+        var settings = new Settings();
+
+        Assert.That(settings.ThroughTrafficEnabled, Is.True);
+        Assert.That(settings.ThroughTrafficTrainSymbolPrefix, Is.EqualTo("Z-"));
+        Assert.That(settings.ThroughTrafficOnTimeGraceMinutes, Is.EqualTo(5));
+        Assert.That(settings.ThroughTrafficDollarsPerPassenger, Is.EqualTo(3));
     }
 
     [Test]

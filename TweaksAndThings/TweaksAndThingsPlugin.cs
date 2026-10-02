@@ -1,4 +1,4 @@
-// Ignore Spelling: RMROC
+﻿// Ignore Spelling: RMROC
 
 using HarmonyLib;
 using Game;
@@ -40,11 +40,13 @@ public sealed class TweaksAndThingsPlugin
                 settings = UnityModManager.ModSettings.Load<Settings>(entry) ?? new Settings()
             };
             Instance.NormalizeSettings();
+            ThroughTrafficSpawner.Reset();
 
             harmony = new Harmony(entry.Info.Id);
             entry.OnToggle = OnToggle;
             entry.OnGUI = OnGUI;
             entry.OnSaveGUI = OnSaveGUI;
+            entry.OnUpdate = OnUpdate;
 
             if (entry.Enabled)
             {
@@ -67,6 +69,10 @@ public sealed class TweaksAndThingsPlugin
         settings ??= new Settings();
         settings.WebhookSettingsList = SettingsExtensions.SanitizeEmptySettings(settings.WebhookSettingsList);
         settings.EngineRosterFuelColumnSettings ??= new RosterFuelColumnSettings();
+        if (string.IsNullOrWhiteSpace(settings.ThroughTrafficTrainSymbolPrefix))
+            settings.ThroughTrafficTrainSymbolPrefix = ThroughTrafficPolicy.DefaultTrainSymbolPrefix;
+        settings.ThroughTrafficOnTimeGraceMinutes = Math.Max(0, Math.Min(60, settings.ThroughTrafficOnTimeGraceMinutes));
+        settings.ThroughTrafficDollarsPerPassenger = Math.Max(0, Math.Min(100, settings.ThroughTrafficDollarsPerPassenger));
     }
 
     private static bool OnToggle(UnityModManager.ModEntry entry, bool value)
@@ -102,8 +108,22 @@ public sealed class TweaksAndThingsPlugin
         plugin.settings.Save(entry);
     }
 
+    private static void OnUpdate(UnityModManager.ModEntry entry, float deltaTime)
+    {
+        var plugin = Instance;
+        if (plugin?.IsEnabled != true || plugin.settings == null) return;
+        try
+        {
+            ThroughTrafficSpawner.Tick(plugin.settings, deltaTime);
+        }
+        catch (Exception exception)
+        {
+            entry.Logger.LogException("Through traffic update failed", exception);
+        }
+    }
+
     private static int selectedTab;
-    private static readonly string[] Tabs = { "Caboose Mods", "UI", "Webhooks", "Crew Update", "Keybindings" };
+    private static readonly string[] Tabs = { "Caboose Mods", "UI", "Webhooks", "Crew Update", "Keybindings", "Through Traffic" };
     private static readonly string[] CrewLoadMethods = { "Tracks", "Daily" };
     private static readonly string[] FuelColumns = { "None", "Engine", "Crew", "Status" };
     private static string crewUpdateMessage = string.Empty;
@@ -129,7 +149,27 @@ public sealed class TweaksAndThingsPlugin
             case 2: DrawWebhookSettings(settings); break;
             case 3: DrawCrewUpdate(); break;
             case 4: DrawKeybindings(settings); break;
+            case 5: DrawThroughTrafficSettings(settings); break;
         }
+    }
+
+    private static void DrawThroughTrafficSettings(Settings settings)
+    {
+        settings.ThroughTrafficEnabled = GUILayout.Toggle(settings.ThroughTrafficEnabled, "Generate AI through traffic from marked timetable trains");
+        GUILayout.Label("The generator scans first-class timetable rows whose train symbol starts with the prefix. Both endpoints must be interchanges and the full route must be covered by active CTC blocks.");
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Train symbol prefix", GUILayout.Width(150f));
+        settings.ThroughTrafficTrainSymbolPrefix = GUILayout.TextField(settings.ThroughTrafficTrainSymbolPrefix ?? string.Empty, 32);
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Arrival on-time grace period (minutes)");
+        settings.ThroughTrafficOnTimeGraceMinutes = (int)GUILayout.HorizontalSlider(settings.ThroughTrafficOnTimeGraceMinutes, 0, 60);
+        GUILayout.Label($"{settings.ThroughTrafficOnTimeGraceMinutes} minutes");
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Schedule reward / penalty per passenger", GUILayout.Width(250f));
+        settings.ThroughTrafficDollarsPerPassenger = (int)GUILayout.HorizontalSlider(settings.ThroughTrafficDollarsPerPassenger, 0, 100);
+        GUILayout.Label($"${settings.ThroughTrafficDollarsPerPassenger}");
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Passenger services use route demand to size a random load; way freight services use a reference consist. Engines are selected and multiplied to meet the route grade power requirement.");
     }
 
     private static void DrawCrewUpdate()

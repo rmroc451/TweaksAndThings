@@ -66,6 +66,10 @@ public class Settings : UnityModManager.ModSettings
     public bool DisableWaypointControls;
     public bool AllowRepairsWithoutWaybill = true;
     public bool ShowWaypointSetNotifications = true;
+    public bool ThroughTrafficEnabled = true;
+    public string ThroughTrafficTrainSymbolPrefix = ThroughTrafficPolicy.DefaultTrainSymbolPrefix;
+    public int ThroughTrafficOnTimeGraceMinutes = ThroughTrafficPolicy.DefaultOnTimeGraceMinutes;
+    public int ThroughTrafficDollarsPerPassenger = 3;
     public KeyBinding ClickAltBinding = new KeyBinding { keyCode = KeyCode.LeftAlt };
     public KeyBinding ClickControlBinding = new KeyBinding { keyCode = KeyCode.LeftControl };
     public KeyBinding ClickShiftBinding = new KeyBinding { keyCode = KeyCode.LeftShift };

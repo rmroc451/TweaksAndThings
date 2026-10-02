@@ -39,6 +39,7 @@ internal class CarPickable_Activate_Patch
 
     private static bool Prefix(CarPickable __instance, PickableActivateEvent evt)
     {
+        if (ThroughTrafficGuard.BlockInteraction(__instance.car)) return false;
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
