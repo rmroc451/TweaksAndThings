@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>TweaksAndThings.Tests</AssemblyName>
+    <RootNamespace>RMROC451.TweaksAndThings.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\TweaksAndThings\Settings\Settings.cs" Link="Settings\Settings.cs" />
+    <Compile Include="..\TweaksAndThings\Enums\CrewHourLoadMethod.cs" Link="Enums\CrewHourLoadMethod.cs" />
+    <Compile Include="..\TweaksAndThings\Enums\EngineRosterFuelDisplayColumn.cs" Link="Enums\EngineRosterFuelDisplayColumn.cs" />
+  </ItemGroup>
+</Project>
