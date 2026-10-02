@@ -1,13 +1,17 @@
 ﻿using HarmonyLib;
+using Game.Notices;
+using Game.State;
 using Helpers;
 using Map.Runtime;
 using Model;
 using Model.AI;
+using Network;
 using Serilog;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Track;
+using Track.Search;
 using UI;
 using UI.EngineControls;
 using UI.Map;
@@ -94,34 +98,48 @@ internal class MapWindow_OnClick_Patch
     {
         if (HotkeyBindings.ControlDown && HotkeyBindings.AltDown)
         {
+            var selectedLoco = TrainController.Shared?.SelectedLocomotive;
+            if (selectedLoco == null) return true;
+
             Ray ray = RayForViewportNormalizedPoint(__instance, viewportNormalizedPoint);
             Vector3 gamePoint = MapManager.Instance.FindTerrainPointForXZ(WorldTransformer.WorldToGame(ray.origin));
-            var selectedLoco = TrainController.Shared?.SelectedLocomotive;
-            if (selectedLoco != null)
+            Camera _camera = null;
+            if (MainCameraHelper.TryGetIfNeeded(ref _camera) &&
+                Graph.Shared.TryGetLocationFromGamePoint(gamePoint, 200f, out Location location))
             {
                 Hit? valueOrDefault = null;
-                Camera _camera = null;
-                if (MainCameraHelper.TryGetIfNeeded(ref _camera))
+                Hit? hit = HitLocation(location, selectedLoco);
+                if (hit.HasValue)
                 {
-                    float rad = 200f;
-                    if (Graph.Shared.TryGetLocationFromGamePoint(gamePoint, rad, out Location location))
-                    {
-                        Hit? hit = HitLocation(location, selectedLoco);
-                        if (hit.HasValue)
-                        {
-                            valueOrDefault = hit.GetValueOrDefault();
-                            location =  valueOrDefault.Value.Location;
-                        }
-                        var aeoh = new AutoEngineerOrdersHelper(persistence: new AutoEngineerPersistence(selectedLoco.KeyValueObject), locomotive: selectedLoco);
-                        var mw = (location: (Location)location, carId: valueOrDefault?.CarInfo?.car?.id ?? string.Empty);
-                        
-                        aeoh.SetWaypoint(mw.location, mw.carId);
-                        aeoh.SetOrdersValue(maybeWaypoint: mw);
-                        AutoEngineerDestinationPicker.Shared.Cancel();
-                    }
+                    valueOrDefault = hit.Value;
+                    location = valueOrDefault.Value.Location;
                 }
+
+                var start = selectedLoco.AutoEngineerPlanner.RouteStartLocation(out float momentum);
+                var length = selectedLoco.AutoEngineerPlanner.CalculateTotalLength();
+                bool routeFound = Graph.Shared.FindRoute(start, location, HeuristicCosts.AutoEngineer,
+                    null, out _, checkForCars: false, length, momentum);
+                bool safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco);
+                if (!FeaturePolicies.CanSetWaypointFromMap(routeFound, safetyFirst))
+                {
+                    if (safetyFirst)
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer, "Safety First, find yourself a caboose!", AlertLevel.Error);
+                    else
+                    {
+                        bool routeWithoutTrainLength = Graph.Shared.FindRoute(start, location, HeuristicCosts.AutoEngineer, null, out _);
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            routeWithoutTrainLength ? $"{selectedLoco.DisplayName} Train too long to navigate to waypoint." : $"{selectedLoco.DisplayName} Unable to find a path to waypoint.", AlertLevel.Error);
+                    }
+                    return false;
+                }
+
+                var aeoh = new AutoEngineerOrdersHelper(persistence: new AutoEngineerPersistence(selectedLoco.KeyValueObject), locomotive: selectedLoco);
+                var mw = (location: location, carId: valueOrDefault?.CarInfo?.car?.id ?? string.Empty);
+                aeoh.SetWaypoint(mw.location, mw.carId);
+                aeoh.SetOrdersValue(maybeWaypoint: mw);
+                AutoEngineerDestinationPicker.Shared.Cancel();
+                return false;
             }
-            return false;
         }
         return true;
     }

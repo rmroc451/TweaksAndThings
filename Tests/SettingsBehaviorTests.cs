@@ -165,6 +165,14 @@ public sealed class SettingsBehaviorTests
         Assert.That(FeaturePolicies.ShouldAcceptWaypointPickerHit(clicked, escaped, locationChanged), Is.EqualTo(expected));
     }
 
+    [TestCase(true, false, true)]
+    [TestCase(false, false, false)]
+    [TestCase(true, true, false)]
+    public void MapWaypointPolicy_RequiresRouteAndSafetyClearance(bool routeFound, bool safetyFirst, bool expected)
+    {
+        Assert.That(FeaturePolicies.CanSetWaypointFromMap(routeFound, safetyFirst), Is.EqualTo(expected));
+    }
+
     [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {

@@ -21,4 +21,7 @@ internal static class FeaturePolicies
 
     internal static bool ShouldAcceptWaypointPickerHit(bool mouseClicked, bool escapePressed, bool locationChanged) =>
         mouseClicked && !escapePressed && locationChanged;
+
+    internal static bool CanSetWaypointFromMap(bool routeFound, bool safetyFirstApplies) =>
+        routeFound && !safetyFirstApplies;
 }
