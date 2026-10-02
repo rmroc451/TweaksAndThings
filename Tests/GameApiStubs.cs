@@ -69,6 +69,7 @@ namespace RMROC451.TweaksAndThings
 {
     public sealed class TweaksAndThingsPlugin
     {
+        public static TweaksAndThingsPlugin? Instance { get; set; }
         public bool IsEnabled { get; set; }
         public Settings? settings { get; set; }
     }

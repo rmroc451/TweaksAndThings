@@ -2,7 +2,7 @@
   "Id": "RMROC451.TweaksAndThings",
   "DisplayName": "RMROC451's Tweaks and Things",
   "Author": "RMROC451",
-  "Version": "2.1.8",
+  "Version": "__ASSEMBLY_VERSION__",
   "ManagerVersion": "0.20.0",
   "AssemblyName": "RMROC451.TweaksAndThings.dll",
   "EntryMethod": "RMROC451.TweaksAndThings.TweaksAndThingsPlugin.Load",

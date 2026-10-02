@@ -26,6 +26,11 @@
     </Reference>
   </ItemGroup>
 
+  <!-- Keep the packaged UMM manifest version in sync with Assembly.version. -->
+  <Target Name="SetModInfoVersion" AfterTargets="CopyFilesToOutputDirectory">
+    <Exec Command="powershell -NoProfile -Command &quot;$infoPath = '$(TargetDir)Info.json'; $infoJson = [System.IO.File]::ReadAllText($infoPath); $infoJson = $infoJson.Replace('__ASSEMBLY_VERSION__', '$(AssemblyVersion)'); [System.IO.File]::WriteAllText($infoPath, $infoJson)&quot;" />
+  </Target>
+
   <!-- Publish the mod as a neat zip file -->
   <Target Name="PrepareForPublishing" AfterTargets="AfterBuild" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
