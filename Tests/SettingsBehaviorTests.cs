@@ -185,6 +185,14 @@ public sealed class SettingsBehaviorTests
         Assert.That(FeaturePolicies.ShouldSafetyFirstGovern(enabled, hasCars, express, freight, caboose), Is.EqualTo(expected));
     }
 
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public void WaypointRefresh_RunsOnlyForWaypointModeWithALocomotive(bool waypointMode, bool hasLocomotive, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldRunWaypointRefresh(waypointMode, hasLocomotive), Is.EqualTo(expected));
+    }
+
     [Test]
     public void SwitchListAccess_SendsEveryCarToTheCurrentCrewSwitchList()
     {

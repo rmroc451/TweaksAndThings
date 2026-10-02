@@ -33,6 +33,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static int lastSeenIntegrationSetCount = default;
     private static string? lastLocoSeenCarId = default;
     private static Coroutine? watchyWatchy = null;
+    private static MonoBehaviour? watchyOwner = null;
     private static HashSet<OpsCarPosition?> locoConsistDestinations = [];
     private static Game.GameDateTime? timetableSaveTime = null;
     static string getDictKey(Car car) => car.DisplayName;
@@ -41,22 +42,32 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     {
         try
         {
+            var waypointControls = __instance.aiWaypointControls as AutoEngineerWaypointControls;
+            var controlledLocomotive = waypointControls?.Locomotive;
+            string? currentLocomotiveId = controlledLocomotive?.id;
+            bool shouldRun = FeaturePolicies.ShouldRunWaypointRefresh(
+                __instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint,
+                controlledLocomotive != null);
+
             if (lastLocoSeenCarId != null &&
-                lastLocoSeenCarId.Equals(TrainController.Shared?.SelectedLocomotive.id) &&
+                lastLocoSeenCarId.Equals(currentLocomotiveId) &&
+                ReferenceEquals(watchyOwner, __instance) &&
                 watchyWatchy != null)
                 return;
 
-            if (watchyWatchy != null)
-                ((MonoBehaviour)__instance).StopCoroutine(watchyWatchy);
+            if (watchyWatchy != null && watchyOwner != null)
+                watchyOwner.StopCoroutine(watchyWatchy);
 
             watchyWatchy = null;
+            watchyOwner = null;
+            lastLocoSeenCarId = currentLocomotiveId;
+            locoConsistDestinations.Clear();
+            lastSeenIntegrationSetCount = default;
+            timetableSaveTime = null;
 
-            if (__instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint)
+            if (shouldRun)
             {
-                lastLocoSeenCarId = TrainController.Shared?.SelectedLocomotive?.id;
-                locoConsistDestinations.Clear();
-                lastSeenIntegrationSetCount = default;
-                timetableSaveTime = null;
+                watchyOwner = __instance;
                 watchyWatchy =
                     ((MonoBehaviour)__instance)
                     .StartCoroutine(UpdateCogCoroutine(__instance));
@@ -75,13 +86,19 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
         while (true)
         {
-            if (__instance._persistence.Orders.Mode != AutoEngineerMode.Waypoint || ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null)
+            var waypointControls = __instance.aiWaypointControls as AutoEngineerWaypointControls;
+            if (!FeaturePolicies.ShouldRunWaypointRefresh(
+                    __instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint,
+                    waypointControls?.Locomotive != null))
+                yield break;
+
+            if (waypointControls?.Locomotive == null)
             {
                 yield return wait;
                 continue;
             }
 
-            PrepLocoUsage((AutoEngineerWaypointControls)__instance.aiWaypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
+            PrepLocoUsage(waypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
             HashSet<OpsCarPosition?> destinations = [];
             if (!tweaksAndThings.IsEnabled() || tweaksAndThings.DisableWaypointControls() || !ShouldRecalc(__instance, selectedLoco, out destinations))
             {
@@ -92,8 +109,8 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             lastSeenIntegrationSetCount = selectedLoco.set.NumberOfCars;
 
             IterateCarsDetectDestinations(
-                (AutoEngineerWaypointControls)__instance.aiWaypointControls,
-                ((AutoEngineerWaypointControls)__instance.aiWaypointControls).ConfigureOptionsDropdown(),
+                waypointControls,
+                waypointControls.ConfigureOptionsDropdown(),
                 selectedLoco,
                 numberOfCars,
                 destinations: destinations,
@@ -108,7 +125,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                 BuildJumpToOptions((AutoEngineerWaypointControls)__instance.aiWaypointControls, selectedLoco);
 
             var config = WireUpJumpTosToSettingMenu(
-                (AutoEngineerWaypointControls)__instance.aiWaypointControls,
+                waypointControls,
                 selectedLoco,
                 rowDatas,
                 func,

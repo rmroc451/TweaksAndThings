@@ -28,4 +28,6 @@ internal static class FeaturePolicies
     internal static bool ShouldSafetyFirstGovern(bool safetyFirstEnabled, bool hasNonMotiveCars, bool expressTrain,
         bool allCarsFreight, bool hasCaboose) =>
         safetyFirstEnabled && hasNonMotiveCars && !expressTrain && allCarsFreight && !hasCaboose;
+
+    internal static bool ShouldRunWaypointRefresh(bool waypointMode, bool hasLocomotive) => waypointMode && hasLocomotive;
 }
