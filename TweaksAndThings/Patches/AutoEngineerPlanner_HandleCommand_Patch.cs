@@ -67,6 +67,8 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
     private static void LocoNoticeWPSet(AutoEngineerPlanner __instance, AutoEngineerCommand command, IPlayer sender)
     {
+        if (!FeaturePolicies.ShouldShowWaypointSetNotification(TweaksAndThingsPlugin.Instance?.settings)) return;
+
         OrderWaypoint? wp =
                     string.IsNullOrEmpty(command.WaypointLocationString) ?
                     null :

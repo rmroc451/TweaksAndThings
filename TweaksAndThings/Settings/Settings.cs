@@ -65,6 +65,7 @@ public class Settings : UnityModManager.ModSettings
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
     public bool DisableWaypointControls;
     public bool AllowRepairsWithoutWaybill = true;
+    public bool ShowWaypointSetNotifications = true;
     public KeyBinding ClickAltBinding = new KeyBinding { keyCode = KeyCode.LeftAlt };
     public KeyBinding ClickControlBinding = new KeyBinding { keyCode = KeyCode.LeftControl };
     public KeyBinding ClickShiftBinding = new KeyBinding { keyCode = KeyCode.LeftShift };

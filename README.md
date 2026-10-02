@@ -204,7 +204,7 @@ Enter Tweaks and Things.
                             </li>
                         </ul>
                     </li>
-                    <li><b>S2d:</b> Allow repair-track service without a waybill (on by default).</li>
+                    <li><b>S2d:</b> Allow repair-track service without a waybill (on by default) and show or hide the <b>WP SET</b> waypoint notification (shown by default).</li>
                 </ul>
             </li>
             <li><b>S3:</b> Webhooks

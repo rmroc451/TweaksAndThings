@@ -99,6 +99,12 @@ public sealed class SettingsBehaviorTests
     }
 
     [Test]
+    public void DefaultSettings_ShowWaypointSetNotifications()
+    {
+        Assert.That(new Settings().ShowWaypointSetNotifications, Is.True);
+    }
+
+    [Test]
     public void RepairPolicy_AllowsWorkOrderCarsRegardlessOfSetting()
     {
         var settings = new Settings { AllowRepairsWithoutWaybill = false };
@@ -118,6 +124,14 @@ public sealed class SettingsBehaviorTests
         var settings = new Settings { AllowRepairsWithoutWaybill = false };
 
         Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: false, settings), Is.False);
+    }
+
+    [Test]
+    public void WaypointSetNotificationPolicy_CanHideNotifications()
+    {
+        Assert.That(FeaturePolicies.ShouldShowWaypointSetNotification(new Settings()), Is.True);
+        Assert.That(FeaturePolicies.ShouldShowWaypointSetNotification(
+            new Settings { ShowWaypointSetNotifications = false }), Is.False);
     }
 
     [Test]
