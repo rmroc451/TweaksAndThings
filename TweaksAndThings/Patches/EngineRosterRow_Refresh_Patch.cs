@@ -49,8 +49,9 @@ internal class EngineRosterRow_Refresh_Patch
         try
         {
             Car engineOrTender = __instance._engine;
-            IEnumerable<Car> locos = engineOrTender.EnumerateCoupled().Where(c => c.IsLocomotive).ToList();
-            IEnumerable<Car> consist = engineOrTender.EnumerateCoupled().Where(c => c.EnableOiling).ToList();
+            List<Car> coupledCars = engineOrTender.EnumerateCoupled().ToList();
+            List<Car> locos = coupledCars.Where(c => c.IsLocomotive).ToList();
+            List<Car> consist = coupledCars.Where(c => c.EnableOiling).ToList();
             bool cabooseRequirementFulfilled = 
                 !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() 
                 || consist.ConsistNoFreight() 
@@ -94,7 +95,9 @@ internal class EngineRosterRow_Refresh_Patch
             {
                 if (cabooseRequirementFulfilled && StateManager.Shared.Storage.OilFeature && consist.Any())
                 {
-                    float lowestOilLevel = consist.OrderBy(c => c.Oiled).FirstOrDefault().Oiled;
+                    var consistOiling = PerformancePolicies.SummarizeOilingConsist(
+                        consist.Select(c => (NeedsOiling: c.NeedsOiling, HasHotbox: c.HasHotbox, Oiled: c.Oiled)));
+                    float lowestOilLevel = consistOiling.LowestOil ?? 0f;
                     var oilLevel = FuelLevel(lowestOilLevel, 1);
                     fuelInfoTooltip += $"{lowestOilLevel.TriColorPiePercent(1)} {oilLevel} Consist Oil Lowest Level\n";
                     if (CalcPercentLoad(lowestOilLevel, 1) < offendingPercentage)
@@ -102,7 +105,7 @@ internal class EngineRosterRow_Refresh_Patch
                         fuelInfoText = $"{oilLevel} ";
                     }
 
-                    if (consist.Any(c => c.HasHotbox))
+                    if (consistOiling.HasHotbox)
                     {
                         fuelInfoText = $"{TextSprites.Hotbox} ";
                         fuelInfoTooltip = $"{TextSprites.Hotbox} Hotbox detected!\n{fuelInfoTooltip}";
@@ -165,19 +168,15 @@ internal class EngineRosterRow_Refresh_Patch
     {
         (string nameLabel, string nameTooltip, int selectedCount)? output = null;
         int selectedCount = 0;
-        Dictionary<PlayerId, IPlayer> dictionary = StateManager.Shared.PlayersManager.AllPlayers.ToDictionary((IPlayer p) => p.PlayerId, (IPlayer p) => p);
-        List<string> usersSelected = new();
-        foreach (var kvp in dictionary)
-        {
-            if (new PlayerProperties(PlayerPropertiesManager.Shared._object[kvp.Key.ToString()]).SelectedCarId == loco.id)
-            {
-                usersSelected.Add(kvp.Value.Name);
-                selectedCount++;
-            }
-        }
+        var players = PerformancePolicies.SummarizePlayers(
+            StateManager.Shared.PlayersManager.AllPlayers.Select(player =>
+                (Name: player.Name,
+                 Selected: new PlayerProperties(PlayerPropertiesManager.Shared._object[player.PlayerId.ToString()]).SelectedCarId == loco.id)));
+        selectedCount = players.SelectedNames.Count;
 
-        if (selectedCount > 0 && dictionary.Count > 1) 
-            output = ($"{(mapIcon && loco is BaseLocomotive ? loco.Ident.RoadNumber : loco.DisplayName)}<sub>{selectedCount}</sub>", $"{Environment.NewLine}Selected by: {string.Join(", ", usersSelected)}", selectedCount);
+        if (selectedCount > 0 && players.PlayerCount > 1)
+            output = ($"{(mapIcon && loco is BaseLocomotive ? loco.Ident.RoadNumber : loco.DisplayName)}<sub>{selectedCount}</sub>",
+                $"{Environment.NewLine}Selected by: {string.Join(", ", players.SelectedNames)}", selectedCount);
         return output;
     }
 

@@ -108,4 +108,34 @@ public sealed class PerformancePoliciesTests
         Assert.That(result, Is.EqualTo(expected));
         Assert.That(cabooseCheckCount, Is.EqualTo(!needsOil && hasHotbox ? 1 : 0));
     }
+
+
+    [Test]
+    public void SummarizePlayers_CountsAndCollectsSelectedPlayersInOnePass()
+    {
+        var visits = 0;
+        var players = new[]
+        {
+            (Name: "Ryan", Selected: true),
+            (Name: "Crysty", Selected: false),
+            (Name: "Guest", Selected: true)
+        };
+
+        var result = PerformancePolicies.SummarizePlayers(CountPlayerVisits(players, () => visits++));
+
+        Assert.That(visits, Is.EqualTo(players.Length));
+        Assert.That(result.PlayerCount, Is.EqualTo(3));
+        Assert.That(result.SelectedNames, Is.EqualTo(new[] { "Ryan", "Guest" }));
+    }
+
+    private static IEnumerable<(string Name, bool Selected)> CountPlayerVisits(
+        IEnumerable<(string Name, bool Selected)> players,
+        System.Action visited)
+    {
+        foreach (var player in players)
+        {
+            visited();
+            yield return player;
+        }
+    }
 }

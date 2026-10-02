@@ -51,6 +51,21 @@ internal static class PerformancePolicies
         return (hasNeedsOiling, hasHotbox, lowestOil);
     }
 
+    internal static (int PlayerCount, List<string> SelectedNames) SummarizePlayers(
+        IEnumerable<(string Name, bool Selected)> players)
+    {
+        int playerCount = 0;
+        var selectedNames = new List<string>();
+        foreach (var player in players)
+        {
+            playerCount++;
+            if (player.Selected)
+                selectedNames.Add(player.Name);
+        }
+
+        return (playerCount, selectedNames);
+    }
+
     internal static bool ShouldReportConsistOiling(
         bool hasNeedsOiling,
         bool hasHotbox,
