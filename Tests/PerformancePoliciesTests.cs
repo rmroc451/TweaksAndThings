@@ -160,4 +160,25 @@ public sealed class PerformancePoliciesTests
         Assert.That(visits, Is.EqualTo(items.Length));
         Assert.That(result, Is.EquivalentTo(new int?[] { 4, 9 }));
     }
+
+
+    [Test]
+    public void SnapshotSet_EnumeratesSourceOnceAndContainsEveryDistinctValue()
+    {
+        var visits = 0;
+        IEnumerable<string> Values()
+        {
+            visits++;
+            yield return "A";
+            visits++;
+            yield return "B";
+            visits++;
+            yield return "A";
+        }
+
+        var result = PerformancePolicies.SnapshotSet(Values());
+
+        Assert.That(visits, Is.EqualTo(3));
+        Assert.That(result, Is.EquivalentTo(new[] { "A", "B" }));
+    }
 }

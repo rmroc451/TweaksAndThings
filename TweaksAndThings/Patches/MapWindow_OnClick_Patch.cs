@@ -157,13 +157,14 @@ internal class MapWindow_OnClick_Patch
             Vector3 position = _graph.GetPosition(valueOrDefault);
             float num = 2f;
             Hit? result = null;
+            var selectedConsist = PerformancePolicies.SnapshotSet(selectedLoco.EnumerateCoupled());
             HashSet<Car> value;
             using (CollectionPool<HashSet<Car>, Car>.Get(out value))
             {
                 shared.CheckForCarsAtPoint(position, 2f, value, valueOrDefault);
                 foreach (Car item in value)
                 {
-                    if (selectedLoco.EnumerateCoupled().ToHashSet().Contains(item))
+                    if (selectedConsist.Contains(item))
                     {
                         continue;
                     }

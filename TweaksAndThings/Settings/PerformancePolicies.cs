@@ -82,6 +82,15 @@ internal static class PerformancePolicies
         return values;
     }
 
+    internal static HashSet<T> SnapshotSet<T>(IEnumerable<T> items)
+    {
+        var values = new HashSet<T>();
+        foreach (var item in items)
+            values.Add(item);
+
+        return values;
+    }
+
     internal static bool ShouldReportConsistOiling(
         bool hasNeedsOiling,
         bool hasHotbox,
