@@ -19,9 +19,12 @@ internal class EngineRosterPanel_Populate_Patch
         __instance._window.Title = __instance._window.Title.Split(':')[0].Trim();
         if (!tweaksAndThings.IsEnabled()) return true;
 
-        var hiddenEntries = rows.Where(r => r.Engine.locomotiveControl.air.IsCutOut && !r.IsSelected && !r.IsFavorite).Select(r => r.Engine.id) ?? Enumerable.Empty<string>();
+        var hiddenEntries = PerformancePolicies.SelectIds(
+            rows,
+            r => r.Engine.locomotiveControl.air.IsCutOut && !r.IsSelected && !r.IsFavorite,
+            r => r.Engine.id);
 
-        if (hiddenEntries.Any()) __instance._window.Title =string.Format("{0} : {1}", __instance._window.Title, $"Hidden MU Count [{hiddenEntries.Count()}]");
+        if (hiddenEntries.Count > 0) __instance._window.Title = string.Format("{0} : {1}", __instance._window.Title, $"Hidden MU Count [{hiddenEntries.Count}]");
 
         rows = rows.Where(r => !hiddenEntries.Contains(r.Engine.id)).ToList();
 

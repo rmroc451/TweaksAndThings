@@ -85,7 +85,13 @@ internal class CarInspector_PopulateCarPanel_Patch
             {
                 hstack.AddButtonCompact("To Switch List", delegate
                 {
-                    if (SwitchListAccess.TryAddConsist(__instance._car, out int addedCount))
+                    var trainCrew = StateManager.Shared.PlayersManager.MyTrainCrew;
+                    if (trainCrew == null)
+                    {
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            "Join a Train Crew to add cars to your switch list.", AlertLevel.Error);
+                    }
+                    else if (SwitchListAccess.TryAddConsist(__instance._car, out int addedCount))
                         Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
                             StateManager.IsHost ? $"Verified {addedCount.Pluralize("car")} added to the current switch list." : $"Requested {addedCount.Pluralize("car")} for the current switch list; waiting for host update.", AlertLevel.Info);
                     else

@@ -176,6 +176,7 @@ Enter Tweaks and Things.
             </li>
             <li><b>M5:</b> The formatted `/cu` locomotive status message can be sent from the UnityModManager **Crew Update** tab.</li>
             <li><b>M6:</b> The car inspector's <b>Add Consist to Switch List</b> button adds the connected cars to the current switch list even when the consist has no locomotive.</li>
+            <li><b>M7:</b> Auto Engineer waypoint options include <b>Run around, then ...</b>. Select this while the train is stopped to close the anglecocks, uncouple the motive power using the mod's existing coupler command, run to the saved free tail coupler, recouple, then continue to the selected destination. The consist must have one motive-power-to-car boundary and one free tail coupler.</li>
         </ul>
   </li>
   <li><b>S:</b> Settings
@@ -207,7 +208,7 @@ Enter Tweaks and Things.
                     <li><b>S2a:</b> Enable Tag Updates<br/>
                     Allows all tag updates from <b>A</b> to display.</li>
                     <li><b>S2b (🟢 NEW v2.0.0):</b> Debt Allowance<br/>
-                    Allows repair-track servicing to continue when you are insolvent, at a 20% overdraft fee.</li>
+                    Allows repair-track servicing and interchange orders for parts or fuel to continue when you are insolvent, with a 20% overdraft fee.</li>
                     <li><b>S2c:</b> Engine Roster Fuel/Info
                         <ul>
                             <li><b>S2c1:</b> Enable Fuel Display in Engine Roster<br/>

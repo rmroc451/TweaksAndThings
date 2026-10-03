@@ -1,4 +1,4 @@
-﻿using Game;
+using Game;
 using Game.State;
 using HarmonyLib;
 using Model;
@@ -132,7 +132,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
 
             var refillIds = new HashSet<string>(cabeese.Select(c => c.id));
-            CrewCarDict = CrewCarDict.Where(kvp => refillIds.Contains(kvp.Key)).ToDictionary(k => k.Key, v => v.Value);
+            CrewCarDict = PerformancePolicies.RetainActiveCrewStatuses(CrewCarDict, refillIds);
 
             var deltaTime = Math.Max(0f, (float)(TimeWeather.Now.TotalSeconds - dateTime.TotalSeconds));
             foreach (var caboose in cabeese)

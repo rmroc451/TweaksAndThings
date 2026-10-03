@@ -44,7 +44,7 @@ internal class RepairTrack_DailyPayables_Patch
         {
             int num = Mathf.CeilToInt(rateState.PayDue);
             rateState.PaidCurrent = shared.CanAfford(num);
-            int penalty = Mathf.CeilToInt(!rateState.PaidCurrent ? num * 0.2f : 0);
+            int penalty = FeaturePolicies.CalculateServicingOverdraftFee(num, rateState.PaidCurrent);
             Multiplayer.Broadcast($"{Hyperlink.To(__instance.Industry)}: Paid {num:C0} wages for shop crew${(penalty > 0 ? $"; Overdraft fee of {penalty:C0}" : ".")}");
 
             __instance.Industry.ApplyToBalance(-num, Ledger.Category.WagesRepair, null, 0, quiet: true);

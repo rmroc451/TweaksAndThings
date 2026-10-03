@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: RMROC
+// Ignore Spelling: RMROC
 
 using HarmonyLib;
 using Game;
@@ -326,7 +326,7 @@ public sealed class TweaksAndThingsPlugin
         if (ModSettingsAuthority.HostControlsLocked) GUILayout.Label("Host only — repair service settings are read-only.");
         GUI.enabled = enabled && !ModSettingsAuthority.HostControlsLocked;
         settings.AllowRepairsWithoutWaybill = GUILayout.Toggle(settings.AllowRepairsWithoutWaybill, "Allow repair-track service without a waybill (on by default)");
-        settings.ServicingFundPenalty = GUILayout.Toggle(settings.ServicingFundPenalty, "Allow repair-track servicing with insufficient funds (20% overdraft fee)");
+        settings.ServicingFundPenalty = GUILayout.Toggle(settings.ServicingFundPenalty, "Allow repair and interchange servicing with insufficient funds (20% overdraft fee)");
         GUI.enabled = enabled;
         settings.ShowWaypointSetNotifications = GUILayout.Toggle(settings.ShowWaypointSetNotifications, "Show WP SET notifications");
         settings.TrainBrakeDisplayShowsColorsInCalloutMode = GUILayout.Toggle(settings.TrainBrakeDisplayShowsColorsInCalloutMode, "Show train brake colors in callout mode");

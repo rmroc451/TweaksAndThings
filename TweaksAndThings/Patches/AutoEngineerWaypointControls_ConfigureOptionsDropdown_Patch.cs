@@ -29,10 +29,12 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 {
+    private const string RunaroundDestinationPrefix = "__RUNAROUND__:";
     private static Serilog.ILogger _log => Log.ForContext<LocomotiveControlsUIAdapter_UpdateCarText_Postfix>();
     private static int lastSeenIntegrationSetCount = default;
     private static string? lastLocoSeenCarId = default;
     private static Coroutine? watchyWatchy = null;
+    private static MonoBehaviour? watchyOwner = null;
     private static HashSet<OpsCarPosition?> locoConsistDestinations = [];
     private static Game.GameDateTime? timetableSaveTime = null;
     static string getDictKey(Car car) => car.DisplayName;
@@ -41,44 +43,41 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     {
         try
         {
-            var locomotive = TrainController.Shared?.SelectedLocomotive;
-            if (locomotive == null || locomotive.KeyValueObject == null)
+            var waypointControls = __instance.aiWaypointControls as AutoEngineerWaypointControls;
+            var controlledLocomotive = waypointControls?.Locomotive;
+            if (ThroughTrafficGuard.IsGenerated(controlledLocomotive))
             {
-                if (watchyWatchy != null) __instance.StopCoroutine(watchyWatchy);
+                if (watchyWatchy != null && watchyOwner != null) watchyOwner.StopCoroutine(watchyWatchy);
                 watchyWatchy = null;
-                lastLocoSeenCarId = null;
-                return;
-            }
-            if (ThroughTrafficGuard.IsGenerated(locomotive))
-            {
-                if (watchyWatchy != null) __instance.StopCoroutine(watchyWatchy);
-                watchyWatchy = null;
+                watchyOwner = null;
                 lastLocoSeenCarId = null;
                 NpcRecoveryControls.Configure(__instance);
                 return;
             }
-            if (new AutoEngineerPersistence(locomotive.KeyValueObject).Orders.Mode != AutoEngineerMode.Waypoint)
-            {
-                if (watchyWatchy != null) __instance.StopCoroutine(watchyWatchy);
-                watchyWatchy = null;
-                lastLocoSeenCarId = null;
-                lastSeenIntegrationSetCount = -1;
-                return;
-            }
+            string? currentLocomotiveId = controlledLocomotive?.id;
+            bool shouldRun = FeaturePolicies.ShouldRunWaypointRefresh(
+                __instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint,
+                controlledLocomotive != null);
+
             if (lastLocoSeenCarId != null &&
-                lastLocoSeenCarId.Equals(locomotive.id) &&
+                lastLocoSeenCarId.Equals(currentLocomotiveId) &&
+                ReferenceEquals(watchyOwner, __instance) &&
                 watchyWatchy != null)
                 return;
 
-            if (watchyWatchy != null)
-                ((MonoBehaviour)__instance).StopCoroutine(watchyWatchy);
+            if (watchyWatchy != null && watchyOwner != null)
+                watchyOwner.StopCoroutine(watchyWatchy);
 
             watchyWatchy = null;
-            lastSeenIntegrationSetCount = -1;
-            lastLocoSeenCarId = locomotive.id;
+            watchyOwner = null;
+            lastLocoSeenCarId = currentLocomotiveId;
+            locoConsistDestinations.Clear();
+            lastSeenIntegrationSetCount = default;
+            timetableSaveTime = null;
 
-            if (new AutoEngineerPersistence(locomotive.KeyValueObject).Orders.Mode == AutoEngineerMode.Waypoint)
+            if (shouldRun)
             {
+                watchyOwner = __instance;
                 watchyWatchy =
                     ((MonoBehaviour)__instance)
                     .StartCoroutine(UpdateCogCoroutine(__instance));
@@ -97,17 +96,19 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
         while (true)
         {
-            var locomotive = TrainController.Shared?.SelectedLocomotive;
-            if (locomotive == null || locomotive.KeyValueObject == null ||
-                __instance.aiWaypointControls == null ||
-                ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null ||
-                new AutoEngineerPersistence(locomotive.KeyValueObject).Orders.Mode != AutoEngineerMode.Waypoint)
+            var waypointControls = __instance.aiWaypointControls as AutoEngineerWaypointControls;
+            if (!FeaturePolicies.ShouldRunWaypointRefresh(
+                    __instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint,
+                    waypointControls?.Locomotive != null))
+                yield break;
+
+            if (waypointControls?.Locomotive == null)
             {
                 yield return wait;
                 continue;
             }
 
-            PrepLocoUsage((AutoEngineerWaypointControls)__instance.aiWaypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
+            PrepLocoUsage(waypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
             if (ThroughTrafficGuard.IsGenerated(selectedLoco))
             { NpcRecoveryControls.Configure(__instance); yield return wait; continue; }
             HashSet<OpsCarPosition?> destinations = [];
@@ -120,8 +121,8 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             lastSeenIntegrationSetCount = selectedLoco.set.NumberOfCars;
 
             IterateCarsDetectDestinations(
-                (AutoEngineerWaypointControls)__instance.aiWaypointControls,
-                ((AutoEngineerWaypointControls)__instance.aiWaypointControls).ConfigureOptionsDropdown(),
+                waypointControls,
+                waypointControls.ConfigureOptionsDropdown(),
                 selectedLoco,
                 numberOfCars,
                 destinations: destinations,
@@ -136,7 +137,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                 BuildJumpToOptions((AutoEngineerWaypointControls)__instance.aiWaypointControls, selectedLoco);
 
             var config = WireUpJumpTosToSettingMenu(
-                (AutoEngineerWaypointControls)__instance.aiWaypointControls,
+                waypointControls,
                 selectedLoco,
                 rowDatas,
                 func,
@@ -158,10 +159,19 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static bool ShouldRecalc(LocomotiveControlsUIAdapter __instance, BaseLocomotive selectedLoco, out HashSet<OpsCarPosition?> destinations)
     {
         bool output = false;
-        string locoKey = getDictKey(selectedLoco);
-        List<Car> consist = new List<Car>();
-        consist = selectedLoco.EnumerateCoupled().ToList();
-        destinations = consist.Where(c => GetCarDestinationIdentifier(c).HasValue).Select(GetCarDestinationIdentifier).ToHashSet();
+        string locoKey = selectedLoco.id;
+        if (FeaturePolicies.IsWaypointCacheForDifferentLocomotive(lastLocoSeenCarId, locoKey))
+        {
+            lastLocoSeenCarId = locoKey;
+            locoConsistDestinations.Clear();
+            lastSeenIntegrationSetCount = default;
+            timetableSaveTime = null;
+            output = true;
+        }
+        destinations = PerformancePolicies.CollectDistinctWhen(
+            selectedLoco.EnumerateCoupled(),
+            GetCarDestinationIdentifier,
+            destination => destination.HasValue);
 
         //_log.Information($"{locoKey} --> [{destinations.Count}] -> Seen -> {string.Join(Environment.NewLine, destinations.Select(k => k.Value.DisplayName))}");
         //_log.Information($"{locoKey} --> [{locoConsistDestinations.Count}] -> Cache -> {string.Join(Environment.NewLine, locoConsistDestinations.Select(k => $"{locoKey}:{k.Value.DisplayName}"))}");
@@ -194,10 +204,16 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             jumpTos = jumpTos?.OrderBy(c => c.sortDistance)?.ToList() ?? default;
         }
         
-        var localJumpTos = jumpTos.ToList();
+        var localJumpTos = new List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)>();
+        foreach (var jumpTo in jumpTos)
+        {
+            localJumpTos.Add(jumpTo);
+            localJumpTos.Add((RunaroundDestinationPrefix + jumpTo.destinationId,
+                $"Run around, then {jumpTo.destination}", jumpTo.distance, jumpTo.sortDistance, jumpTo.location));
+        }
         var safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco) && jumpTos.Any();
 
-        rowDatas.AddRange(jumpTos.Select(j =>
+        rowDatas.AddRange(localJumpTos.Select(j =>
             new DropdownMenu.RowData(
                 $"{j.destination} <b>({(j.distance.HasValue ? Units.DistanceText(j.distance.Value) : "N/A")})</b>",
                 !safetyFirst ? null : "<i>Disabled; Safety First!</i>"
@@ -236,6 +252,15 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                     }
                     else
                     {
+                        var selectedDestination = localJumpTos[row - origCount];
+                        if (selectedDestination.destinationId.StartsWith(RunaroundDestinationPrefix, StringComparison.Ordinal))
+                        {
+                            if (!AutoEngineerRunaround.TryStart(selectedLoco, end, string.Empty))
+                                Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                                    "Run-around needs a stopped locomotive, one locomotive-to-car connection, and a single free tail coupler.", AlertLevel.Error);
+                            return;
+                        }
+
                         var mw = (location: end, carId: string.Empty);
                         // Supplying the mode initializes native waypoint defaults
                         // (including speed) and sends the first destination atomically.
@@ -250,50 +275,49 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     private static List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> BuildJumpToOptions(AutoEngineerWaypointControls __instance, BaseLocomotive selectedLoco)
     {
         List<(string destinationId, string destination, float? distance, float sortDistance, Location? location)> jumpTos = new();
+        float trainMomentum = 0f;
+        Location start = StateManager.IsHost
+            ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum)
+            : RouteStartLocation(__instance, selectedLoco);
+        float totalLength = StateManager.IsHost
+            ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength()
+            : CalculateTotalLength(selectedLoco);
+        HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
         foreach (OpsCarPosition ocp in locoConsistDestinations)
         {
             string destName = ocp.DisplayName;
             string destId = ocp.Identifier;
             float? distance = null;
             float sortdistance = 0f;
-            if (
-                Graph.Shared.TryGetLocationFromPoint(
-                    ocp.Spans?.FirstOrDefault().GetSegments().FirstOrDefault(),
-                    ocp.Spans?.FirstOrDefault()?.GetCenterPoint() ?? default,
-                    200f,
-                    out Location destLoc
-                )
-            )
+            Location? resolvedDestination = null;
+            var span = ocp.Spans?.FirstOrDefault();
+            var segment = span?.GetSegments()?.FirstOrDefault();
+            if (span != null && segment != null && Graph.Shared.TryGetLocationFromPoint(
+                    segment, span.GetCenterPoint(), 200f, out Location destLoc))
             {
-                float trainMomentum = 0f;
-                Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
-                HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
-                List<RouteSearch.Step> list = new List<RouteSearch.Step>();
-                var totLen = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength() : CalculateTotalLength(selectedLoco);
-                distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum)
+                resolvedDestination = destLoc;
+                distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out var metrics, checkForCars: false, totalLength, trainMomentum)
                 ? metrics.Distance
                 : null;
-                sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out metrics, checkForCars: false, 0f, trainMomentum)
+                sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out metrics, checkForCars: false, 0f, trainMomentum)
                 ? metrics.Distance
                 : float.MaxValue;
             }
             ;
             _log.Debug($"{getDictKey(selectedLoco)} ->  {destName} {destId} {distance?.ToString()}");
-            jumpTos.Add((
-                destinationId: destId,
-                destination: $"WP> {destName}"
-                , distance: distance
-                , sortdistance: sortdistance
-                , location: (Location?)destLoc
-            ));
+            if (FeaturePolicies.IsWaypointDestinationSelectable(resolvedDestination.HasValue, destId, destName))
+                jumpTos.Add((destinationId: destId, destination: $"WP> {destName}", distance: distance,
+                    sortDistance: sortdistance, location: resolvedDestination));
         }
 
         if (selectedLoco.TryGetTimetableTrain(out Timetable.Train t))
         {
             //_log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong}");
+            var stationsByCode = TimetableController.Shared.GetAllStations()
+                .ToLookup(station => station.code, StringComparer.Ordinal);
             foreach (var e in t.Entries)
             {
-                var stp = TimetableController.Shared.GetAllStations().FirstOrDefault(ps => ps.code == e.Station);
+                var stp = stationsByCode[e.Station].FirstOrDefault();
                 //_log.Information($"{getDictKey(selectedLoco)} -> {t.DisplayStringLong} -> {e.Station} {stp}");
                 if (stp != null)
                 {
@@ -303,36 +327,25 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                         string destId = t.TrainType == Timetable.TrainType.Passenger ? stp.passengerStop.identifier : stp.code;
                         float? distance = null;
                         float sortdistance = 0f;
-                        if (
-                            Graph.Shared.TryGetLocationFromPoint(
-                                stp.passengerStop.TrackSpans?.FirstOrDefault().GetSegments().FirstOrDefault(),
-                                stp.passengerStop.TrackSpans?.FirstOrDefault()?.GetCenterPoint() ?? default,
-                                200f,
-                                out Location destLoc
-                            )
-                        )
+                        Location? resolvedDestination = null;
+                        var timetableSpan = stp.passengerStop?.TrackSpans?.FirstOrDefault();
+                        var timetableSegment = timetableSpan?.GetSegments()?.FirstOrDefault();
+                        if (timetableSpan != null && timetableSegment != null &&
+                            Graph.Shared.TryGetLocationFromPoint(timetableSegment, timetableSpan.GetCenterPoint(), 200f, out Location destLoc))
                         {
-                            float trainMomentum = 0f;
-                            Location start = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum) : RouteStartLocation(__instance, selectedLoco);
-                            HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
-                            List<RouteSearch.Step> list = new List<RouteSearch.Step>();
-                            var totLen = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength() : CalculateTotalLength(selectedLoco);
-                            distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum)
+                            resolvedDestination = destLoc;
+                            distance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out var metrics, checkForCars: false, totalLength, trainMomentum)
                             ? metrics.Distance
                             : null;
-                            sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, list, out metrics, checkForCars: false, 0f, trainMomentum)
+                            sortdistance = Graph.Shared.FindRoute(start, destLoc, autoEngineer, null, out metrics, checkForCars: false, 0f, trainMomentum)
                             ? metrics.Distance
                             : float.MaxValue;
                         }
                         ;
                         _log.Debug($"{getDictKey(selectedLoco)} ->  {destName} {destId} {distance?.ToString()}");
-                        jumpTos.Add((
-                            destinationId: destId,
-                            destination: $"{t.DisplayStringLong} > {destName}"
-                            , distance: distance
-                            , sortdistance: sortdistance
-                            , location: (Location?)destLoc
-                        ));
+                        if (FeaturePolicies.IsWaypointDestinationSelectable(resolvedDestination.HasValue, destId, destName))
+                            jumpTos.Add((destinationId: destId, destination: $"{t.DisplayStringLong} > {destName}",
+                                distance: distance, sortDistance: sortdistance, location: resolvedDestination));
                     }
                     catch (Exception ex)
                     {

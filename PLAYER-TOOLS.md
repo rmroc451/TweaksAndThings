@@ -36,6 +36,15 @@ Selecting a freight/repair destination from the player locomotive's AE cog can e
 
 This convenience applies to player locomotives. Active NPC cogs expose their restricted recovery actions, and parked pool power cannot be reassigned to an arbitrary player route. A selected destination still requires a valid native route and appropriate signal/switch access.
 
+## Run around before continuing to a destination
+
+Player locomotive AE waypoint menus also offer **Run around, then ...** for each resolved destination. Stop the train before choosing this action. It requires one connection between the motive-power unit and the cars, and one free tail coupler. The host closes the anglecocks at the separation, issues the native uncoupling command, and sends AE toward the saved tail coupler. After the locomotive separates and recouples to that tail car, the selected destination is restored in Waypoint mode.
+
+This command relies on the native engineer finding a usable runaround route; it does not create a passing track or override signals. Keep the free tail and route accessible, verify air connections after recoupling, and monitor the maneuver. Active NPC trains and pooled NPC power retain their restricted controls. The pending maneuver is held in memory, so complete or cancel it before saving/reloading.
+
+## Servicing when funds are insufficient
+
+**Allow repair and interchange servicing with insufficient funds (20% overdraft fee)** covers repair-track work and native interchange-loader parts/fuel orders. When enabled, qualifying orders proceed even if the railroad cannot afford the total charge; the extra fee is 20% of the service cost, rounded up. When disabled, the game's ordinary interchange servicing applies. This setting is controlled by the multiplayer host. It is separate from the pulpwood ordering surcharge and held-delivery premium.
 ## Generate a random consist
 
 In the native **Consist Placer**, choose the car types/categories using the filter buttons at the top, then click **Random consist…**. Enter a whole number from 1 to 200 and confirm **Generate**. The generated selection replaces the current preview; use the game's normal **Place** action to place it.

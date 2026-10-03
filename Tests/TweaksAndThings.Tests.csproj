@@ -40,6 +40,7 @@
     <Compile Include="..\TweaksAndThings\Settings\ModDiagnosticLog.cs" Link="Settings\ModDiagnosticLog.cs" />
     <Compile Include="..\TweaksAndThings\Settings\ModLogTailReader.cs" Link="Settings\ModLogTailReader.cs" />
     <Compile Include="..\TweaksAndThings\Settings\RandomConsistPolicy.cs" Link="Settings\RandomConsistPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\PerformancePolicies.cs" Link="Settings\PerformancePolicies.cs" />
     <Compile Include="..\TweaksAndThings\Patches\SwitchListAccess.cs" Link="Patches\SwitchListAccess.cs" />
     <Compile Include="..\TweaksAndThings\Patches\CabooseCrewLoadSlot_Patch.cs" Link="Patches\CabooseCrewLoadSlot_Patch.cs" />
   </ItemGroup>

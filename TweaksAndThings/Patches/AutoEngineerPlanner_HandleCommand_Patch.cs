@@ -1,4 +1,4 @@
-﻿using Game;
+using Game;
 using Game.Messages;
 using Game.Notices;
 using Game.State;
@@ -120,7 +120,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
         if (loco.EnumerateCoupled().All(c => c.IsCaboose() || c.MotivePower())) return false;
 
-        bool cabooseReq = TweaksAndThingsPlugin.Instance!.RequireConsistCabooseForOilerAndHotboxSpotter();
+        bool safetyFirstEnabled = TweaksAndThingsPlugin.Instance!.SafetyFirst();
         string logMessage = $"\n{nameof(SafetyFirstGoverningApplies)}:{Enum.GetName(typeof(AutoEngineerMode), OrdersHelper.Mode)}[{loco.DisplayName}] ";
         Func<bool> firstClass = () =>
         {
@@ -131,7 +131,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
         Func<bool> FreightConsist = () =>
         {
-            bool output = !loco.EnumerateCoupled().ConsistNoFreight();
+            bool output = loco.EnumerateCoupled().ConsistFreight();
             logMessage += $"\nFreightConsist? {output}";
             logMessage += " " + string.Join(" / ", loco.EnumerateCoupled().Where(c => !c.MotivePower()).Select(c => $"{c.id} {Enum.GetName(typeof(CarArchetype), c.Archetype)}"));
             return output;
@@ -144,13 +144,14 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
             return output;
         };
 
-        logMessage += $"\nCaboose Required {cabooseReq}";
+        logMessage += $"\nSafety First Enabled {safetyFirstEnabled}";
 
-        bool output =
-            cabooseReq &&
-            !firstClass() &&
-            FreightConsist() &&
-            noCaboose();
+        bool output = FeaturePolicies.ShouldSafetyFirstGovern(
+            safetyFirstEnabled,
+            hasNonMotiveCars: loco.EnumerateCoupled().Any(c => !c.MotivePower()),
+            expressTrain: firstClass(),
+            allCarsFreight: FreightConsist(),
+            hasCaboose: !noCaboose());
 
         logMessage += $"\nGovern AE? {output}";
         if (_log.IsEnabled(Serilog.Events.LogEventLevel.Verbose))

@@ -1,4 +1,4 @@
-﻿using Game.State;
+using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
@@ -52,16 +52,21 @@ internal class TagController_UpdateTag_Patch
         if (OpsController_AnnounceCoalescedPayments_Patch.CrewCarStatus(car).spotted) tags.Add("+");
         //if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : $"<cspace=-1em>{TextSprites.Warning}{car.Oiled.TriColorPiePercent(1)}</cspace>");
         if (car.EnableOiling) tags.Add(car.HasHotbox ? TextSprites.Hotbox : car.Oiled.TriColorPiePercent(1, oilSpriteName));
-        if (StateManager.Shared?.Storage?.OilFeature == true
-            && car.IsLocomotive 
-            && !car.NeedsOiling
-        ) 
+        if (StateManager.Shared?.Storage?.OilFeature == true && car.IsLocomotive && !car.NeedsOiling)
         {
             var consist = car.EnumerateCoupled().Where(c => c.EnableOiling).ToList();
-            bool hotbox = consist.Any(c => c.HasHotbox);
-            if ((hotbox || consist.Any(c => c.NeedsOiling)) &&
-                (!cabooseRequired || consist.ConsistNoFreight() || car.FindMyCabooseSansLoadRequirement() != null))
-                tags.Add(hotbox ? TextSprites.Hotbox : consist.OrderBy(c => c.Oiled).First().Oiled.TriColorPiePercent(1, oilSpriteName));
+            var summary = PerformancePolicies.SummarizeOilingConsist(
+                consist.Select(c => (NeedsOiling: c.NeedsOiling, HasHotbox: c.HasHotbox, Oiled: c.Oiled)));
+            if (PerformancePolicies.ShouldReportConsistOiling(
+                summary.HasNeedsOiling,
+                summary.HasHotbox,
+                () => !cabooseRequired || consist.ConsistNoFreight() || (bool)car.FindMyCabooseSansLoadRequirement()))
+            {
+                float lowestOil = summary.LowestOil ?? 0f;
+                tags.Add(summary.HasHotbox
+                    ? TextSprites.Hotbox
+                    : lowestOil.TriColorPiePercent(1, oilSpriteName));
+            }
         }
         if (car.EndAirSystemIssue()) tags.Add(TextSprites.CycleWaybills);
         if (car.HandbrakeApplied()) tags.Add(TextSprites.HandbrakeWheel);

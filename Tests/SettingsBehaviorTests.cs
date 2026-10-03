@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RMROC451.TweaksAndThings;
@@ -311,4 +311,78 @@ internal sealed class SwitchListTestController
     public static readonly SwitchListTestController Shared = new();
     public readonly List<string> AddedIds = new();
     public void AddCar(Model.Car car) => AddedIds.Add(car.id);
+    [Test]
+    public void WaypointDestinationCache_IsInvalidatedWhenSelectedLocomotiveChanges()
+    {
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive("loco-a", "loco-a"), Is.False);
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive("loco-a", "loco-b"), Is.True);
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive(null, "loco-a"), Is.True);
+    }
+    [TestCase(true, "destination", "Mill", true)]
+    [TestCase(false, "destination", "Mill", false)]
+    [TestCase(true, "", "Mill", false)]
+    [TestCase(true, "destination", " ", false)]
+    public void WaypointDestinationPolicy_OnlyExposesResolvedNamedDestinations(
+        bool locationResolved, string destinationId, string destinationName, bool expected)
+    {
+        Assert.That(FeaturePolicies.IsWaypointDestinationSelectable(locationResolved, destinationId, destinationName), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, false, true, true)]
+    [TestCase(true, true, true, false)]
+    [TestCase(false, false, true, false)]
+    [TestCase(true, false, false, false)]
+    public void WaypointPicker_OnlyAcceptsClickedNonCancelledNewLocation(
+        bool clicked, bool escaped, bool locationChanged, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldAcceptWaypointPickerHit(clicked, escaped, locationChanged), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, false, true)]
+    [TestCase(false, false, false)]
+    [TestCase(true, true, false)]
+    public void MapWaypointPolicy_RequiresRouteAndSafetyClearance(bool routeFound, bool safetyFirst, bool expected)
+    {
+        Assert.That(FeaturePolicies.CanSetWaypointFromMap(routeFound, safetyFirst), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, false, true, false, true)]
+    [TestCase(false, true, false, true, false, false)]
+    [TestCase(true, false, false, true, false, false)]
+    [TestCase(true, true, true, true, false, false)]
+    [TestCase(true, true, false, false, false, false)]
+    [TestCase(true, true, false, true, true, false)]
+    public void SafetyFirstPolicy_GovernsOnlyEnabledNonExpressAllFreightWithoutCaboose(
+        bool enabled, bool hasCars, bool express, bool freight, bool caboose, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldSafetyFirstGovern(enabled, hasCars, express, freight, caboose), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public void WaypointRefresh_RunsOnlyForWaypointModeWithALocomotive(bool waypointMode, bool hasLocomotive, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldRunWaypointRefresh(waypointMode, hasLocomotive), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true, true, true)]
+    [TestCase(false, true, true, true, false)]
+    [TestCase(true, false, true, true, false)]
+    [TestCase(true, true, false, true, false)]
+    [TestCase(true, true, true, false, false)]
+    public void RunaroundPolicy_RequiresStoppedLocoSingleBoundaryTailCouplerAndDestination(
+        bool stopped, bool oneBoundary, bool oneTailCoupler, bool destinationResolved, bool expected)
+    {
+        Assert.That(FeaturePolicies.CanBeginRunaround(stopped, oneBoundary, oneTailCoupler, destinationResolved), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public void RunaroundPolicy_ContinuesOnlyAfterSavedTailCarRecouples(bool pending, bool tailRecoupled, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldCompleteRunaround(pending, tailRecoupled), Is.EqualTo(expected));
+    }
+
 }
