@@ -6,5 +6,6 @@
   "ManagerVersion": "0.20.0",
   "AssemblyName": "RMROC451.TweaksAndThings.dll",
   "EntryMethod": "RMROC451.TweaksAndThings.TweaksAndThingsPlugin.Load",
-  "Repository": "https://github.com/rmroc451/TweaksAndThings"
+  "HomePage": "https://github.com/rmroc451/TweaksAndThings/releases",
+  "Repository": "https://raw.githubusercontent.com/rmroc451/TweaksAndThings/main/Repository.json"
 }

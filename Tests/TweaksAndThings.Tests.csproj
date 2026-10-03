@@ -5,6 +5,9 @@
     <RootNamespace>RMROC451.TweaksAndThings.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\TweaksAndThings\Settings\NpcPoolPowerPolicy.cs" Link="Settings\NpcPoolPowerPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcTrackAccessPolicy.cs" Link="Settings\NpcTrackAccessPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcTimetablePlanPolicy.cs" Link="Settings\NpcTimetablePlanPolicy.cs" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="4.2.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
@@ -16,6 +19,28 @@
     <Compile Include="..\TweaksAndThings\Settings\HotkeyBindings.cs" Link="Settings\HotkeyBindings.cs" />
     <Compile Include="..\TweaksAndThings\Settings\FeaturePolicies.cs" Link="Settings\FeaturePolicies.cs" />
     <Compile Include="..\TweaksAndThings\Settings\ThroughTrafficPolicy.cs" Link="Settings\ThroughTrafficPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcServicePolicy.cs" Link="Settings\NpcServicePolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcPowerSelection.cs" Link="Settings\NpcPowerSelection.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcRandomTrafficPolicy.cs" Link="Settings\NpcRandomTrafficPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcTimetableProtection.cs" Link="Settings\NpcTimetableProtection.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcSpawnSearch.cs" Link="Settings\NpcSpawnSearch.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcPassingSidingPolicy.cs" Link="Settings\NpcPassingSidingPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcCorridorPolicy.cs" Link="Settings\NpcCorridorPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcSidingHoldPolicy.cs" Link="Settings\NpcSidingHoldPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\TimetableHistoryPolicy.cs" Link="Settings\TimetableHistoryPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcRouteGradePolicy.cs" Link="Settings\NpcRouteGradePolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcTimewarpGate.cs" Link="Settings\NpcTimewarpGate.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcTrafficPlanPolicy.cs" Link="Settings\NpcTrafficPlanPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcBoardMarkerPolicy.cs" Link="Settings\NpcBoardMarkerPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\TimetableForecastPolicy.cs" Link="Settings\TimetableForecastPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\SimulationSpeedPolicy.cs" Link="Settings\SimulationSpeedPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\TimetableChartGeometry.cs" Link="Settings\TimetableChartGeometry.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcServiceRecord.cs" Link="Settings\NpcServiceRecord.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcHeldDeliveryPolicy.cs" Link="Settings\NpcHeldDeliveryPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\ModDiagnosticLog.cs" Link="Settings\ModDiagnosticLog.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\ModLogTailReader.cs" Link="Settings\ModLogTailReader.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\RandomConsistPolicy.cs" Link="Settings\RandomConsistPolicy.cs" />
     <Compile Include="..\TweaksAndThings\Patches\SwitchListAccess.cs" Link="Patches\SwitchListAccess.cs" />
+    <Compile Include="..\TweaksAndThings\Patches\CabooseCrewLoadSlot_Patch.cs" Link="Patches\CabooseCrewLoadSlot_Patch.cs" />
   </ItemGroup>
 </Project>

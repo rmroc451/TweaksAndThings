@@ -1,4 +1,4 @@
-﻿using Game.Messages;
+using Game.Messages;
 using Game.Notices;
 using Game.State;
 using HarmonyLib;
@@ -41,8 +41,32 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
     {
         try
         {
+            var locomotive = TrainController.Shared?.SelectedLocomotive;
+            if (locomotive == null || locomotive.KeyValueObject == null)
+            {
+                if (watchyWatchy != null) __instance.StopCoroutine(watchyWatchy);
+                watchyWatchy = null;
+                lastLocoSeenCarId = null;
+                return;
+            }
+            if (ThroughTrafficGuard.IsGenerated(locomotive))
+            {
+                if (watchyWatchy != null) __instance.StopCoroutine(watchyWatchy);
+                watchyWatchy = null;
+                lastLocoSeenCarId = null;
+                NpcRecoveryControls.Configure(__instance);
+                return;
+            }
+            if (new AutoEngineerPersistence(locomotive.KeyValueObject).Orders.Mode != AutoEngineerMode.Waypoint)
+            {
+                if (watchyWatchy != null) __instance.StopCoroutine(watchyWatchy);
+                watchyWatchy = null;
+                lastLocoSeenCarId = null;
+                lastSeenIntegrationSetCount = -1;
+                return;
+            }
             if (lastLocoSeenCarId != null &&
-                lastLocoSeenCarId.Equals(TrainController.Shared?.SelectedLocomotive.id) &&
+                lastLocoSeenCarId.Equals(locomotive.id) &&
                 watchyWatchy != null)
                 return;
 
@@ -50,8 +74,10 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                 ((MonoBehaviour)__instance).StopCoroutine(watchyWatchy);
 
             watchyWatchy = null;
+            lastSeenIntegrationSetCount = -1;
+            lastLocoSeenCarId = locomotive.id;
 
-            if (__instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint)
+            if (new AutoEngineerPersistence(locomotive.KeyValueObject).Orders.Mode == AutoEngineerMode.Waypoint)
             {
                 watchyWatchy =
                     ((MonoBehaviour)__instance)
@@ -60,7 +86,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         }
         catch (Exception ex)
         {
-            _log.Error(ex, "I have a very unique set of skills; I will find you and I will squash you.");
+            _log.Error(ex, "Unable to update locomotive waypoint controls.");
         }
     }
 
@@ -71,20 +97,26 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 
         while (true)
         {
-            if (__instance._persistence.Orders.Mode != AutoEngineerMode.Waypoint || ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null)
+            var locomotive = TrainController.Shared?.SelectedLocomotive;
+            if (locomotive == null || locomotive.KeyValueObject == null ||
+                __instance.aiWaypointControls == null ||
+                ((AutoEngineerWaypointControls)__instance.aiWaypointControls).Locomotive == null ||
+                new AutoEngineerPersistence(locomotive.KeyValueObject).Orders.Mode != AutoEngineerMode.Waypoint)
             {
                 yield return wait;
                 continue;
             }
 
             PrepLocoUsage((AutoEngineerWaypointControls)__instance.aiWaypointControls, out BaseLocomotive selectedLoco, out int numberOfCars);
+            if (ThroughTrafficGuard.IsGenerated(selectedLoco))
+            { NpcRecoveryControls.Configure(__instance); yield return wait; continue; }
             HashSet<OpsCarPosition?> destinations = [];
             if (!tweaksAndThings.IsEnabled() || tweaksAndThings.DisableWaypointControls() || !ShouldRecalc(__instance, selectedLoco, out destinations))
             {
                 yield return wait;
                 continue;
             }
-            timetableSaveTime = TimetableController.Shared.CurrentDocument.Modified;
+            timetableSaveTime = TimetableController.Shared?.CurrentDocument.Modified;
             lastSeenIntegrationSetCount = selectedLoco.set.NumberOfCars;
 
             IterateCarsDetectDestinations(
@@ -141,7 +173,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         //_log.Information($"{locoKey} 2-> {output}");
         //output |= __instance.optionsDropdown.scrollRect.content.childCount != (destinations.Count + timetableDestinations.Count + 1); //+1 for the default "JumpTo" entry)
         //_log.Information($"{locoKey} 2.5-> {output} {__instance.optionsDropdown.scrollRect.content.childCount} {(destinations.Count)} {timetableDestinations.Count}");
-        output |= selectedLoco.TryGetTimetableTrain(out _) && TimetableController.Shared.CurrentDocument.Modified != timetableSaveTime;
+        output |= selectedLoco.TryGetTimetableTrain(out _) && TimetableController.Shared?.CurrentDocument.Modified != timetableSaveTime;
         //_log.Information($"{locoKey} 3-> {output}");
 
         return output;
@@ -183,6 +215,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                 }
                 if (row > maxRowOrig && localJumpTos[row - origCount].location.HasValue)
                 {
+                    if (__instance.Locomotive != selectedLoco || ThroughTrafficGuard.BlockInteraction(selectedLoco)) return;
                     if (safetyFirst)
                     {
                         Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer, "Safety First, find yourself a caboose!", AlertLevel.Error);
@@ -204,8 +237,9 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                     else
                     {
                         var mw = (location: end, carId: string.Empty);
-                        aeoh.SetWaypoint(mw.location, mw.carId);
-                        aeoh.SetOrdersValue(maybeWaypoint: mw);
+                        // Supplying the mode initializes native waypoint defaults
+                        // (including speed) and sends the first destination atomically.
+                        aeoh.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: mw);
                     }
                 }
             }

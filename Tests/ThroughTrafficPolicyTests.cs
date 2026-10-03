@@ -28,7 +28,10 @@ public sealed class ThroughTrafficPolicyTests
     }
 
     [TestCase(600, 600, 0, true)]
-    [TestCase(600, 605, 5, true)]
+    [TestCase(600, 605, 5, false)]
+    [TestCase(605, 600, 5, true)]
+    [TestCase(606, 600, 5, false)]
+    [TestCase(2, 1438, 5, true)]
     [TestCase(600, 606, 5, false)]
     [TestCase(1438, 2, 0, false)]
     public void IsDepartureDue_OpensTheScheduledServiceWindow(int now, int scheduled, int grace, bool expected)

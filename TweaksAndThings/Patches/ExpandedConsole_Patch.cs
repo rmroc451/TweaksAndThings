@@ -24,9 +24,10 @@ internal class ExpandedConsole_Add_Patch
     private static Serilog.ILogger _log => Log.ForContext<ExpandedConsole_Add_Patch>();
     private static void Prefix(ref UI.Console.Console.Entry entry)
     {
+        bool internalDiagnostic = entry.Text.StartsWith("[TweaksAndThings] ");
         entry.Text = $"{entry.Timestamp} : {entry.Text}";
         entry.Timestamp = RealNow();
-        SendMs((UI.Console.Console.Entry?)entry);
+        if (!internalDiagnostic) SendMs((UI.Console.Console.Entry?)entry);
     }
 
 

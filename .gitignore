@@ -401,3 +401,6 @@ FodyWeavers.xsd
 .claude
 claude.md
 todo.md
+
+# Local build outputs and game API inspection tools
+artifacts/

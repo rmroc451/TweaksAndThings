@@ -11,6 +11,32 @@ namespace RMROC451.TweaksAndThings.Tests;
 [TestFixture]
 public sealed class SettingsBehaviorTests
 {
+    [SetUp]
+    public void ResetSwitchList()
+    {
+        UI.SwitchList.SwitchListPanel.Shared = null;
+        Game.State.StateManager.IsHost = true;
+        Game.State.StateManager.AcceptSwitchListUpdates = true;
+    }
+
+    [Test]
+    public void SwitchListAccess_DoesNotClaimSuccessWhenHostUpdateFails()
+    {
+        Game.State.StateManager.AcceptSwitchListUpdates = false;
+        Assert.That(SwitchListAccess.TryAddCars(new[] { new Model.Car { id = "unconfirmed" } }, out var count), Is.False);
+        Assert.That(count, Is.Zero);
+    }
+
+    [Test]
+    public void SwitchListAccess_IncludesLocomotiveAndTenderWithRepairBills()
+    {
+        var loco = new Model.Car { id = "repair-loco", IsMotivePower = true, HasRepairBill = true };
+        var tender = new Model.Car { id = "repair-tender", Archetype = Model.Definition.CarArchetype.Tender, HasRepairBill = true };
+        loco.Consist = new[] { loco, tender };
+        Assert.That(SwitchListAccess.TryAddConsist(loco, out var count), Is.True);
+        Assert.That(count, Is.EqualTo(2));
+    }
+
     [Test]
     public void SanitizeEmptySettings_NullList_ReturnsOneEditableBlankRow()
     {
@@ -147,7 +173,7 @@ public sealed class SettingsBehaviorTests
     }
 
     [Test]
-    public void SwitchListAccess_AddsEveryCarToTheDiscoveredSwitchListApi()
+    public void SwitchListAccess_SendsNativeCommandForCurrentCrew()
     {
         SwitchListTestController.Shared.AddedIds.Clear();
         var cars = new[] { new Model.Car { id = "A" }, new Model.Car { id = "B" } };
@@ -157,6 +183,40 @@ public sealed class SettingsBehaviorTests
         Assert.That(succeeded, Is.True);
         Assert.That(addedCount, Is.EqualTo(2));
         Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+        Assert.That(Game.State.StateManager.LastMessage!.TrainCrewId, Is.EqualTo("crew"));
+        Assert.That(Game.State.StateManager.LastMessage.On, Is.True);
+    }
+
+    [Test]
+    public void SwitchListAccess_WithoutCrewDoesNotSendCommand()
+    {
+        var manager = Game.State.StateManager.Shared.PlayersManager;
+        var original = manager.MyTrainCrew;
+        manager.MyTrainCrew = null;
+        Game.State.StateManager.LastMessage = null;
+        try
+        {
+            Assert.That(SwitchListAccess.TryAddCars(new[] { new Model.Car { id = "A" } }, out int count), Is.False);
+            Assert.That(count, Is.Zero);
+            Assert.That(Game.State.StateManager.LastMessage, Is.Null);
+        }
+        finally { manager.MyTrainCrew = original; }
+    }
+
+    [Test]
+    public void SwitchListAccess_PreservesExistingListAndSkipsAlreadyListedCars()
+    {
+        var panel = new UI.SwitchList.SwitchListPanel();
+        panel.Ids.Add("A");
+        UI.SwitchList.SwitchListPanel.Shared = panel;
+        try
+        {
+            Assert.That(SwitchListAccess.TryAddCars(new[] { new Model.Car { id = "A" }, new Model.Car { id = "B" } }, out int count), Is.True);
+            Assert.That(count, Is.EqualTo(1));
+            Assert.That(Game.State.StateManager.LastMessage!.CarIds, Is.EqualTo(new[] { "B" }));
+            Assert.That(panel.Ids, Does.Contain("A"));
+        }
+        finally { UI.SwitchList.SwitchListPanel.Shared = null; }
     }
 
     [Test]

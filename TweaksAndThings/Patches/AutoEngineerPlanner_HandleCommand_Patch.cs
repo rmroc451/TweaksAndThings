@@ -6,6 +6,8 @@ using HarmonyLib;
 using Model;
 using Model.AI;
 using Model.Definition;
+using Model.Ops;
+using Model.Ops.Timetable;
 using Network;
 using Network.Messages;
 using RMROC451.TweaksAndThings.Extensions;
@@ -34,6 +36,8 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
     static bool Prefix(AutoEngineerPlanner __instance, ref AutoEngineerCommand command, ref IPlayer sender)
     {
         if (ThroughTrafficGuard.BlockInteraction(__instance._locomotive)) return false;
+        // Visiting railroads operate under their own rules; native track and signal limits still apply.
+        if (ThroughTrafficGuard.IsGenerated(__instance._locomotive)) return true;
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         LocoNoticeWPSet(__instance, command, sender);
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.SafetyFirst() || (sender.IsRemote && !tweaksAndThings.SafetyFirstClientEnforce()) || command.MaxSpeedMph <= governedSpeed) return true;
@@ -120,7 +124,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
         string logMessage = $"\n{nameof(SafetyFirstGoverningApplies)}:{Enum.GetName(typeof(AutoEngineerMode), OrdersHelper.Mode)}[{loco.DisplayName}] ";
         Func<bool> firstClass = () =>
         {
-            var output = TrainController.Shared.SelectedEngineExpress();
+            var output = loco.TryGetTimetableTrain(out Timetable.Train train) && train.TrainClass == Timetable.TrainClass.First;
             logMessage += $"\nfirst class {output}";
             return output;
         };

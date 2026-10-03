@@ -51,7 +51,7 @@ public class Settings : UnityModManager.ModSettings
     }
 
     public List<WebhookSettings>? WebhookSettingsList;
-    public bool HandBrakeAndAirTagModifiers;
+    public bool HandBrakeAndAirTagModifiers = true;
     public RosterFuelColumnSettings? EngineRosterFuelColumnSettings;
     public bool EndGearHelpersRequirePayment;
     public bool RequireConsistCabooseForOilerAndHotboxSpotter;
@@ -67,6 +67,20 @@ public class Settings : UnityModManager.ModSettings
     public bool AllowRepairsWithoutWaybill = true;
     public bool ShowWaypointSetNotifications = true;
     public bool ThroughTrafficEnabled = true;
+    public bool RandomThroughFreightsEnabled;
+    public float RandomThroughFreightMultiplier = 1f;
+    public bool RandomThroughFreightFirstClass = true;
+    public bool RandomThroughFreightSecondClass = true;
+    public bool RandomThroughFreightThirdClass = true;
+    public int RandomThroughFreightMinCars = 5;
+    public int RandomThroughFreightMaxCars = 15;
+    public int PulpwoodOrderingFeePercent = 10;
+    public InterchangeServiceMode InterchangeService = InterchangeServiceMode.Automatic;
+    public NpcSpawnMode InterchangeSpawnMode = NpcSpawnMode.NearestMapEdge;
+    public int HeldDeliveryDeadlineHours = 4;
+    public int HeldDeliveryPremiumPercent = 100;
+    public string ThroughFreightReferenceCar = string.Empty;
+    public List<InterchangeApproachOverride> InterchangeApproaches = new List<InterchangeApproachOverride>();
     public string ThroughTrafficTrainSymbolPrefix = ThroughTrafficPolicy.DefaultTrainSymbolPrefix;
     public int ThroughTrafficOnTimeGraceMinutes = ThroughTrafficPolicy.DefaultOnTimeGraceMinutes;
     public int ThroughTrafficDollarsPerPassenger = 3;

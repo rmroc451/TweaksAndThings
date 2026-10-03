@@ -78,7 +78,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
         load.description = "Crew";
         load.units = LoadUnits.Quantity;
 
-        return load;
+        return _crewLoadHours = load;
     }
 
     private static void CarLoadCrewHelper(Car car, float deltaTime)
@@ -105,29 +105,40 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
         }
     }
 
-    public static bool Prefix(IndustryComponent __instance)
+    public static bool Prefix(OpsController __instance)
     {
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!StateManager.IsHost || !tweaksAndThings.IsEnabled() || !tweaksAndThings.EndGearHelpersRequirePayment() || tweaksAndThings.DayLoadCrewHours()) return true;
 
-        TrainController tc = UnityEngine.Object.FindAnyObjectByType<TrainController>();
+        TrainController tc = TrainController.Shared;
+        if (tc == null || tc.graph == null || __instance.AllIndustries == null)
+        {
+            dateTime = TimeWeather.Now;
+            return true;
+        }
         try {
 
-            var passengerStops = OpsController.Shared.AllIndustries
-                .SelectMany(i => i.TrackDisplayables.Where(t => refillLocations.Contains(t.GetType())));
+            var passengerStops = __instance.AllIndustries
+                .Where(i => i != null)
+                .SelectMany(i => i.TrackDisplayables.Where(t => t != null && refillLocations.Contains(t.GetType())));
             //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
 
-            var cabeese = passengerStops
-                .SelectMany(t => t.TrackSpans?.Select(s => (tc.CarsOnSpan(s) ?? Enumerable.Empty<Car>()).Where(c => c.IsCaboose()))?.SelectMany(c => c?.Select(c2 => (t, c2))));
+            // The native segment cache is not ready during initial industry callbacks.
+            // Check caboose locations directly and materialize once (also avoiding duplicate refills).
+            var cabooses = tc.Cars.Where(c => c != null && !c.IsInBardo && c.IsCaboose() && c.OpsLocation.IsValid).ToList();
+            var spans = passengerStops.SelectMany(t => t.TrackSpans ?? Enumerable.Empty<Track.TrackSpan>())
+                .Where(s => s != null && s.IsValid).ToList();
+            var cabeese = cabooses.Where(c => spans.Any(s => s.Contains(c.OpsLocation))).ToList();
             //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
 
-            CrewCarDict = CrewCarDict.Where(kvp => cabeese.Select(c => c.c2.id).Contains(kvp.Key)).ToDictionary(k => k.Key, v => v.Value);
+            var refillIds = new HashSet<string>(cabeese.Select(c => c.id));
+            CrewCarDict = CrewCarDict.Where(kvp => refillIds.Contains(kvp.Key)).ToDictionary(k => k.Key, v => v.Value);
 
-            var deltaTime = (float)(TimeWeather.Now.TotalSeconds - dateTime.TotalSeconds);
+            var deltaTime = Math.Max(0f, (float)(TimeWeather.Now.TotalSeconds - dateTime.TotalSeconds));
             foreach (var caboose in cabeese)
             {
                 //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
-                CarLoadCrewHelper(caboose.c2, deltaTime);
+                CarLoadCrewHelper(caboose, deltaTime);
             }
             dateTime = TimeWeather.Now;
         } catch (System.Exception ex)

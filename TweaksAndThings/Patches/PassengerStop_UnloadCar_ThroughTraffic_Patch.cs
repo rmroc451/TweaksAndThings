@@ -1,4 +1,5 @@
 using Game.State;
+using Game;
 using HarmonyLib;
 using Model;
 using Model.Ops;
@@ -24,7 +25,7 @@ internal static class PassengerStop_UnloadCar_ThroughTraffic_Patch
     private static void Prefix(PassengerStop __instance, Car car, ref UnloadState __state)
     {
         __state = default;
-        if (!StateManager.IsHost || car == null || !car.TryGetTimetableTrain(out Timetable.Train train) ||
+        if (!StateManager.IsHost || car == null || !ThroughTrafficGuard.IsGenerated(car) || !car.TryGetTimetableTrain(out Timetable.Train train) ||
             !ThroughTrafficPolicy.IsMarkedTrain(train.Name, TweaksAndThingsPlugin.Instance?.settings?.ThroughTrafficTrainSymbolPrefix) ||
             train.TrainClass != Timetable.TrainClass.First) return;
 
@@ -52,17 +53,18 @@ internal static class PassengerStop_UnloadCar_ThroughTraffic_Patch
         }
         if (entryIndex < 0 || !train.TryGetAbsoluteTimeForEntry(entryIndex, TimetableTimeType.Arrival, out int scheduledMinutes)) return;
 
-        var now = StateManager.Now;
-        int actualMinutes = now.Hours * 60 + now.Minutes;
+        var now = TimeWeather.Now;
+        int actualMinutes = (int)(now.Hours * 60 + now.Minutes);
         bool onTime = ThroughTrafficPolicy.IsWithinGracePeriod(scheduledMinutes, actualMinutes,
             TweaksAndThingsPlugin.Instance.settings.ThroughTrafficOnTimeGraceMinutes);
+        int delivered = Math.Max(0, __state.PassengerCount - (car.GetPassengerMarker()?.CountPassengersForStop(__instance.identifier) ?? 0));
         int amount = ThroughTrafficPolicy.PassengerCarSettlement(
-            __state.PassengerCount, onTime, TweaksAndThingsPlugin.Instance.settings.ThroughTrafficDollarsPerPassenger);
+            delivered, onTime, TweaksAndThingsPlugin.Instance.settings.ThroughTrafficDollarsPerPassenger);
         if (amount == 0) return;
 
         // The native passenger fare is still paid by the game. This separate entry is the schedule bonus/penalty.
         StateManager.Shared.ApplyToBalance(amount, Ledger.Category.WagesAI, null,
-            memo: $"Through traffic {train.Name}: {__state.PassengerCount} passengers {(onTime ? "on time" : "late")} at {station.code}");
+            memo: $"Through traffic {train.Name}: {delivered} passengers {(onTime ? "on time" : "late")} at {station.code}");
     }
 
     private static Exception? Finalizer(UnloadState __state, Exception? __exception)

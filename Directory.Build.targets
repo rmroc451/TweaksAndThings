@@ -4,7 +4,7 @@
 
     <!-- Copy the mod to the game directory -->
     <GameModDir Condition="'$(GameModDir)' == ''">$(GameDir)/Mods/$(AssemblyName)</GameModDir>
-    <OutDir Condition="'$(Configuration)' == 'Debug'">$(GameModDir)/</OutDir>
+    <OutDir Condition="'$(Configuration)' == 'Debug' AND '$(OutDir)' == ''">$(GameModDir)/</OutDir>
   </PropertyGroup>
 
   <!-- Replace the default version if something was set for it -->
@@ -31,42 +31,18 @@
     <Exec Command="powershell -NoProfile -Command &quot;$infoPath = '$(TargetDir)Info.json'; $infoJson = [System.IO.File]::ReadAllText($infoPath); $infoJson = $infoJson.Replace('__ASSEMBLY_VERSION__', '$(AssemblyVersion)'); [System.IO.File]::WriteAllText($infoPath, $infoJson)&quot;" />
   </Target>
 
-  <!-- Publish the mod as a neat zip file -->
-  <Target Name="PrepareForPublishing" AfterTargets="AfterBuild" Condition="'$(Configuration)' == 'Release'">
+  <!-- Package both Debug and Release builds beside the actual build output. -->
+  <Target Name="PrepareForPublishing" AfterTargets="Build" DependsOnTargets="SetModInfoVersion"
+          Condition="'$(DesignTimeBuild)' != 'true' AND '$(IsTestProject)' != 'true'">
     <PropertyGroup>
-      <ModsDirectory>$(OutputPath)/Mods</ModsDirectory>
-      <ModDirectory>$(ModsDirectory)/$(AssemblyName)</ModDirectory>
-
-      <!-- Folder we'll put the published zips into -->
-      <PublishPath>../bin</PublishPath>
-      <ZipName>$(PublishPath)/$(AssemblyName)_$(AssemblyVersion).zip</ZipName>
+      <ZipName>$(TargetDir)$(AssemblyName)_$(AssemblyVersion).zip</ZipName>
     </PropertyGroup>
-
-    <!-- Assure the output path exists -->
-    <MakeDir Directories="$(PublishPath)" />
-
-    <!-- Remove the old Mods directory, and Zips file if any is lying around -->
     <ItemGroup>
-      <OldZips Include="$(PublishPath)/$(AssemblyName)_*.zip" />
+      <ModPackageFiles Include="$(TargetDir)Info.json;$(TargetPath);$(TargetDir)Newtonsoft.Json.dll" />
     </ItemGroup>
-
-    <RemoveDir Directories="$(ModsDirectory)"  ContinueOnError="true" />
-    <Delete Files="@(OldZips)" />
-
-    <!-- Create the Mods directory again -->
-    <MakeDir Directories="$(ModDirectory)" />
-
-    <!-- Move all files to the right folder -->
-    <ItemGroup>
-      <OutputFiles Include="$(OutputPath)/**/*" />
-    </ItemGroup>
-
-    <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(ModDirectory)" />
-
-    <!-- Zip it up -->
-    <Exec Command="powershell -Command &quot;Compress-Archive -Path '$(ModDirectory)' -Destination '$(ZipName)'&quot;" />
-
-    <!-- Move them to the game directory -->
-    <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(GameModDir)" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)build\Package-Mod.ps1&quot; -OutputDirectory &quot;$(TargetDir).&quot; -AssemblyName &quot;$(AssemblyName)&quot; -Version &quot;$(AssemblyVersion)&quot;" />
+    <Message Importance="high" Text="Unity Mod Manager package: $(ZipName)" />
+    <!-- Preserve Release deployment, copying only the installable mod files. -->
+    <Copy SourceFiles="@(ModPackageFiles)" DestinationFolder="$(GameModDir)" Condition="'$(Configuration)' == 'Release'" />
   </Target>
 </Project>

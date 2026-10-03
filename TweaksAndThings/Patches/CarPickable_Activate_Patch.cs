@@ -39,7 +39,12 @@ internal class CarPickable_Activate_Patch
 
     private static bool Prefix(CarPickable __instance, PickableActivateEvent evt)
     {
-        if (ThroughTrafficGuard.BlockInteraction(__instance.car)) return false;
+        if (ThroughTrafficGuard.IsGenerated(__instance.car))
+        {
+            if (evt.Activation == PickableActivation.Primary) UI.CarInspector.CarInspector.Show(__instance.car);
+            else ThroughTrafficGuard.Notify(__instance.car);
+            return false;
+        }
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
@@ -101,8 +106,11 @@ internal class CarPickable_Activate_Patch
                 if (car.TryGetAdjacentCar(Car.LogicalEnd.A, out Model.Car cA)) CarInspector_PopulateCarPanel_Patch.CarEndAirUpdate(cA);
                 if (car.TryGetAdjacentCar(Car.LogicalEnd.B, out Model.Car cB)) CarInspector_PopulateCarPanel_Patch.CarEndAirUpdate(cB);
                 _log.ForContext("car", car).Debug("ctrlHeld!");
-                TagController.Shared.UpdateTag(car, car.TagCallout, OpsController.Shared);
-                car.TagCallout.Update();
+                if (TagController.Shared != null && car.TagCallout != null && car.TagCallout.callout != null)
+                {
+                    TagController.Shared.UpdateTag(car, car.TagCallout, OpsController.Shared);
+                    car.TagCallout.Update();
+                }
                 output = false;
             }
             else if (HotkeyBindings.ShiftDown)
