@@ -28,6 +28,7 @@ internal class EngineRosterRow_Refresh_Patch
 
     public static void Postfix(EngineRosterRow __instance)
     {
+        EngineRosterColumns.Apply(__instance);
         TweaksAndThingsPlugin? tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         RosterFuelColumnSettings? rosterFuelColumnSettings = tweaksAndThings?.settings?.EngineRosterFuelColumnSettings;
 
@@ -35,6 +36,26 @@ internal class EngineRosterRow_Refresh_Patch
         string fuelInfoTooltip = string.Empty;
 
         TweakyTweakTweakers(__instance);
+        var local = tweaksAndThings?.IsEnabled == true ? AeLocalService.Job(__instance._engine) : null;
+        if (local != null)
+        {
+            __instance.infoLabel.text = AeLocalService.Summary(local);
+            __instance.infoTooltip.TooltipInfo = new TooltipInfo("AE Local", local.Status + "\nPlan: " + local.PlanDetail +
+                "\nEngineer: " + local.NativeStatus + "\nDeferred cars: " + local.YardRemainder.Count);
+            return;
+        }
+
+        if (tweaksAndThings?.IsEnabled() == true && NpcServiceStore.Load())
+        {
+            var service = NpcServiceStore.State.Services.FirstOrDefault(s => s.PowerIds.Contains(__instance._engine.id));
+            if (service != null)
+            {
+                __instance.infoLabel.text = NpcServiceHud.TransferStatus(service);
+                __instance.infoTooltip.TooltipInfo = new TooltipInfo(service.TrainSymbol + " · " + service.InterchangeId,
+                    NpcServiceHud.TransferStatus(service) + (service.WaitingReason.Length > 0 ? "\n" + service.WaitingReason : ""));
+                return;
+            }
+        }
 
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 

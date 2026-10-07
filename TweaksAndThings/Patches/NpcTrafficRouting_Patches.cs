@@ -15,7 +15,11 @@ internal static class NpcTrafficRouting_Recalculate_Patch
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class NpcTrafficRouting_Corridor_Patch
 {
-    private static void Prefix(AutoEngineer __instance, AutoEngineer.Targets targets) => NpcTrafficRouting.Protect(__instance, targets);
+    private static void Prefix(AutoEngineer __instance, ref AutoEngineer.Targets targets)
+    {
+        NpcSchedulePacing.Apply(__instance, ref targets);
+        NpcTrafficRouting.Protect(__instance, targets);
+    }
 }
 
 [HarmonyPatch(typeof(AutoEngineerPlanner), "TrySetSwitch")]

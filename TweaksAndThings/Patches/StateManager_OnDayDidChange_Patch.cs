@@ -35,6 +35,7 @@ internal class StateManager_OnDayDidChange_Patch
     {
         foreach (var car in TrainController.Shared.Cars.Where(Car_Extensions.IsCaboose))
         {
+            if (NpcServiceCaboose.IsServiceCar(car)) continue;
             var data = car.QuantityCapacityOfLoad(OpsController_AnnounceCoalescedPayments_Patch.CrewLoadHours);
             if (data.quantity < data.capacity)
             {

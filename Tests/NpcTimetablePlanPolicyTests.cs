@@ -5,6 +5,18 @@ namespace RMROC451.TweaksAndThings.Tests;
 
 public class NpcTimetablePlanPolicyTests
 {
+    [Test]
+    public void SavedSparseLegGetsIntermediatePassesWithoutExtendingPublishedArrival()
+    {
+        Assert.That(NpcTimetablePlanPolicy.PassingEntries(new[] { "Sylva", "Dillsboro", "Whittier", "Bryson" },
+            new[] { 10, 10, 20 }, 1430, 1470), Is.EqualTo(new[] { ("Dillsboro", 1440), ("Whittier", 1450) }));
+        // A subsequent leg uses the retained departure after the switching dwell.
+        Assert.That(NpcTimetablePlanPolicy.PassingEntries(new[] { "Bryson", "Nantahala", "Andrews" },
+            new[] { 15, 15 }, 1500, 1530), Is.EqualTo(new[] { ("Nantahala", 1515) }));
+    }
+    [Test]
+    public void AlreadyCompleteAdjacentLegAddsNoDuplicateEndpoints() =>
+        Assert.That(NpcTimetablePlanPolicy.PassingEntries(new[] { "Sylva", "Dillsboro" }, new[] { 10 }, 60, 70), Is.Empty);
     [Test] public void SparseHumanScheduleUsesNativeLegWeightsAcrossMidnight()
     {
         Assert.That(NpcTimetablePlanPolicy.Interpolate(1430, 1470, 15, 40), Is.EqualTo(1445));

@@ -18,6 +18,7 @@ public sealed class TweaksAndThingsPlugin
     private static Harmony? harmony;
     private static UnityModManager.ModEntry? modEntry;
     private static HttpClient? client;
+    private static bool initializedAfterMods;
 
     public static TweaksAndThingsPlugin? Instance { get; private set; }
 
@@ -25,6 +26,7 @@ public sealed class TweaksAndThingsPlugin
     internal Settings? settings { get; private set; }
     internal bool IsEnabled { get; private set; }
     public string ModDirectory => modEntry?.Path ?? string.Empty;
+    internal static string ModVersion => modEntry?.Info.Version ?? string.Empty;
 
     internal static void LogException(string message, Exception exception)
     {
@@ -61,14 +63,14 @@ public sealed class TweaksAndThingsPlugin
             entry.OnGUI = OnGUI;
             entry.OnSaveGUI = OnSaveGUI;
             entry.OnUpdate = OnUpdate;
+            entry.OnLateUpdate = OnLateUpdate;
 
             if (entry.Enabled)
             {
-                harmony.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
                 Instance.IsEnabled = true;
             }
 
-            entry.Logger.Log("Tweaks and Things loaded for UnityModManager.");
+            entry.Logger.Log("Tweaks and Things registered; gameplay initialization waits until all enabled UMM mods finish loading.");
             return true;
         }
         catch (Exception exception)
@@ -103,7 +105,7 @@ public sealed class TweaksAndThingsPlugin
             if (plugin.IsEnabled == value) return true;
             if (value)
             {
-                harmony.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
+                initializedAfterMods = false;
             }
             else
             {
@@ -113,6 +115,8 @@ public sealed class TweaksAndThingsPlugin
                 NpcTrafficWindow.Hide();
                 BrysonCtcMirrors.Remove();
                 harmony.UnpatchAll(entry.Info.Id);
+                initializedAfterMods = false;
+                ModJoinCompatibility.Reset();
             }
             plugin.IsEnabled = value;
             return true;
@@ -138,6 +142,18 @@ public sealed class TweaksAndThingsPlugin
     }
 
     private static readonly float[] nextSlowUpdateNotice = new float[3];
+    private static void OnLateUpdate(UnityModManager.ModEntry entry, float deltaTime)
+    {
+        if (Instance?.IsEnabled != true || initializedAfterMods || !WorldPatchReadiness.ModsLoaded) return;
+        try
+        {
+            harmony!.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
+            initializedAfterMods = true;
+            WorldPatchReadiness.Changed();
+            entry.Logger.Log("Gameplay initialized after all enabled UMM mods; start eligibility will follow the settled track/progression graph.");
+        }
+        catch (Exception ex) { LogException("Deferred mod initialization failed", ex); Instance.IsEnabled = false; }
+    }
     private static void ReportUpdateDuration(UnityModManager.ModEntry entry, int component, string name, long start)
     {
         double milliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - start) * 1000d / System.Diagnostics.Stopwatch.Frequency;
@@ -150,9 +166,16 @@ public sealed class TweaksAndThingsPlugin
     private static void OnUpdate(UnityModManager.ModEntry entry, float deltaTime)
     {
         var plugin = Instance;
-        if (plugin?.IsEnabled != true || plugin.settings == null) return;
+        if (plugin?.IsEnabled != true || !initializedAfterMods || plugin.settings == null) return;
         try
         {
+            ModJoinCompatibility.Update();
+            if (NewGameStartPicker.Choosing) return;
+            NpcLoadRecovery.Update();
+            AeLocalService.Tick();
+            AeLocalNotices.Update();
+            NewGameStartOptions.InspectLoadedMap();
+            NpcLogOrdering.Tick();
             long start = System.Diagnostics.Stopwatch.GetTimestamp();
             NpcSimulationSpeed.Update();
             if (StateManager.IsHost) NpcDailyTrafficPlans.Tick(plugin.settings, Game.TimeWeather.Now.TotalSeconds);
@@ -166,6 +189,7 @@ public sealed class TweaksAndThingsPlugin
             NpcTrafficWindow.UpdateToolbar();
             BrysonCtcMirrors.Update();
             NpcServiceHud.Update();
+            NpcMaintenance.Update();
             TimetableHistory.Update();
             NpcTrafficDiagnostics.UpdateFileSnapshot();
             ReportUpdateDuration(entry, 2, "NPC HUD", start);
@@ -334,6 +358,15 @@ public sealed class TweaksAndThingsPlugin
 
         GUILayout.Space(6f);
         GUILayout.Label("Fuel display in engine roster");
+        GUILayout.Label("Engine roster column widths (pixels; narrower panels shrink columns to fit)");
+        GUILayout.Label("Locomotive: " + settings.EngineRosterNameWidth);
+        settings.EngineRosterNameWidth = Mathf.RoundToInt(GUILayout.HorizontalSlider(settings.EngineRosterNameWidth, 60, 600));
+        GUILayout.Label("Crew / mode: " + settings.EngineRosterCrewWidth);
+        settings.EngineRosterCrewWidth = Mathf.RoundToInt(GUILayout.HorizontalSlider(settings.EngineRosterCrewWidth, 60, 600));
+        GUILayout.Label("Status: " + settings.EngineRosterStatusWidth);
+        settings.EngineRosterStatusWidth = Mathf.RoundToInt(GUILayout.HorizontalSlider(settings.EngineRosterStatusWidth, 60, 600));
+        if (GUILayout.Button("Reset roster column widths"))
+        { settings.EngineRosterNameWidth = 150; settings.EngineRosterCrewWidth = 100; settings.EngineRosterStatusWidth = 280; }
         var current = (int)(settings.EngineRosterFuelColumnSettings?.EngineRosterFuelStatusColumn ?? EngineRosterFuelDisplayColumn.None);
         var selected = GUILayout.SelectionGrid(current, FuelColumns, FuelColumns.Length);
         if (Enum.IsDefined(typeof(EngineRosterFuelDisplayColumn), selected))

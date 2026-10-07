@@ -37,6 +37,7 @@ internal static class NpcHeldDelivery_IndustryPanel_Patch
         builder.RebuildOnInterval(5);
         NpcHeldDeliveryTracking.BuildList(builder, __instance._industry.identifier);
         NpcPulpwoodOrdering.Build(__instance._industry, builder);
+        NpcLogOrdering.Build(__instance._industry, builder);
     }
 }
 

@@ -10,7 +10,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class NpcControls_Cog_Patch
 {
-    private static bool Prefix(LocomotiveControlsUIAdapter __instance) => !NpcRecoveryControls.Configure(__instance);
+    private static bool Prefix(LocomotiveControlsUIAdapter __instance) => !NpcRecoveryControls.Configure(__instance) && !AeLocalWindow.Configure(__instance);
 }
 
 [HarmonyPatch(typeof(LocomotiveControlsUIAdapter), nameof(LocomotiveControlsUIAdapter.DropdownDidChange))]

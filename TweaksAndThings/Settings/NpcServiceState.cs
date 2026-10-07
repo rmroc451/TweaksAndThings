@@ -11,6 +11,7 @@ internal static class NpcServiceStore
     private static IKeyValueObject? loadedObject;
     private static string? loadedJson;
     internal static NpcServiceState State { get; private set; } = new NpcServiceState();
+    internal static int Generation { get; private set; }
 
     internal static bool Load()
     {
@@ -22,6 +23,7 @@ internal static class NpcServiceStore
         State = value.IsNull ? new NpcServiceState() :
             JsonConvert.DeserializeObject<NpcServiceState>(value.StringValue) ?? new NpcServiceState();
         loadedObject = kv;
+        Generation++;
         return true;
     }
 

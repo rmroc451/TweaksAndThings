@@ -38,6 +38,7 @@ internal static class TimetableLiveForecast
         internal double Meters;
         internal float Retry;
         internal bool Queued;
+        internal readonly Dictionary<string, double?> Anchors = new();
         internal bool Project(Location location, out double meters)
         {
             meters = 0;
@@ -55,13 +56,43 @@ internal static class TimetableLiveForecast
             }
             return false;
         }
-        internal double? Travel(double progress, double speed, bool knownDeparture)
+        internal bool Anchor(Location location, out double meters)
+        {
+            meters = 0;
+            if (!location.IsValid) return false;
+            string key = Graph.Shared.LocationToString(location);
+            if (Anchors.TryGetValue(key, out var cached)) { meters = cached ?? 0; return cached.HasValue; }
+            if (Project(location, out meters)) { Anchors[key] = meters; return true; }
+            // A platform may be parallel to the service's actual route.
+            meters = 0;
+            if (Steps == null || !location.IsValid) return false;
+            float best = 200;
+            double offset = 0;
+            bool found = false;
+            foreach (var step in Steps)
+            {
+                if (Graph.Shared.TryGetLocationFromPoint(step.Location.segment, location.GetPosition(), best, out var point))
+                {
+                    float d = point.WithEnd(step.Location.end).distance;
+                    float begin = step.Location.distance - step.Distance;
+                    if (d >= begin && d <= step.Location.distance)
+                    {
+                        float distance = Vector3.Distance(point.GetPosition(), location.GetPosition());
+                        if (distance < best) { best = distance; meters = offset + d - begin; found = true; }
+                    }
+                }
+                offset += step.Distance;
+            }
+            Anchors[key] = found ? meters : null;
+            return found;
+        }
+        internal double? Travel(double progress, double speed, bool knownDeparture, double until = double.MaxValue)
         {
             double total = 0, offset = 0;
             if (Steps == null) return null;
             foreach (var step in Steps)
             {
-                double distance = Math.Max(0, offset + step.Distance - Math.Max(offset, progress));
+                double distance = Math.Max(0, Math.Min(until, offset + step.Distance) - Math.Max(offset, progress));
                 double? seconds = TimetableForecastPolicy.TravelSeconds(distance, speed, Math.Max(1, step.Location.segment.GetExpectedSpeedLimit()), knownDeparture);
                 if (!seconds.HasValue) return null;
                 total += seconds.Value; offset += step.Distance;
@@ -89,6 +120,7 @@ internal static class TimetableLiveForecast
         var leg = pending.Dequeue(); leg.Queued = false;
         if (!legs.TryGetValue(leg.Key, out var registered) || !ReferenceEquals(registered, leg)) return;
         leg.Steps = NpcTrainOperations.Route(leg.From, leg.To, out var steps, out var meters) ? steps : null;
+        leg.Anchors.Clear();
         leg.Meters = meters; leg.Retry = Time.realtimeSinceStartup + 15;
     }
 
@@ -131,11 +163,30 @@ internal static class TimetableLiveForecast
         bool interchange = service?.InterchangeId.Length > 0;
         bool returning = interchange && (service!.ReturnTrainSymbol == train.Name ||
             (service.ReturnTrainSymbol.Length == 0 && service.Phase == "Departing" && service.TrainSymbol == train.Name));
+        if (returning && service!.Phase != "Departing") { latest.Remove(train.Name); return null; }
         if (interchange && !returning && service!.Phase == "Departing") { latest.Remove(train.Name); return null; }
         int next = service != null ? (interchange ? 1 : Math.Min(service.StopIndex, train.Entries.Count - 1)) : -1;
         if (interchange || service?.RandomFreight == true) next = -1;
         Leg? leg = null; double progress = 0;
-        if (next > 0)
+        double firstUntil = double.MaxValue;
+        if (interchange)
+        {
+            var from = Graph.Shared.ResolveLocationString(returning ? service!.Target : service!.Spawn);
+            var to = Graph.Shared.ResolveLocationString(returning ? service!.Spawn : service!.Target);
+            leg = GetLeg(service!.Id + ":full:" + (returning ? "return:" : "") + service.Target,
+                train.Entries[0].Station, train.Entries.Last().Station, from, to);
+            if (leg == null || !leg.Project(lead.OpsLocation, out progress))
+            {
+                NpcTrafficDiagnostics.Detail("chart:" + service.Id, $"Chart route projection pending: {train.Name}, phase={service.Phase}, location={Graph.Shared.LocationToString(lead.OpsLocation)}");
+                return null;
+            }
+            next = train.Entries.Count - 1;
+            firstUntil = leg.Meters;
+            for (int i = 1; i < train.Entries.Count - 1; i++)
+                if (leg.Anchor(Station(train.Entries[i].Station), out double stationMeters) && stationMeters > progress + 10)
+                { next = i; firstUntil = stationMeters; break; }
+        }
+        else if (next > 0)
         {
             var a = train.Entries[next - 1].Station; var b = train.Entries[next].Station;
             Location? from = null, to = null;
@@ -192,11 +243,12 @@ internal static class TimetableLiveForecast
             planned.Add(new Stop { Code = entry.Station, Arrival = arrival * 60, Departure = departure * 60 }); previous = departure;
         }
         // Waiting at the originating station for its scheduled departure.
-        if (progress < 30 && planned[next - 1].Departure > now)
+        if (!interchange && progress < 30 && planned[next - 1].Departure > now)
         { knownWait = true; ready = Math.Max(ready, planned[next - 1].Departure); }
-        bool atNextStop = leg!.Meters - progress <= 30;
-        if (atNextStop && planned[next].Departure > now) knownWait = true;
-        double? firstTravel = atNextStop ? 0 : leg.Travel(progress, forecast.Speed, knownWait);
+        bool atNextStop = Math.Min(leg!.Meters, firstUntil) - progress <= 30;
+        bool passing = interchange && next < train.Entries.Count - 1 && train.Entries[next].HasSingleArrivalAndDeparture;
+        if (!passing && atNextStop && planned[next].Departure > now) knownWait = true;
+        double? firstTravel = atNextStop ? 0 : leg.Travel(progress, forecast.Speed, knownWait, firstUntil);
         if (!firstTravel.HasValue)
         { forecast.Status = "Stopped; departure uncertain"; latest[train.Name] = forecast; return forecast; }
         if (ready > now)
@@ -223,10 +275,22 @@ internal static class TimetableLiveForecast
             double passenger = 0;
             if (service != null && TimetableController.Shared.TryGetStation(entry.Station, out var station) && station.passengerStop != null)
                 passenger = lead.EnumerateCoupled().Sum(c => c.GetPassengerMarker()?.CountPassengersForStop(station.passengerStop.identifier) ?? 0);
-            double departureTime = TimetableForecastPolicy.Departure(arrivalTime, Math.Max(dwell, passenger), planned[i].Departure, meet, 0);
+            bool pass = interchange && i < train.Entries.Count - 1 && entry.HasSingleArrivalAndDeparture;
+            double departureTime = TimetableForecastPolicy.Departure(arrivalTime, Math.Max(dwell, passenger), planned[i].Departure, meet, 0, passing: pass);
             if (interchange && !returning && i == train.Entries.Count - 1) departureTime = Math.Max(departureTime, Math.Max(arrivalTime, service!.Scheduled) + RemainingTransfers(service));
             forecast.Stops.Add(new Stop { Code = entry.Station, Arrival = arrivalTime / 60, Departure = departureTime / 60 });
             if (i + 1 >= train.Entries.Count) break;
+            if (interchange)
+            {
+                double fromMeters = i == next ? Math.Min(firstUntil, leg.Meters) :
+                    leg.Anchor(Station(entry.Station), out double a) ? a : leg.Meters;
+                double toMeters = i + 1 == train.Entries.Count - 1 ? leg.Meters :
+                    leg.Anchor(Station(train.Entries[i + 1].Station), out double b) ? b : leg.Meters;
+                double? remaining = leg.Travel(fromMeters, forecast.Speed, knownWait, toMeters);
+                if (!remaining.HasValue) break;
+                arrivalTime = departureTime + remaining.Value;
+                continue;
+            }
             var nextLeg = GetLeg(entry.Station + ":" + train.Entries[i + 1].Station, entry.Station, train.Entries[i + 1].Station);
             double? travel = nextLeg?.Travel(0, forecast.Speed, knownWait);
             if (!travel.HasValue) break;
@@ -239,7 +303,7 @@ internal static class TimetableLiveForecast
 
     private static double RemainingTransfers(NpcServiceRecord service)
     {
-        int inbound = service.InboundPlanKnown ? Math.Max(service.PlannedInboundCars, service.Inbound.Count) : service.Inbound.Count;
+        int inbound = service.Phase == "Loading" && service.InboundPlanKnown ? Math.Max(service.PlannedInboundCars, service.Inbound.Count) : service.Inbound.Count;
         int count = Math.Max(0, inbound - service.SetoutDone) + Math.Max(0, Math.Max(service.PickupSnapshot.Count, service.Outbound.Count) - service.PickupDone);
         if ((service.Phase == "Setting out" || service.Phase == "Picking up") && service.NextTransfer > TimeWeather.Now.TotalSeconds)
         {
@@ -251,22 +315,32 @@ internal static class TimetableLiveForecast
     }
 
     internal static float? Row(Forecast forecast, IReadOnlyList<TimetableStation> rows)
+        => Row(forecast.Route, forecast.Progress, rows);
+
+    internal static float? HistoryRow(Forecast forecast, TimetableHistorySample sample, IReadOnlyList<TimetableStation> rows)
+    {
+        if (!forecast.Route.Anchor(Station(sample.From), out double from) ||
+            !forecast.Route.Anchor(Station(sample.To), out double to)) return null;
+        return Row(forecast.Route, from + (to - from) * sample.Fraction, rows);
+    }
+
+    private static float? Row(Leg route, double progress, IReadOnlyList<TimetableStation> rows)
     {
         var anchors = new List<(double meters, int row)>();
         for (int i = 0; i < rows.Count; i++)
         {
-            if (forecast.Route.Project(Station(rows[i].code), out double meters)) anchors.Add((meters, i));
-            else if (rows[i].code == forecast.Route.FromCode) anchors.Add((0, i));
-            else if (rows[i].code == forecast.Route.ToCode) anchors.Add((forecast.Route.Meters, i));
+            if (route.Anchor(Station(rows[i].code), out double meters)) anchors.Add((meters, i));
+            else if (rows[i].code == route.FromCode) anchors.Add((0, i));
+            else if (rows[i].code == route.ToCode) anchors.Add((route.Meters, i));
         }
         if (anchors.Count == 0) return null;
         anchors = anchors.OrderBy(a => a.meters).ToList();
-        var before = anchors.LastOrDefault(a => a.meters <= forecast.Progress);
-        if (forecast.Progress < anchors[0].meters) return anchors[0].row;
-        var after = anchors.FirstOrDefault(a => a.meters >= forecast.Progress);
-        if (forecast.Progress > anchors[anchors.Count - 1].meters) return anchors[anchors.Count - 1].row;
+        var before = anchors.LastOrDefault(a => a.meters <= progress);
+        if (progress < anchors[0].meters) return anchors[0].row;
+        var after = anchors.FirstOrDefault(a => a.meters >= progress);
+        if (progress > anchors[anchors.Count - 1].meters) return anchors[anchors.Count - 1].row;
         double width = after.meters - before.meters;
-        return width <= 0 ? before.row : (float)(before.row + (after.row - before.row) * (forecast.Progress - before.meters) / width);
+        return width <= 0 ? before.row : (float)(before.row + (after.row - before.row) * (progress - before.meters) / width);
     }
 
     internal static string Status(string symbol) => latest.TryGetValue(symbol, out var forecast) && Time.unscaledTime - forecast.UpdatedAt < 5 ? $"Live: {forecast.Speed:N0} mph · {forecast.Status}" : "No active train matched to this route.";

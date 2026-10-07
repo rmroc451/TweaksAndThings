@@ -71,8 +71,9 @@ internal static class NpcPulpwoodOrdering
             foreach (var car in TrainController.Shared.Cars.Where(c => c.Waybill?.Tag == record.Tag))
                 if (record.Fulfilled.Add(car.id))
                 {
+                    car.KeyValueObject[Patches.CaptiveLoadSource.Key] = KeyValue.Runtime.Value.String(record.Interchange);
                     record.Remaining = Math.Max(0, record.Remaining - 1);
-                    int actualFee = NpcRandomTrafficPolicy.OrderingFee(car.GetLoadInfo(0)?.Quantity ?? 0, record.UnitValue, record.FeePercent);
+                    int actualFee = record.DeferredLogFee ? 0 : NpcRandomTrafficPolicy.OrderingFee(car.GetLoadInfo(0)?.Quantity ?? 0, record.UnitValue, record.FeePercent);
                     int adjustment = record.EstimatedFeePerCar - actualFee;
                     if (adjustment != 0)
                     {

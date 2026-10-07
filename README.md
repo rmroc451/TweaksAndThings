@@ -16,9 +16,11 @@ The expanded traffic and railroad-management features have dedicated Markdown gu
 | --- | --- |
 | [NPC traffic](NPC-TRAFFIC.md) | Traffic types, daily random freight ranges, catalog power/MU/tenders, track speeds, route authority, telegraphs, NPC restrictions and recovery. |
 | [Interchange services and pool power](INTERCHANGE-SERVICES.md) | Enabling simulated service, dispatch lead time, automatic spawn locations, timed transfers, free caboose assistance, full-yard deferrals, pickups and saved parked power. |
+| [AE Local physical switching](AE-LOCAL.md) | Assign a player consist to selected industries, sort delivery cuts, collect outbound cars, return pickups to its home yard, and park; roster progress and dispatcher signal notices. |
 | [Freight and industries](FREIGHT-AND-INDUSTRIES.md) | Held orders without duplicates, declining delivery premiums, delinquent pickup penalties, purchased coal pickups, pulpwood orders/fees and switch-list accounting. |
 | [Timetable and time controls](TIMETABLE-AND-TIME.md) | String charts, planned meets, current positions, forecasts, actual running/variance, protected daily schedules, dispatch-board markers and 2×/4×/8× simulation. |
 | [Player tools](PLAYER-TOOLS.md) | Expanded load/speed/status tags, compact inspector helpers, waybill summaries, first-waypoint selection, random consist generation, crew-hours migration and Bryson mirrored CTC controls. |
+| [New-game starting areas](NEW-GAME-STARTS.md) | Loaded-map starting-area selection, progression checkboxes, equipment validation and troubleshooting missing locations. |
 | [Installation and releases](INSTALLATION-AND-RELEASES.md) | UMM installation/update checking, multiplayer authority, local assembly references, automatic ZIP output and publishing releases after 2.1.9. |
 | [Troubleshooting and bug reports](TROUBLESHOOTING.md) | Missing trains/cars, clearance holds, stalled transfers, pool restrictions, accounting problems, lag, UI/build errors and exactly which logs to attach. |
 

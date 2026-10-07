@@ -112,6 +112,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             if (ThroughTrafficGuard.IsGenerated(selectedLoco))
             { NpcRecoveryControls.Configure(__instance); yield return wait; continue; }
             HashSet<OpsCarPosition?> destinations = [];
+            if (AeLocalWindow.Configure(__instance)) { yield return wait; continue; }
             if (!tweaksAndThings.IsEnabled() || tweaksAndThings.DisableWaypointControls() || !ShouldRecalc(__instance, selectedLoco, out destinations))
             {
                 yield return wait;

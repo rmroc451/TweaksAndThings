@@ -53,6 +53,9 @@ public class Settings : UnityModManager.ModSettings
     public List<WebhookSettings>? WebhookSettingsList;
     public bool HandBrakeAndAirTagModifiers = true;
     public RosterFuelColumnSettings? EngineRosterFuelColumnSettings;
+    public int EngineRosterNameWidth = 150;
+    public int EngineRosterCrewWidth = 100;
+    public int EngineRosterStatusWidth = 280;
     public bool EndGearHelpersRequirePayment;
     public bool RequireConsistCabooseForOilerAndHotboxSpotter;
     public bool CabooseAllowsConsistInfo;
@@ -67,6 +70,7 @@ public class Settings : UnityModManager.ModSettings
     public bool AllowRepairsWithoutWaybill = true;
     public bool ShowWaypointSetNotifications = true;
     public bool ThroughTrafficEnabled = true;
+    public string NpcReportingMark = string.Empty;
     public bool RandomThroughFreightsEnabled;
     public float RandomThroughFreightMultiplier = 1f;
     public bool RandomThroughFreightFirstClass = true;

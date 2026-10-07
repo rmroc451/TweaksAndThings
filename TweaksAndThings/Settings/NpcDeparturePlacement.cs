@@ -91,14 +91,17 @@ internal static class NpcDeparturePlacement
     {
         var lead = TrainController.Shared.CarForId(service.LeadId);
         var forward = NpcTrainOperations.FacingRoute(lead.LocationF, destination);
-        if (forward.end == lead.LocationF.end) return true;
         var coupled = lead.EnumerateCoupled().ToList();
+        var ordered = NpcServiceCaboose.TravelOrder(service, coupled);
+        if (forward.end == lead.LocationF.end)
+        {
+            if (!ordered.SequenceEqual(coupled)) MoveExisting(lead.LocationA, ordered);
+            return true;
+        }
         var ids = new HashSet<string>(coupled.Select(c => c.id));
         var rear = NpcTrainOperations.FacingRoute(NpcTrainOperations.Tail(service).LocationB.Flipped(), destination);
         float length = TrainController.ApproximateLength(coupled.Select(c => c.Descriptor()));
         if (!Fits(rear, length, ids)) return false;
-        var ordered = service.PowerIds.Select(id => TrainController.Shared.CarForId(id)).Where(c => c != null).ToList();
-        ordered.AddRange(coupled.Where(c => !service.PowerIds.Contains(c.id)));
         MoveExisting(rear, ordered);
         return true;
     }

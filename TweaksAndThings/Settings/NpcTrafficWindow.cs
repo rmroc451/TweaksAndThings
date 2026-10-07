@@ -46,7 +46,7 @@ internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
     {
         if (Time.realtimeSinceStartup < nextToolbarCheck) return;
         nextToolbarCheck = Time.realtimeSinceStartup + 1;
-        if (toolbarButton != null) return;
+        if (toolbarButton != null) { EnableToolbarButton(); return; }
         var area = Object.FindFirstObjectByType<TopRightArea>();
         if (area == null || area.timetableButton == null) return;
         // Use the game's button for sizing, hover behavior and toolbar layout.
@@ -65,6 +65,38 @@ internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
         if (toolbarButton.GetComponent<UITooltipProvider>() == null)
             toolbarButton.gameObject.AddComponent<UITooltipProvider>().TooltipInfo = new TooltipInfo("AI traffic / interchanges", "Open traffic management.");
         toolbarButton.gameObject.SetActive(true);
+        EnableToolbarButton();
+        ModDiagnosticLog.Write("TRAFFIC UI", "Toolbar created; components=" + string.Join(", ",
+            toolbarButton.GetComponents<Component>().Select(c => c.GetType().Name)) +
+            "; interactable=" + toolbarButton.IsInteractable() + "; enabled=" + toolbarButton.enabled +
+            "; parent groups=" + string.Join(", ", toolbarButton.GetComponentsInParent<CanvasGroup>(true)
+                .Select(g => g.name + ": input=" + g.interactable + ", raycasts=" + g.blocksRaycasts + ", alpha=" + g.alpha)));
+    }
+
+    private static void EnableToolbarButton()
+    {
+        if (toolbarButton == null) return;
+        toolbarButton.enabled = true;
+        toolbarButton.interactable = true;
+        // A cloned animator can retain the timetable's disabled visual state.
+        // This button owns its appearance; the toolbar's parent fade remains native.
+        foreach (var animator in toolbarButton.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
+        foreach (var group in toolbarButton.GetComponentsInChildren<CanvasGroup>(true))
+        { group.interactable = true; group.blocksRaycasts = true; group.alpha = 1; }
+        var colors = toolbarButton.colors;
+        colors.normalColor = Color.white;
+        toolbarButton.colors = colors;
+        toolbarButton.transition = Selectable.Transition.ColorTint;
+        if (toolbarButton.targetGraphic != null)
+        {
+            toolbarButton.targetGraphic.enabled = true;
+            toolbarButton.targetGraphic.raycastTarget = true;
+        }
+        foreach (var image in toolbarButton.GetComponentsInChildren<Image>(true))
+        {
+            image.enabled = true;
+            image.color = Color.white;
+        }
     }
 
     internal static void Show(string tab = "active")
@@ -99,6 +131,7 @@ internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
 
     internal static void BuildContents(UIPanelBuilder builder, UIState<string> selected)
     {
+        ResponsiveModText.Install(builder._container);
         builder.AddTabbedPanels(selected, tabs =>
         {
             tabs.AddTab("Active traffic", "active", BuildActive);
@@ -200,6 +233,10 @@ internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
         builder.HVScrollView(list =>
         {
             list.AddFieldToggle("Timetable AI traffic", () => settings.ThroughTrafficEnabled, value => { settings.ThroughTrafficEnabled = value; SaveSettings(); });
+            list.AddField("NPC reporting mark", list.AddInputField(settings.NpcReportingMark ?? "", value =>
+            { settings.NpcReportingMark = value.Trim().ToUpperInvariant(); SaveSettings(); }, "Blank = default NPC mark", Game.State.GameStorage.ReportingMarkMaxLength));
+            list.AddLabel("New NPC locomotives use 18xx numbers, then 19xx, 20xx and onward as ranges fill. Reporting-mark changes affect newly generated NPC equipment.");
+            list.AddField("NPC diesel proportion", () => NpcTrainOperations.OwnedDieselShare().ToString("P0") + " of owned locomotive roster", UIPanelBuilder.Frequency.Periodic);
             list.AddFieldToggle("Random through freights", () => settings.RandomThroughFreightsEnabled, value => { settings.RandomThroughFreightsEnabled = value; SaveSettings(); });
             list.AddField("Random traffic multiplier", list.AddInputField(settings.RandomThroughFreightMultiplier.ToString(), value =>
             { if (float.TryParse(value, out float multiplier) && !float.IsNaN(multiplier)) { settings.RandomThroughFreightMultiplier = Math.Max(0, Math.Min(10, multiplier)); SaveSettings(); } }));

@@ -47,7 +47,7 @@ internal static class ThroughTrafficGuard
         return BlockInteraction(car);
     }
 
-    internal static bool IsRestricted(Car? car) => IsGenerated(car);
+    internal static bool IsRestricted(Car? car) => IsGenerated(car) || AeLocalService.Owns(car);
 
     internal static bool BlockInteraction(Car? car)
     {
@@ -58,7 +58,7 @@ internal static class ThroughTrafficGuard
 
     internal static bool ShouldBlockPropertyChange(string objectId, string key)
     {
-        if (IsTrustedMutation || !IsGeneratedCarId(objectId)) return false;
+        if (IsTrustedMutation || TrainController.Shared == null || !TrainController.Shared.TryGetCarForId(objectId, out var restricted) || !IsRestricted(restricted)) return false;
         if (TrainController.Shared.TryGetCarForId(objectId, out var pooled) && NpcPoolPower.IsPooled(pooled) && IsCouplerKey(key))
         {
             bool locked = NpcPoolPower.ConnectionBlocked(pooled, key);
@@ -76,7 +76,7 @@ internal static class ThroughTrafficGuard
     internal static bool ShouldBlockConsistMutation(IEnumerable<object> arguments)
     {
         if (IsTrustedMutation) return false;
-        var car = arguments.OfType<Car>().FirstOrDefault(IsGenerated);
+        var car = arguments.OfType<Car>().FirstOrDefault(IsRestricted);
         if (car == null) return false;
         Notify(car);
         return true;
@@ -87,9 +87,10 @@ internal static class ThroughTrafficGuard
         if (!notifiedCarIds.Add(car.id)) return;
         try
         {
+            string message = AeLocalService.Owns(car) ? "AE Local owns this equipment. Pause or cancel its local job before taking control." : Notice;
             var localPlayer = StateManager.Shared?.PlayersManager?.LocalPlayer;
-            if (localPlayer != null) Multiplayer.SendError(localPlayer, Notice, AlertLevel.Info);
-            else car.PostNotice("through-traffic-npc", Notice);
+            if (localPlayer != null) Multiplayer.SendError(localPlayer, message, AlertLevel.Info);
+            else car.PostNotice("through-traffic-npc", message);
         }
         catch { car.PostNotice("through-traffic-npc", Notice); }
     }

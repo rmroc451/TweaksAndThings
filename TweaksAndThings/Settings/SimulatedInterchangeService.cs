@@ -22,6 +22,20 @@ internal static class SimulatedInterchangeService
     private static float scanRemainder;
     private static readonly Dictionary<string, float> nextDispatchAttempt = new Dictionary<string, float>();
     private static readonly Dictionary<string, float> nextLoadAttempt = new Dictionary<string, float>();
+    private static readonly Dictionary<string, GameDateTime> pendingServiceTimes = new();
+    private static OpsController? scheduleOwner;
+
+    private static GameDateTime ServiceTime(Interchange interchange, double now)
+    {
+        if (scheduleOwner != OpsController.Shared) {
+            pendingServiceTimes.Clear(); scheduleOwner = OpsController.Shared;
+        }
+        if (pendingServiceTimes.TryGetValue(interchange.Identifier, out var pending) &&
+            NpcServicePolicy.KeepPendingService(pending.TotalSeconds, interchange.LastServiced?.TotalSeconds ?? double.NegativeInfinity)) return pending;
+        var due = interchange.GetNextServiceTime(new GameDateTime((float)now), out _);
+        pendingServiceTimes[interchange.Identifier] = due;
+        return due;
+    }
 
     internal static void Tick(Settings settings, float deltaTime)
     {
@@ -53,7 +67,7 @@ internal static class SimulatedInterchangeService
                 if (nextDispatchAttempt.TryGetValue(interchange.Identifier, out float retry) && Time.realtimeSinceStartup < retry) continue;
                 try
                 {
-                    var due = interchange.GetNextServiceTime(TimeWeather.Now, out _);
+                    var due = ServiceTime(interchange, now);
                     if (!NpcTrainOperations.TryApproach(interchange, settings, out var spawn, out var target, out var travelSeconds))
                     { NpcTrafficDiagnostics.Report(interchange.Identifier, NpcTrainOperations.ApproachStatus(interchange.Identifier)); continue; }
                     if (now < PlannedDispatch(interchange, due.TotalSeconds, travelSeconds))
@@ -77,7 +91,8 @@ internal static class SimulatedInterchangeService
     internal static bool HasInboundService(Interchange interchange) => NpcServiceStore.Load() && NpcServiceStore.State.Services.Any(s => s.InterchangeId == interchange.Identifier && !s.PoolOutbound);
 
     private static double PlannedDispatch(Interchange interchange, double due, double travel) =>
-        NpcTrafficPlanPolicy.ForInterchange(NpcServiceStore.State, interchange.Identifier, due)?.Dispatch ?? NpcServicePolicy.DispatchTime(due, travel);
+        NpcTrafficPlanPolicy.ForInterchange(NpcServiceStore.State, interchange.Identifier, due)?.Dispatch ??
+        NpcServicePolicy.DispatchTime(due, NpcTimetablePacingPolicy.BufferedTravelSeconds(travel));
 
     internal static bool PrepareWarp(Settings settings)
     {
@@ -109,7 +124,7 @@ internal static class SimulatedInterchangeService
         {
             if (HasInboundService(interchange) || !NpcTrainOperations.TryApproach(interchange, settings, out _, out _, out var travel)) continue;
             if (!NpcServicePolicy.HasServiceDemand(interchange.Orders.Sum(o => o.CarCount), PickupCars(interchange).Count())) continue;
-            var due = interchange.GetNextServiceTime(new GameDateTime((float)now), out _);
+            var due = ServiceTime(interchange, now);
             times.Add(PlannedDispatch(interchange, due.TotalSeconds, travel));
         }
         return NpcServicePolicy.WarpBoundary(now, now + 7 * 86400, times);
@@ -120,7 +135,7 @@ internal static class SimulatedInterchangeService
         foreach (var interchange in OpsController.Shared.EnabledInterchanges)
         {
             if (HasInboundService(interchange) || !NpcTrainOperations.TryApproach(interchange, settings, out var spawn, out var target, out var travel)) continue;
-            var due = interchange.GetNextServiceTime(TimeWeather.Now, out _);
+            var due = ServiceTime(interchange, TimeWeather.Now.TotalSeconds);
             // Native clock storage rounds to float hours; allow one second at the boundary.
             if (PlannedDispatch(interchange, due.TotalSeconds, travel) > TimeWeather.Now.TotalSeconds + 1) continue;
             try { Dispatch(interchange, spawn, target, due); }
@@ -149,6 +164,8 @@ internal static class SimulatedInterchangeService
             NpcDailyTrafficPlans.Skip(interchange, due.TotalSeconds);
             return;
         }
+        var caboose = NpcServiceCaboose.Catalog();
+        if (caboose == null) { NpcTrafficDiagnostics.Report(interchange.Identifier, "Dispatch blocked: no caboose available in catalog"); return; }
         float outboundWeight = pickups.Sum(c => c.Weight);
         float reserve = Math.Max(inbound.Weight, outboundWeight);
         NpcTrafficDiagnostics.Report(interchange.Identifier, $"Power sizing: {inbound.Count} inbound cars, {inbound.Weight / 2000:N0} inbound tons, {outboundWeight / 2000:N0} pickup tons; planning for {reserve / 2000:N0} tons");
@@ -156,18 +173,18 @@ internal static class SimulatedInterchangeService
         if (!NpcTrainOperations.TryCatalogPower(inbound.Weight, route, null, out var descriptors, returnRoute, outboundWeight,
             trainLength: NpcPassingSidings.Length(inbound.Descriptors) + 60, returnTrainLength: NpcPassingSidings.Length(pickups.Select(c => c.Descriptor())) + 60))
         { NpcTrafficDiagnostics.Report(interchange.Identifier, $"Dispatch blocked: no suitable catalog power for delivery {inbound.Weight / 2000:N0} tons and pickup {outboundWeight / 2000:N0} tons"); return; }
-        if (!FitPassingSidings(interchange, inbound, pickups, route, returnRoute, ref descriptors)) return;
+        if (!FitPassingSidings(interchange, inbound, pickups, route, returnRoute, ref descriptors, caboose.Value)) return;
         outboundWeight = pickups.Sum(c => c.Weight);
         float fullLength = TrainController.ApproximateLength(descriptors.Concat(inbound.Descriptors));
         if (!NpcDeparturePlacement.Find(ref spawn, target, fullLength))
         { NpcTrafficDiagnostics.Report(interchange.Identifier, "Dispatch blocked: neither departure end has room for the complete train"); return; }
         // Relocating inward can change the route and its grades. Size power again for the actual departure point.
         if (!NpcTrainOperations.Route(spawn, target, out route, out _) || !NpcTrainOperations.Route(target, spawn, out returnRoute, out _)) return;
-        if (!FitPassingSidings(interchange, inbound, pickups, route, returnRoute, ref descriptors)) return;
+        if (!FitPassingSidings(interchange, inbound, pickups, route, returnRoute, ref descriptors, caboose.Value)) return;
         outboundWeight = pickups.Sum(c => c.Weight);
         if (!NpcDeparturePlacement.Find(ref spawn, target, TrainController.ApproximateLength(descriptors.Concat(inbound.Descriptors)))) return;
         if (!NpcTrainOperations.Route(spawn, target, out route, out _) || !NpcTrainOperations.Route(target, spawn, out returnRoute, out _) ||
-            !FitPassingSidings(interchange, inbound, pickups, route, returnRoute, ref descriptors)) return;
+            !FitPassingSidings(interchange, inbound, pickups, route, returnRoute, ref descriptors, caboose.Value)) return;
         outboundWeight = pickups.Sum(c => c.Weight);
         inbound.TrimForSpawn(interchange, spawn, descriptors);
         if (!NpcServicePolicy.HasServiceDemand(inbound.Count, pickups.Count))
@@ -207,26 +224,32 @@ internal static class SimulatedInterchangeService
     }
 
     private static bool FitPassingSidings(Interchange interchange, NpcInboundPlan inbound, List<Car> pickups,
-        List<RouteSearch.Step> route, List<RouteSearch.Step> returnRoute, ref List<CarDescriptor> power)
+        List<RouteSearch.Step> route, List<RouteSearch.Step> returnRoute, ref List<CarDescriptor> power, CarDescriptor caboose)
     {
         float limit = Math.Min(NpcPassingSidings.Limit(route), NpcPassingSidings.Limit(returnRoute));
+        // A train must also fit a service span to clear the main at arrival.
+        // Existing native-order trimming defers excess cars for a later trip.
+        float berthLimit = interchange.TrackSpans.Select(s => Math.Max(0, s.Length - 30)).DefaultIfEmpty(0).Max();
+        limit = Math.Min(limit, berthLimit);
         if (limit <= 0)
-        { NpcTrafficDiagnostics.Report(interchange.Identifier, "Dispatch blocked: no usable passing siding on the service route"); return false; }
+        { NpcTrafficDiagnostics.Report(interchange.Identifier, "Dispatch blocked: no usable passing siding or interchange arrival span"); return false; }
         int originalInbound = inbound.Count, originalPickups = pickups.Count;
         while (true)
         {
             inbound.TrimToLength(interchange, limit, power);
             while (pickups.Count > 0 && NpcPassingSidings.Length(power.Concat(pickups.Select(c => c.Descriptor()))) > limit)
                 pickups.RemoveAt(UnityEngine.Random.Range(0, pickups.Count));
-            if (!NpcTrainOperations.TryCatalogPower(inbound.Weight, route, null, out power, returnRoute, pickups.Sum(c => c.Weight),
+            float cabooseWeight = caboose.DefinitionInfo.Definition.WeightEmpty;
+            if (!NpcTrainOperations.TryCatalogPower(inbound.Weight + cabooseWeight, route, null, out power, returnRoute, pickups.Sum(c => c.Weight) + cabooseWeight,
                 trainLength: NpcPassingSidings.Length(inbound.Descriptors) + 60,
                 returnTrainLength: NpcPassingSidings.Length(pickups.Select(c => c.Descriptor())) + 60)) return false;
+            power.Add(caboose);
             if (NpcPassingSidings.Length(power) > limit && inbound.Count == 0 && pickups.Count == 0)
             { NpcTrafficDiagnostics.Report(interchange.Identifier, "Dispatch blocked: locomotive power alone exceeds passing siding length"); return false; }
             if (NpcPassingSidings.Length(power.Concat(inbound.Descriptors)) <= limit &&
                 NpcPassingSidings.Length(power.Concat(pickups.Select(c => c.Descriptor()))) <= limit) break;
         }
-        ModDiagnosticLog.Write("SIDING", $"{interchange.Identifier}: usable passing siding {limit:N0} m; delivery train {NpcPassingSidings.Length(power.Concat(inbound.Descriptors)):N0} m; pickup train {NpcPassingSidings.Length(power.Concat(pickups.Select(c => c.Descriptor()))):N0} m; deliveries deferred={originalInbound - inbound.Count}; pickups left for later={originalPickups - pickups.Count}.");
+        ModDiagnosticLog.Write("SIDING", $"{interchange.Identifier}: usable route/arrival train length {limit:N0} m; delivery train {NpcPassingSidings.Length(power.Concat(inbound.Descriptors)):N0} m; pickup train {NpcPassingSidings.Length(power.Concat(pickups.Select(c => c.Descriptor()))):N0} m; deliveries deferred={originalInbound - inbound.Count}; pickups left for later={originalPickups - pickups.Count}.");
         return true;
     }
 
@@ -321,8 +344,13 @@ internal static class SimulatedInterchangeService
             return;
         }
         TweaksAndThingsPlugin.LogDiagnostic($"NPC {interchange.DisplayName}: attached {service.Inbound.Count - previousInbound} inbound cars ({service.Inbound.Count} total); {interchange.Orders.Sum(o => o.CarCount)} orders remaining.");
-        NpcTrainOperations.Order((BaseLocomotive)TrainController.Shared.CarForId(service.LeadId), target);
+        NpcInterchangeArrival.Update(service, interchange,
+            (BaseLocomotive)TrainController.Shared.CarForId(service.LeadId), ref target, force: true);
         service.Phase = "Approaching";
+        var travelCars = TrainController.Shared.CarForId(service.LeadId).EnumerateCoupled().ToList();
+        NpcDeparturePlacement.MoveExisting(travelCars[0].LocationA, NpcServiceCaboose.TravelOrder(service, travelCars));
+        NpcTrainOperations.ArmRollingSpawn((BaseLocomotive)travelCars[0]);
+        NpcTimetableRegistry.RefreshReturnReservation(service);
         NpcTrafficMessages.Send(service, "inbound", $"On the move toward {interchange.DisplayName} for interchange service.");
     }
 
@@ -377,6 +405,19 @@ internal static class SimulatedInterchangeService
         }
         var spawn = Graph.Shared.ResolveLocationString(service.Spawn);
         var target = Graph.Shared.ResolveLocationString(service.Target);
+        // Recover saved services whose parking search failed after setting the
+        // provisional Departing phase. Empty power must never leave the area.
+        if (service.Phase == "Departing" && NpcServicePolicy.ShouldPoolPower(
+            service.Inbound.Count - service.SetoutDone, service.Outbound.Count - service.PickupDone,
+            service.Outbound.Count(p => p.Queued && !p.Missed)))
+        {
+            service.Phase = "Awaiting repair parking";
+            service.WaitingReason = "Waiting for a clear repair track in the interchange game area";
+            service.NextTransfer = now;
+            NpcTrainOperations.Hold(lead);
+            NpcServiceStore.Save();
+            ModDiagnosticLog.Write("POOL POWER", $"{service.Id}: recovered empty return service into repair parking; no successful pickups.");
+        }
         if (service.OutboundCollected && !service.PickupSnapshotTaken)
         {
             // Older saves had already run the native collection backend at arrival.
@@ -387,7 +428,7 @@ internal static class SimulatedInterchangeService
         if (service.Suspended)
         {
             service.Suspended = false;
-            if (service.Phase == "Approaching" || service.Phase == "Departing")
+            if (service.Phase == "Approaching" || service.Phase == "Departing" || service.Phase == "Parking power")
             {
                 if (!NpcDeparturePlacement.FaceDeparture(service, service.Phase == "Departing" ? spawn : target))
                 { service.Suspended = true; service.WaitingReason = "Clear track to turn NPC power toward its destination"; return; }
@@ -396,11 +437,36 @@ internal static class SimulatedInterchangeService
             else service.NextTransfer = Deadline(service, now, PendingBatch(service));
         }
         if (service.Phase == "Loading") { InitializeInbound(service, interchange, target); return; }
+        if (service.Phase == "Awaiting repair parking")
+        {
+            if (now < service.NextTransfer) return;
+            if (!NpcPoolPower.TryOrderRepairParking(service, lead)) service.NextTransfer = now + 30;
+            return;
+        }
         service.WaitingReason = string.Empty;
+        if (service.Phase == "Tidying yard")
+        {
+            if (!NpcSetoutPlacement.Tidy(service, interchange, now)) return;
+            service.Phase = "Setting out"; service.NextTransfer = now;
+        }
+        if (service.Phase == "Parking power")
+        {
+            var parking = UnityEngine.Resources.FindObjectsOfTypeAll<RepairTrack>()
+                .Where(r => r.gameObject.scene.IsValid()).SelectMany(r => r.TrackSpans)
+                .FirstOrDefault(s => s.id == service.ArrivalSpan);
+            if (parking != null && NpcPoolPower.SafeParkedUnit(service, lead, parking)) NpcPoolPower.Park(service);
+            else if (lead.IsStopped())
+            {
+                service.WaitingReason = "Parking: the full power unit must be inside the repair berth and clear of switches";
+                NpcTrafficDiagnostics.Report("parking-arrival:" + service.Id, $"{lead.DisplayName}: parking not complete; span={service.ArrivalSpan}; lead={Graph.Shared.LocationToString(lead.LocationF)}; target={service.Target}; full unit/switch clearance required.");
+            }
+            return;
+        }
         if (service.Phase == "Approaching")
         {
+            if (!NpcInterchangeArrival.Update(service, interchange, lead, ref target)) return;
             NpcTrafficMessages.Approaching(service, lead, target, interchange.DisplayName, "approach-inbound");
-            if (!NpcTrainOperations.Arrived(lead, target)) return;
+            if (!NpcInterchangeArrival.Ready(service, interchange, lead, target)) return;
             if (now < service.Scheduled) { service.WaitingReason = "Waiting for configured service time"; return; }
             NpcTrainOperations.Order(lead, target, false);
             if (!service.OutboundCollected)
@@ -411,8 +477,9 @@ internal static class SimulatedInterchangeService
                 service.OutboundCollected = true;
             }
             service.Phase = "Setting out";
-            TrimArrival(service, interchange);
+            if (!DropArrivalCut(service, interchange, lead)) TrimArrival(service, interchange);
             service.TransferSecondsPerCar = NpcServicePolicy.TransferRate(CabooseNearby(interchange));
+            NpcTimetableRegistry.RefreshReturnReservation(service);
             service.NextTransfer = Deadline(service, now, PendingBatch(service));
         }
         if (service.Phase == "Picking up" || service.Phase == "Setting out")
@@ -432,7 +499,19 @@ internal static class SimulatedInterchangeService
                         service.Inbound.Count - service.SetoutDone, service.Outbound.Count - service.PickupDone);
                     if (service.Phase == "Departing")
                     {
-                        if (!service.Outbound.Any(p => p.Queued && !p.Missed)) { NpcPoolPower.Park(service); return; }
+                        if (!service.YardTidied)
+                        { service.Phase = "Tidying yard"; service.NextTransfer = now; NpcServiceStore.Save(); return; }
+                        if (!service.Outbound.Any(p => p.Queued && !p.Missed))
+                        {
+                            // Commit the safe phase before a route search that
+                            // can fail, so exceptions cannot dispatch empty power.
+                            service.Phase = "Awaiting repair parking";
+                            service.WaitingReason = "Waiting for a clear repair track in the interchange game area";
+                            service.NextTransfer = now + 30;
+                            NpcServiceStore.Save();
+                            NpcPoolPower.TryOrderRepairParking(service, lead);
+                            break;
+                        }
                         if (!NpcDeparturePlacement.FaceDeparture(service, spawn))
                         { service.Phase = "Picking up"; service.WaitingReason = "Waiting for room to place power at the departure end"; service.NextTransfer = now + 10; break; }
                         NpcTimetableRegistry.RegisterReturn(service);
@@ -442,6 +521,13 @@ internal static class SimulatedInterchangeService
                     }
                     service.NextTransfer = Deadline(service, service.NextTransfer, PendingBatch(service));
                     continue;
+                }
+                if (service.Phase == "Picking up" && service.SetoutDone == service.Inbound.Count &&
+                    service.PickupDone == 0 && !NpcDeparturePlacement.FaceDeparture(service, spawn))
+                {
+                    service.WaitingReason = "Waiting for room to reposition power for pickups";
+                    service.NextTransfer = now + 10;
+                    break;
                 }
                 bool success = service.Phase == "Picking up" ? Pickup(service, count) : Setout(service, interchange, count);
                 if (!success)
@@ -453,6 +539,16 @@ internal static class SimulatedInterchangeService
                     service.NextTransfer = Deadline(service, now, PendingBatch(service));
                     break;
                 }
+                // Work both sides of the yard instead of waiting until it is full.
+                if (service.Phase == "Setting out" && service.PickupDone < service.Outbound.Count)
+                {
+                    var near = service.TouchedYardCars.Select(id => TrainController.Shared.CarForId(id)).FirstOrDefault(c => c != null);
+                    var point = near?.OpsLocation.GetPosition() ?? interchange.CenterPoint;
+                    service.Outbound = service.Outbound.Take(service.PickupDone).Concat(service.Outbound.Skip(service.PickupDone)
+                        .OrderBy(p => TrainController.Shared.TryGetCarForId(p.CarId, out var pending) ? Vector3.SqrMagnitude(pending.OpsLocation.GetPosition() - point) : float.MaxValue)).ToList();
+                }
+                service.Phase = NpcServicePolicy.AfterBatch(service.Phase, service.Inbound.Count - service.SetoutDone,
+                    service.Outbound.Count - service.PickupDone);
                 service.NextTransfer = Deadline(service, service.NextTransfer, PendingBatch(service));
                 NpcServiceStore.Save();
             }
@@ -524,7 +620,7 @@ internal static class SimulatedInterchangeService
     {
         float configured = TweaksAndThingsPlugin.Instance?.settings?.CabeeseSearchRadiusFtInMeters ?? 0;
         float radius = configured > 0 ? configured : 152.4f; // 500 feet when the legacy setting is unset.
-        return TrainController.Shared.Cars.Any(c => c.IsCaboose() && !c.IsInBardo &&
+        return TrainController.Shared.Cars.Any(c => c.IsCaboose() && !NpcServiceCaboose.IsServiceCar(c) && !c.IsInBardo &&
             (interchange.TrackSpans.Any(s => s.Contains(c.OpsLocation)) ||
                 Vector3.Distance(c.OpsLocation.GetPosition(), interchange.CenterPoint) <= radius));
     }
@@ -550,6 +646,7 @@ internal static class SimulatedInterchangeService
                 continue;
             }
             if (!TrainController.Shared.TryGetCarForId(pickup.CarId, out var car)) return false;
+            foreach (var touched in car.EnumerateCoupled()) service.TouchedYardCars.Add(touched.id);
             var tail = NpcTrainOperations.Tail(service);
             var location = Graph.Shared.LocationByMoving(tail.LocationB, -1f);
             if (!NpcTrainOperations.CanPlaceAt(location, car.carLength + 2)) return false;
@@ -563,6 +660,8 @@ internal static class SimulatedInterchangeService
                 TrainController.Shared.MoveCarCoupleTo(car, tail.LocationB, tail);
                 car.SetHandbrake(false);
             });
+            var coupled = TrainController.Shared.CarForId(service.LeadId).EnumerateCoupled().ToList();
+            NpcDeparturePlacement.MoveExisting(coupled[0].LocationA, NpcServiceCaboose.TravelOrder(service, coupled));
             service.PickupDone++;
             NpcPickupTracking.Collected(pickup.CarId);
         }
@@ -596,6 +695,7 @@ internal static class SimulatedInterchangeService
             }
         });
         foreach (var car in cars) ReleaseSetout(car);
+        foreach (var car in cars) foreach (var touched in car.EnumerateCoupled()) service.TouchedYardCars.Add(touched.id);
         service.SetoutDone += ids.Count;
         ModDiagnosticLog.Write("SETOUT RELEASE", $"service={service.Id}; interchange={interchange.Identifier}; cars={string.Join(",", ids)}; NPC marker and AI crew cleared after native placement.");
         // Removing an inbound group from the middle breaks the remaining train's coupler chain.
@@ -603,8 +703,55 @@ internal static class SimulatedInterchangeService
         var remaining = service.PowerIds.Concat(service.Inbound.Skip(service.SetoutDone))
             .Concat(service.Outbound.Take(service.PickupDone).Where(p => !p.Missed).Select(p => p.CarId))
             .Select(id => TrainController.Shared.CarForId(id)).ToList();
-        NpcDeparturePlacement.MoveExisting(remaining[0].LocationA, remaining);
+        NpcDeparturePlacement.MoveExisting(remaining[0].LocationA, NpcServiceCaboose.TravelOrder(service, remaining));
         NpcTrainOperations.SyncPlacement(cars.Concat(TrainController.Shared.CarForId(service.LeadId).EnumerateCoupled()));
+        return true;
+    }
+
+    private static bool DropArrivalCut(NpcServiceRecord service, Interchange interchange, BaseLocomotive lead)
+    {
+        if (service.SetoutDone != 0 || service.Inbound.Count == 0) return false;
+        var span = interchange.TrackSpans.FirstOrDefault(s => s.id == service.ArrivalSpan);
+        var freight = service.Inbound.Select(id => TrainController.Shared.CarForId(id)).ToList();
+        var coupled = lead.EnumerateCoupled().ToList();
+        if (span == null || freight.Any(c => c == null || !coupled.Contains(c) ||
+            !span.Contains(c.LocationF) || !span.Contains(c.LocationR)) ||
+            coupled.Any(c => !service.PowerIds.Contains(c.id) && !service.Inbound.Contains(c.id))) return false;
+        var power = service.PowerIds.Select(id => TrainController.Shared.CarForId(id)).ToList();
+        // Leave the freight in place. Recover the rear caboose into the power
+        // unit only when there is clear room ahead, never ahead of the freight.
+        Location? powerFront = null;
+        if (power.Any(NpcServiceCaboose.IsServiceCar) && coupled.Last() == power.Last())
+        {
+            try
+            {
+                float cabooseLength = TrainController.ApproximateLength(power.Where(NpcServiceCaboose.IsServiceCar).Select(c => c.Descriptor()));
+                var front = Graph.Shared.LocationByMoving(lead.LocationA, cabooseLength + 3, checkSwitchAgainstMovement: true);
+                float length = TrainController.ApproximateLength(power.Select(c => c.Descriptor()));
+                if (!NpcDeparturePlacement.Fits(front, length + 1, power.Select(c => c.id).ToHashSet())) return false;
+                var area = OpsController.Shared.ClosestArea(lead);
+                if (area == null || !area.Contains(front.GetPosition())) return false;
+                powerFront = front;
+            }
+            catch (EndOfTrack) { return false; }
+            catch (SwitchAgainstMovement) { return false; }
+        }
+        var connections = power.SelectMany(c => new[] { Car.LogicalEnd.A, Car.LogicalEnd.B }
+            .Where(end => c.CoupledTo(end) != null && service.Inbound.Contains(c.CoupledTo(end).id))
+            .Select(end => (car: c, end))).ToList();
+        if (connections.Count != (powerFront.HasValue ? 2 : 1)) return false;
+        NpcTrainOperations.Trusted(() =>
+        {
+            NpcSetoutPlacement.SecureFreight(freight);
+            foreach (var connection in connections) connection.car.HandleOpenCoupler(connection.end);
+            if (powerFront.HasValue) NpcDeparturePlacement.MoveExisting(powerFront.Value, NpcServiceCaboose.TravelOrder(service, power));
+            foreach (var car in freight) ReleaseSetout(car);
+        });
+        service.SetoutDone = service.Inbound.Count;
+        foreach (var car in freight) service.TouchedYardCars.Add(car.id);
+        NpcTrainOperations.SyncPlacement(coupled);
+        NpcServiceStore.Save();
+        ModDiagnosticLog.Write("SETOUT CUT", $"{service.Id}: delivered {freight.Count} cars in place on {span.id}; power uncoupled, freight secured and released to normal service.");
         return true;
     }
 
@@ -631,6 +778,9 @@ internal static class SimulatedInterchangeService
 
     private static void TrimArrival(NpcServiceRecord service, Interchange interchange)
     {
+        // Pending pickups can create the missing space. Try that work before
+        // declaring arriving deliveries held over for another service.
+        if (service.Outbound.Skip(service.PickupDone).Any(p => !p.Missed)) return;
         var remaining = service.Inbound.Skip(service.SetoutDone).Select(id => TrainController.Shared.CarForId(id)).ToList();
         var random = new System.Random();
         int held = NpcServicePolicy.TrimRandomToFit(remaining, cut => cut.Count == 0 ||
@@ -643,6 +793,8 @@ internal static class SimulatedInterchangeService
             foreach (var car in remaining.Concat(service.Outbound.Take(service.PickupDone).Where(p => !p.Missed).Select(p => TrainController.Shared.CarForId(p.CarId))))
             { TrainController.Shared.MoveCarCoupleTo(car, tail.LocationB, tail); tail = car; }
         });
+        var coupled = TrainController.Shared.CarForId(service.LeadId).EnumerateCoupled().ToList();
+        NpcDeparturePlacement.MoveExisting(coupled[0].LocationA, NpcServiceCaboose.TravelOrder(service, coupled));
         NpcTrafficMessages.Send(service, "arrival-held-" + service.Inbound.Count + "-" + service.SetoutDone, $"{interchange.DisplayName} yard full: {held} setout cars held for the next service; {remaining.Count} cars fit now.");
     }
 }

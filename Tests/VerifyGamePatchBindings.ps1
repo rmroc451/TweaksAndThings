@@ -10,7 +10,7 @@ $modModule = [Mono.Cecil.ModuleDefinition]::ReadModule($ModAssemblyPath)
 $checkedBindings = 0
 try {
     foreach ($patchType in $modModule.Types) {
-        if ($patchType.Name -notmatch 'InterchangedIndustryLoader_ServeInterchange|Car_HandleCoupledChange_Runaround|AutoEngineerDestinationPicker_Loop|MapWindow_OnClick|EngineRosterPanel_Populate|EngineRosterRow_Refresh|ThroughTraffic|SimulatedInterchange|AutoEngineerPlanner_HandleCommand|LocomotiveControlsUIAdapter_UpdateCarText|OpsController_AnnounceCoalescedPayments|PlacerWindow_RandomConsist|TagController_UpdateTag|CabooseCrewLoadSlot|TrafficConsoleCommand|SwitchList_UnwaybilledCars|SwitchListSummary|InterchangeTimewarp|NpcInterchangeTimeWindow|SimulationSpeedRestore|NpcInboundDescriptor|NpcPickupPayment|TimetableDelinquentPickups|NpcHeldDelivery|NpcTimetable|NpcControls|NpcFuel|NpcTrafficRouting|NpcTrackAccess|NpcPoolPower|NpcStatusNotice|BrysonCtcMirrors|TimetableHistory_Save') { continue }
+        if ($patchType.Name -notmatch 'CaptiveLoad|AeLocal|NpcOil|NpcCaboose|NewGameStart|NpcLogOrdering|NpcIndustryPlanning|InterchangedIndustryLoader_ServeInterchange|Car_HandleCoupledChange_Runaround|AutoEngineerDestinationPicker_Loop|MapWindow_OnClick|EngineRosterPanel_Populate|EngineRosterRow_Refresh|ThroughTraffic|SimulatedInterchange|AutoEngineerPlanner_HandleCommand|LocomotiveControlsUIAdapter_UpdateCarText|OpsController_AnnounceCoalescedPayments|PlacerWindow_RandomConsist|TagController_UpdateTag|CabooseCrewLoadSlot|TrafficConsoleCommand|SwitchList_UnwaybilledCars|SwitchListSummary|InterchangeTimewarp|NpcInterchangeTimeWindow|SimulationSpeedRestore|NpcInboundDescriptor|NpcPickupPayment|NpcTimetable|NpcHeldDelivery|TimetableDelinquentPickups|NpcControls|NpcFuel|NpcTrafficRouting|NpcTrackAccess|NpcPoolPower|NpcStatusNotice|BrysonCtcMirrors|TimetableHistory_Save') { continue }
         $attributes = @($patchType.CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'HarmonyLib.HarmonyPatch' })
         if ($attributes.Count -eq 0) { continue }
         $targetTypeName = $null
@@ -29,6 +29,13 @@ try {
         $methods = @($targetType.Methods | Where-Object Name -eq $targetMethodName)
         if ($null -ne $targetArgumentTypes) { $methods = @($methods | Where-Object { (@($_.Parameters | ForEach-Object { $_.ParameterType.FullName }) -join ',') -eq ($targetArgumentTypes -join ',') }) }
         if ($methods.Count -ne 1) { throw "Expected one target for $($patchType.Name), found $($methods.Count)" }
+        if ($patchType.Name -match '^SimulationSpeedRestore_(StrategyCamera|CameraGround|CameraSnap|MouseLook|StationaryCamera|CharacterZoom|InputCounters)_Patch$') {
+            $timeReads = @($methods[0].Body.Instructions | Where-Object {
+                $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.DeclaringType.FullName -eq 'UnityEngine.Time' -and
+                $_.Operand.Name -in @('get_deltaTime', 'get_fixedDeltaTime')
+            })
+            if ($timeReads.Count -eq 0) { throw "Camera timing patch $($patchType.Name) has no supported time reads in the installed game." }
+        }
         foreach ($hook in $patchType.Methods | Where-Object { $_.Name -in @('Prefix', 'Postfix', 'Finalizer') }) {
             foreach ($parameter in $hook.Parameters) {
                 if ($parameter.Name -eq '__instance' -and
@@ -48,7 +55,19 @@ try {
         }
         $checkedBindings++
     }
-    Write-Output "Verified $checkedBindings Harmony patch bindings against the installed game assembly."
+    $pickerPatch = $modModule.Types | Where-Object Name -eq 'AutoEngineerDestinationPicker_Loop_Patch'
+    if (@($pickerPatch.Methods | Where-Object Name -eq 'Loop').Count -ne 0) {
+        throw 'Waypoint picker must retain the native frame loop and registered Escape callback.'
+    }
+    foreach ($pickerMethod in $pickerPatch.Methods) {
+        if (!$pickerMethod.HasBody) { continue }
+        foreach ($instruction in $pickerMethod.Body.Instructions) {
+            if ($instruction.Operand -is [Mono.Cecil.MethodReference] -and $instruction.Operand.Name -eq 'DidEscape') {
+                throw 'Waypoint picker invokes the native cancellation callback as an input predicate.'
+            }
+        }
+    }
+    Write-Output "Verified $checkedBindings Harmony patch bindings against the installed game assembly; native waypoint picker loop preserved."
 } finally {
     $gameModule.Dispose()
     $modModule.Dispose()

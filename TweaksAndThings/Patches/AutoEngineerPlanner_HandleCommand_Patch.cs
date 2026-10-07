@@ -35,6 +35,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
     static bool Prefix(AutoEngineerPlanner __instance, ref AutoEngineerCommand command, ref IPlayer sender)
     {
+        if (AeLocalService.CaptureSetupCommand(__instance._locomotive, command)) return false;
         if (ThroughTrafficGuard.BlockInteraction(__instance._locomotive)) return false;
         // Visiting railroads operate under their own rules; native track and signal limits still apply.
         if (ThroughTrafficGuard.IsGenerated(__instance._locomotive)) return true;

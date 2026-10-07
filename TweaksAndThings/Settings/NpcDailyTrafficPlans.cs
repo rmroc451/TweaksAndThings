@@ -24,6 +24,23 @@ internal static class NpcDailyTrafficPlans
     internal static bool IsPending(string symbol) => NpcServiceStore.Load() &&
         NpcServiceStore.State.TrafficPlans.Any(p => !p.Dispatched && (p.Symbol == symbol || p.ReturnSymbol == symbol));
 
+    internal static bool PrepareCurrentDay(Settings settings, double now)
+    {
+        if (!NpcIndustryPlanning.Ready(now)) return false;
+        Tick(settings, now, force: true);
+        // Tick deliberately budgets expensive planning across frames. A warp
+        // must not resume after only the first train's schedule was published.
+        if (settings.InterchangeService == InterchangeServiceMode.Simulated &&
+            OpsController.Shared.EnabledInterchanges.Any(i => NpcTrainOperations.IsApproachPlanning(i.Identifier))) return false;
+        if (settings.ThroughTrafficEnabled && settings.RandomThroughFreightsEnabled &&
+            NpcServiceStore.State.RandomDepartures.Any(d => !NpcServiceStore.State.TrafficPlans.Any(p => p.Symbol == d.Symbol) &&
+                (!retry.TryGetValue(d.Symbol, out var until) || Time.realtimeSinceStartup >= until))) return false;
+        // Failed routes keep their normal retry status instead of making an
+        // impossible route hold the clock indefinitely.
+        NpcTimetableRegistry.Restore();
+        return true;
+    }
+
     internal static string Description(string symbol)
     {
         if (!NpcServiceStore.Load()) return "";
@@ -38,22 +55,20 @@ internal static class NpcDailyTrafficPlans
         if (!StateManager.IsHost || StateManager.Shared?.HasRestoredProperties != true || StateManager.IsUnloading ||
             TimetableController.Shared == null || Graph.Shared == null || OpsController.Shared == null || !NpcServiceStore.Load() ||
             !force && Time.realtimeSinceStartup < nextCheck) return;
+        if (!NpcIndustryPlanning.Ready(now)) return;
         nextCheck = Time.realtimeSinceStartup + 0.25f;
         var state = NpcServiceStore.State;
-        if (state.TimetablePlanVersion < 2) {
-            // Upgrade undispatched schedules once. Active trains keep their
-            // current targets and stop indices until their next planned trip.
-            var old = state.ProtectedTimetables.ToList();
-            var rebuilt = new List<Timetable.Train>();
-            foreach (var item in old.Where(p => IsPending(p.Key))) {
-                if (!TimetableController.Shared.TryRead(item.Value, out var saved, null) || !saved.Trains.TryGetValue(item.Key, out var train) || train.Entries.Count < 2) continue;
-                var minutes = NpcTimetablePlanning.Minutes(train);
-                rebuilt.Add(NpcTimetableRegistry.MakeTrain(train.Name, train.Entries[0].Station, train.Entries.Last().Station, (int)train.TrainClass,
-                    minutes[0] * 60d, minutes.Last() * 60d));
-                state.ProtectedTimetables.Remove(item.Key);
+        if (state.TimetablePlanVersion < 3) {
+            foreach (var item in state.ProtectedTimetables.ToList()) {
+                if (!TimetableController.Shared.TryRead(item.Value, out var saved, null) ||
+                    !saved.Trains.TryGetValue(item.Key, out var train) ||
+                    !NpcTimetableRegistry.ExpandSavedRoute(train, out var expanded, out var indices)) continue;
+                foreach (var service in state.Services.Where(s => s.TrainSymbol == item.Key && s.InterchangeId.Length == 0))
+                    if (indices.TryGetValue(service.StopIndex, out int mapped)) service.StopIndex = mapped;
+                NpcTimetableRegistry.SaveTrain(expanded);
+                ModDiagnosticLog.Write("DAY PLAN", $"Expanded saved NPC timetable {item.Key}: {train.Entries.Count} → {expanded.Entries.Count} locations; published times and dwell preserved.");
             }
-            foreach (var train in rebuilt.OrderBy(t => NpcTimetablePlanning.Minutes(t)[0])) NpcTimetableRegistry.Reserve(train);
-            state.TimetablePlanVersion = 2;
+            state.TimetablePlanVersion = 3;
             NpcServiceStore.Save(); NpcTimetableRegistry.Restore();
         }
         double start = Math.Floor(now / 86400) * 86400;
@@ -141,6 +156,7 @@ internal static class NpcDailyTrafficPlans
     {
         if (!NpcTimetableRegistry.InterchangeStations(spawn, target, out var from, out var to)) return;
         travel = Math.Max(travel, NpcTimetableRegistry.EstimatedTravelSeconds(from, to, 2, travel));
+        travel = NpcTimetablePacingPolicy.BufferedTravelSeconds(travel);
         double dispatch = NpcServicePolicy.DispatchTime(due, travel);
         var state = NpcServiceStore.State;
         string key = NpcTrafficPlanPolicy.ServiceKey(interchange.Identifier, due);
@@ -152,16 +168,14 @@ internal static class NpcDailyTrafficPlans
         if (!NpcTrafficPlanPolicy.InPlanningDay(dispatch, due, now) ||
             state.TrafficPlans.Any(p => p.InterchangeId == interchange.Identifier && Math.Abs(p.ServiceTime - due) <= 2) ||
             state.Services.Any(s => s.InterchangeId == interchange.Identifier && Math.Abs(s.Scheduled - due) <= 2)) return;
-        string symbol = NpcTimetableRegistry.NewSymbol("NI");
-        string returnSymbol = symbol + "R";
-        // Reserve the return symbol against player timetable names as well.
-        if (TimetableController.Shared.CurrentRaw?.Trains.ContainsKey(returnSymbol) == true) returnSymbol = NpcTimetableRegistry.NewSymbol("NIR");
+        string symbol = NpcTimetableRegistry.NewFreightSymbol(from, to, 2, interchange: true);
+        string returnSymbol = NpcTimetableRegistry.NewFreightSymbol(to, from, 2, interchange: true, pairedWith: symbol);
         int cars = interchange.Orders.Sum(o => Math.Max(0, o.CarCount)) + SimulatedInterchangeService.PickupCars(interchange).Count();
-        double working = Math.Max(NpcServicePolicy.SecondsPerCar, cars * NpcServicePolicy.SecondsPerCar);
+        double working = NpcServicePolicy.ReturnDeparture(due, due, cars, 0) - due;
         state.TrafficPlans.Add(new NpcTrafficPlan { Symbol = symbol, ReturnSymbol = returnSymbol, InterchangeId = interchange.Identifier,
             Dispatch = dispatch, ServiceTime = due, Extra = extra });
-        NpcTimetableRegistry.Reserve(NpcTimetableRegistry.MakeTrain(symbol, from, to, 2, dispatch, due));
-        NpcTimetableRegistry.Reserve(NpcTimetableRegistry.MakeTrain(returnSymbol, to, from, 2, due + working, due + working + travel));
+        NpcTimetableRegistry.Reserve(NpcTimetableRegistry.MakeTrain(symbol, from, to, 2, dispatch, due, grace: true));
+        NpcTimetableRegistry.Reserve(NpcTimetableRegistry.MakeTrain(returnSymbol, to, from, 2, due + working, due + working + travel, grace: true));
         ModDiagnosticLog.Write("DAY PLAN", $"Published hidden interchange {symbol}/{returnSymbol}: {interchange.DisplayName}, dispatch {NpcRandomTrafficPolicy.Clock(dispatch)}, service {NpcRandomTrafficPolicy.Clock(due)}; return estimated. No cars or crews allocated.");
     }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Game.State;
 using HarmonyLib;
 using Model.Ops.Timetable;
@@ -8,6 +9,25 @@ using UI.Common;
 using UI.Timetable;
 
 namespace RMROC451.TweaksAndThings.Patches;
+
+[HarmonyPatch(typeof(TimetableController), "FilterForUse")]
+[HarmonyPatchCategory("RMROC451TweaksAndThings")]
+internal static class NpcTimetable_LockedStations_Patch
+{
+    private static void Prefix(Timetable input, out Dictionary<string, Timetable.Train> __state)
+    {
+        __state = new Dictionary<string, Timetable.Train>();
+        if (!NpcServiceStore.Load()) return;
+        // Capture absolute NPC entries before the native ownership filter trims
+        // locked stations or removes a train with fewer than two remaining calls.
+        foreach (var pair in input.Trains)
+            if (NpcServiceStore.State.ProtectedTimetables.ContainsKey(pair.Key)) __state[pair.Key] = pair.Value.Clone();
+    }
+    private static void Postfix(Timetable input, Dictionary<string, Timetable.Train> __state)
+    {
+        NpcTimetableProtection.Merge(input.Trains, __state, t => t.Clone());
+    }
+}
 
 [HarmonyPatch(typeof(TimetableController), "HostSetCurrent")]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
@@ -34,7 +54,29 @@ internal static class NpcTimetable_ReadOnly_Patch
         if (train == null || !NpcTimetableRegistry.IsProtected(train.Name)) return true;
         builder.AddLabel(train.DisplayStringLong);
         builder.AddLabel("AI dispatcher controls this train. Its class, times, route and symbol are locked until the service completes.");
-        foreach (var entry in train.Entries) builder.AddField(entry.Station, entry.DepartureTime.TimeString());
+        var stations = TimetableController.Shared.GetAllStations(includeDisabled: true, includeDuplicates: false);
+        foreach (var entry in train.Entries)
+        {
+            var station = stations.FirstOrDefault(s => s.code == entry.Station);
+            builder.AddField((station?.DisplayName ?? entry.Station) +
+                (station != null && !station.IsEnabled ? " (locked)" : ""), entry.DepartureTime.TimeString());
+        }
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(VisualTimetableEditor), "CheckStation")]
+[HarmonyPatchCategory("RMROC451TweaksAndThings")]
+internal static class NpcTimetable_StationSelection_Patch
+{
+    private static bool Prefix(VisualTimetableEditor __instance, string stationCode, bool toggleChecked)
+    {
+        if (__instance.SelectedTrain != null && NpcTimetableRegistry.IsProtected(__instance.SelectedTrain.Name)) return false;
+        if (!toggleChecked) return true;
+        var station = TimetableController.Shared.GetAllStations(includeDisabled: true, includeDuplicates: false)
+            .FirstOrDefault(s => s.code == stationCode);
+        if (station == null || station.IsEnabled) return true;
+        Toast.Present("Unlock this location before adding it to a player timetable.");
         return false;
     }
 }

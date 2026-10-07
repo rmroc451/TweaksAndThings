@@ -1,5 +1,19 @@
 # Troubleshooting and reporting bugs or feature requests
 
+## AE waypoint arrow does not appear
+
+Use **Set waypoint** on a player locomotive, then point at the track in the game view. The native arrow and click-to-set behavior are retained. An earlier mod picker loop called the game's Escape callback as though it were a key-state check, canceling immediately; the current build removes that replacement loop. Ctrl+Alt map placement remains available separately. NPC locomotives remain excluded from the interactive picker.
+
+If the arrow is still missing after installing the current ZIP and restarting the game, include the selected locomotive, camera view, other UI mods, and the log around clicking **Set waypoint** in a [bug report](https://github.com/rmroc451/TweaksAndThings/issues).
+
+## NPC timetables missing after new day
+
+If `DAY PLAN` shows a published NPC pair but the window is empty, check the usable-timetable ownership filter and company timetable feature. Native processing strips locked station entries, removes trains with fewer than two remaining entries, and clears usable schedules before the company timetable feature unlocks. Updated builds preserve protected NPC calls through that filter and display saved NPC plans directly on the string chart. Publication diagnostics report stored and native usable train counts separately.
+
+Check `DAY PLAN` diagnostics for industry evaluation, publication and saved-route upgrades. First-day contracts wait for new-day evaluation; **Next interchange AI** falls back to the normal service appointment when tier-zero industries have no demand, then pauses at midnight to evaluate tiers and publish the current operating day's plans before continuing.
+
+A `NullReferenceException` mentioning `TryGetStationLocation` and `Track.Graph.TryGetLocationFromPoint` indicates an older build passed a missing segment from a locked station span into the native lookup. Updated builds resolve cached segments, serialized span endpoints or the span's authoring position safely. The native timetable reader accepts locked station codes; NPC routes include their passing entries without requiring those areas to be unlocked. Install the updated build and restart Railroader to replace the loaded assembly.
+
 Start with the symptom and the affected train/car, then capture the mod's saved state and nearby log entries. A service waiting for safe track can look idle without being broken; a timetable plan can exist before a physical train has spawned. The checks below help distinguish those cases.
 
 Feature guides: [NPC traffic](NPC-TRAFFIC.md), [interchanges and pool power](INTERCHANGE-SERVICES.md), [freight and industries](FREIGHT-AND-INDUSTRIES.md), [timetable and time controls](TIMETABLE-AND-TIME.md), [player tools](PLAYER-TOOLS.md), and [installation/builds](INSTALLATION-AND-RELEASES.md).

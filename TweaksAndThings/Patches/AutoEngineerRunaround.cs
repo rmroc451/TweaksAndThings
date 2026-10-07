@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Track;
+using Track.Search;
 using UI.EngineControls;
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -39,6 +40,8 @@ internal static class AutoEngineerRunaround
 
     private static readonly Car.LogicalEnd[] LogicalEnds = { Car.LogicalEnd.A, Car.LogicalEnd.B };
     private static readonly Dictionary<string, PendingRunaround> Pending = new();
+    internal static bool InProgress(string locomotiveId) => Pending.ContainsKey(locomotiveId);
+    internal static void Abort(string locomotiveId) => Pending.Remove(locomotiveId);
 
     internal static bool TryStart(BaseLocomotive locomotive, Location destination, string destinationCarId)
     {
@@ -83,6 +86,24 @@ internal static class AutoEngineerRunaround
         Location tailLocation = physicalEnd == Car.End.F ? tailCar.LocationF : tailCar.LocationR;
         var boundary = boundaries[0];
 
+        // Validate a physical path around the stationary cut before uncoupling.
+        // Ignoring only the power and terminal coupling car prevents a route
+        // straight through the freight string from masquerading as a runaround.
+        if (AeLocalService.Job(locomotive) is AeLocalJob local)
+        {
+            var power = consist.Where(c => c.MotivePower()).ToList();
+            var ignored = power.Concat(new[] { tailCar }).ToHashSet();
+            float length = TrainController.ApproximateLength(power.Select(c => c.Descriptor())) + 8;
+            var route = new List<RouteSearch.Step>();
+            if (!RouteSearch.FindRoute(Graph.Shared, locomotive.LocationF, tailLocation, HeuristicCosts.AutoEngineer,
+                route, out _, checkForCars: true, trainLength: length, trainMomentum: 0, maxIterations: 5000,
+                checkForCarsIgnored: ignored, checkForCarsImpasse: null, limitSwitchIds: null, enableLogging: false))
+            {
+                ModDiagnosticLog.Write("AE LOCAL PLAN", local.Id + ": runaround rejected; no clear path around the stationary cut.");
+                return false;
+            }
+        }
+
         var pending = new PendingRunaround
         {
             Locomotive = locomotive,
@@ -99,6 +120,7 @@ internal static class AutoEngineerRunaround
             // Close the air connection at both sides, then issue the game's
             // native coupler click command, matching the existing mod logic.
             boundary.motiveCar.ApplyEndGearChange(boundary.motiveEnd, Car.EndGearStateKey.Anglecock, 0f);
+            NpcSetoutPlacement.SecureFreight(consist.Where(c => !c.MotivePower()).ToList());
             boundary.rollingCar.ApplyEndGearChange(boundary.rollingEnd, Car.EndGearStateKey.Anglecock, 0f);
             boundary.motiveCar.HandleCouplerClick(boundary.motiveCar[boundary.motiveEnd].Coupler);
 
@@ -162,7 +184,7 @@ internal static class AutoEngineerRunaround
         var persistence = new AutoEngineerPersistence(locomotive.KeyValueObject);
         var orders = new AutoEngineerOrdersHelper(locomotive, persistence);
         var waypoint = (location, carId);
-        orders.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: waypoint);
+        NpcTrainOperations.Trusted(() => orders.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: waypoint));
     }
 }
 

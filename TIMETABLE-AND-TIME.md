@@ -1,8 +1,24 @@
 # Timetable string charts, forecasts, history and time controls
 
+The chart header's **Spacing: even rows / Spacing: track distance** button toggles proportional spacing. In distance mode, each gap represents its share of the displayed connected network's track distance, using the same distance scale across branches. Short spans draw closer together. Grid lines, planned paths, recorded history, live forecasts, markers and click targets all use that spacing. Distances are measured along track routes and cached; a branch with unresolved distances explicitly falls back to even rows.
+
+Each location label includes its surveyed mile marker, rounded to the nearest tenth of a mile. The mod interpolates between the game's milepost objects and preserves their prefix. **MP —** means no usable surveyed markers could be resolved. Mile markers appear in both spacing modes.
+
+The green history line uses connected locked locations as anchors, matching the live marker. Older samples that skipped those locations are reprojected along the active train's route when possible. Return timetable symbols retain their published plan, but do not show a live dashed estimate or marker until the locomotive actually begins that return service.
+
 The main timetable page presents trains as paths through time and locations. It combines the published plan, current train positions, recorded actual movement and a live forecast. These layers answer different questions: what was scheduled, where a train is now, what already happened, and what may happen next.
 
 Related guides: [NPC traffic](NPC-TRAFFIC.md), [interchange services](INTERCHANGE-SERVICES.md), and [troubleshooting](TROUBLESHOOTING.md).
+
+## Physical reach, passing locations and running allowance
+
+The string chart includes locked locations when enabled physical track connects them to the player's usable railroad. They stay grey and italicized. An unfinished bridge or another disabled track section breaks that connection: locations beyond it are hidden until the connection is restored. For example, connected East Whittier–Dillsboro–Sylva territory remains visible before purchase, while Ela West and Bryson are hidden when the intervening bridge is out. Changing a switch position, a red signal or temporary occupancy does not remove locations from the chart. A Bryson start uses Bryson's connected area instead of assuming East Whittier is the player's starting point.
+
+Interchange train markers and their forecasts follow the service's full physical route. Passing Dillsboro or another intermediate location does not end that route or remove the train marker. Platforms on parallel tracks are anchored to that route for chart placement. A passing timestamp is a prediction target: it does not add a horizontal scheduled wait to the forecast. Actual meet holds, signals and service work can still produce waits.
+
+New interchange plans add **15% travel allowance plus two game minutes**, in addition to the existing five-minute dispatch margin. The allowance is distributed across the passing times, with the inbound service time kept at the interchange's configured time. Return estimates receive the same travel allowance. Already published schedules retain their saved times; the new allowance applies to newly generated plans and return schedules.
+
+When an interchange train has more than two minutes of predicted schedule slack, its engineer gently reduces its permitted speed. This pacing never raises a track or signal limit and never orders a stop merely for an early passing time. Pacing is removed when the train runs late or reaches the final 300 metres of its approach, so it can enter and clear the yard normally. The configured service time and genuine safety stops still apply. The debug log records occasional **PACING** messages and reports route-projection failures under **TRAFFIC** for troubleshooting.
 
 ## Read the string chart
 
@@ -24,6 +40,8 @@ A geometric crossing of two train lines is not necessarily a scheduled meet. Loo
 The timetable header has **Maximize / Restore**. The native **Edit Timetable** action remains available for ordinary trains. NPC reservations and active service entries are protected against editing or deletion.
 
 ## Daily plans are visible before the trains spawn
+
+New-day planning waits until the game has evaluated industry performance, applied requested contract tiers, and finished daily industry accounting. Initial planning also waits for the restored industry collection and pending first-time contracts. The same gate applies to warp-triggered planning, so an early check cannot permanently save a zero-tier daily schedule.
 
 At the start of a game day, the mod publishes saved plans for eligible simulated interchanges and random through freights. Interchange plans include estimated return trips. A mid-day load publishes the remaining day's applicable work. Native route planning is incremental and shared travel estimates are cached, so a complex railroad can take some time to finish publishing its plans.
 
@@ -83,6 +101,20 @@ Both acceleration and relevant clock-only waits respect scheduled freight switch
 
 ## Interchange dispatch interception
 
+The fast-forward panel also offers **2× fast clock**, **4× fast clock**, and **8× fast clock**. These run without selecting a destination train, including when locomotives are stopped in AE YARD, ROAD, or WAYPOINT mode. The stop-time option likewise does not require a selected moving train. Every player controlling locomotive on the railroad must be in AE: manual mode blocks starting acceleration, and changing a player controlling locomotive to manual returns the host and clients to normal speed. NPC trains and pooled power are excluded from this eligibility check, including parked pool engines with AE switched off. Fast clock can also run when there are no player controlling engines to check. Trailing MU engines follow their controlling engine rather than requiring independent AE orders. NPC spawns, scheduled switching windows, pause/wait state and unload still stop acceleration. Use **Normal** to end an unrestricted fast-clock run.
+
+NPC timetable generation includes locked locations in its station links, endpoint selection, and intermediate passing entries. Ownership does not truncate the planned journey. The string chart includes those locations in grey italic text and orders the mainline with Andrews at the top and Sylva at the bottom. On load, older saved NPC plans gain missing intermediate passing entries while retaining published arrival/departure times, meets and switching waits. Active through trains retain their current target through a remapped entry index. Player timetable source is unchanged.
+
+The native usable-timetable ownership filter removes locked stations and can discard an NPC column entirely. The mod preserves complete entries for its protected NPC trains through that filter. The string chart also reads saved NPC plans directly, so they remain visible before the company's player timetable feature is unlocked. Player timetables continue to follow native progression rules.
+
+Waiting across midnight pauses at the new day until industry tier evaluation finishes, then regenerates NPC planning. **Next interchange AI** recalculates its dispatch target before continuing. A successful NPC spawn still ends the wait. An unsuccessful dispatch retains its pending service time instead of silently advancing to the following service.
+
+When simulated service has no demand, **Next interchange AI** uses the game's next normal interchange service time instead of refusing to wait. This covers a new railroad whose industries remain at tier zero until the first new day. Midnight still pauses for tier evaluation. If the new tiers create demand, the remaining wait changes to the earliest needed NPC dispatch, including travel lead time. Otherwise it continues to the normal service time. No enabled scheduled interchanges still produces an explanatory message.
+
+At that midnight checkpoint, the mod also finishes publishing timetables for the operating day that has just begun: roughly the upcoming 24 hours, plus the following morning's interchange service when its approach must depart during that operating day. Random freight counts use the evaluated active industry tiers. Route planning remains spread across frames, and the clock waits for pending calculations and publication. Unavailable routes retain their retry status rather than holding the clock forever.
+
+NPC corridor grants apply to generated trains. Player ROAD and WAYPOINT trains use native AE routing, occupancy and signal checks, including yard movements. NPCs still consider player trains when checking their own routes. A distant switch lined against ROAD movement ends that train's known lookahead; it does not abort another interchange's dispatch.
+
 Simulated interchange waiting checks the requested clock interval and stops at the earliest needed NPC dispatch time. Pending approach calculations must finish before this boundary can be resolved. Demand is refreshed when requesting **Next interchange AI** or **Warp to next interchange AI**, and empty interchanges are excluded.
 
 The warp target includes travel lead time and saved dispatch planning. A new NPC interchange/through train cancels an active wait and returns simulation acceleration to normal. Activating an outbound pool assignment also cancels it. Unused waiting time is discarded; start another wait afterward if appropriate. Failed spawn attempts do not trigger successful-spawn cancellation.
@@ -94,3 +126,19 @@ Normal company clock settings are preserved. The simulation multiplier is host-c
 Higher multipliers run more normal physics steps per real second. They can increase CPU load and may not achieve their nominal rate on a large or busy railroad. Start with 2× before using 8×. Switching back to Normal is the first useful comparison when diagnosing choppy motion.
 
 If live markers are missing, check the controlling locomotive's crew and timetable symbol. If a dashed path is uncertain, inspect the service wait rather than treating it as a rendering error. If fast-forward ends immediately, check switching windows, pause/wait state, selected AE mode and whether an NPC just spawned. For repeated holds or skipped dispatches, use the [troubleshooting guide](TROUBLESHOOTING.md) and [report the problem](https://github.com/rmroc451/TweaksAndThings/issues) with game time and train symbols.
+Protected NPC trains in the legacy timetable editor show their location names, including a `(locked)` label for calls through connected locations awaiting progression. Their schedules remain read-only. Player station selection continues to require unlocked locations.
+Track-distance spacing uses unrounded surveyed or calculated milepost differences when adjacent locations share a milepost prefix. Thus MP T46.3–T47.8 occupies one quarter of the height of a six-mile interval at the same scale. Sidings without their own milepost are projected onto the surveyed route from nearby markers, cancelling the extra distance along the siding. Locations without a resolved native track marker can snap from their map-feature position. A gap without compatible mileposts uses routed track distance, then map distance if routing is unavailable; one such gap no longer forces the entire branch into even-row spacing.
+Each string chart now has a dedicated explorer viewport. Location names and mileposts remain pinned at the left while the graph moves horizontally; clock headers remain at the top while the graph moves vertically. Drag inside the graph to pan in both directions, and use the mouse wheel over it to zoom around the pointer. Clicking a line still selects its train, while dragging does not select a train. Zoom ranges from half size to four times size, and the existing Fit day / Expand time scale control resets the base time scale when rebuilding the chart.
+
+Interchange return reservations include time for all planned delivery and pickup cars plus five minutes for repositioning. They are revised when the inbound manifest is confirmed and again when arrival confirms pickups and any full-cut delivery. An existing active service receives the corrected reservation after loading this version. Live forecasts use the actual loaded manifest after preparation, so deferred cars are not counted again as pending transfers. The actual return schedule is still registered at departure after servicing finishes.
+Newly generated NPC services use short numbered train symbols inspired by mid-century employee timetables. Odd numbers run westward and even numbers eastward. Interchange locals and pool-power outbound services use 301–398; first-class through freights use 101–198, second-class through freights 201–298, and third-class through freights 401–498. The interchange return normally takes the paired opposite-direction number, such as 301/302, and the locomotive changes to that symbol when the return actually begins. Occupied player and NPC symbols are skipped. Very busy saves can use section notation such as `2-301`. Existing saved letter-prefixed assignments remain unchanged.
+
+These are fictional number assignments for this railroad, not a reconstruction of historical Murphy Branch schedules. For an example of the period's numbered freight columns and odd/even opposing trains, see the [Camas Prairie employee timetable effective August 13, 1950](https://research.nprha.org/NP%20Timetable%20Scans/CP%2019500813%20ETT%20094.pdf).
+
+During fast clock, camera panning, mouse-look smoothing, scroll-wheel zoom, ground following and UI movement counters retain normal timing. The mod removes only its own fast-clock multiplier from these input/camera calculations, including the strategy camera's repeated physics updates. Train simulation and the game clock remain accelerated; native pause and toolbar visibility behavior remain intact.
+
+## Completed NPC trains and visible hours
+
+Completed NPC timetable entries remain visible and protected until the next new day, including their recorded actual path. The equipment and AI crew can be cleaned up immediately; the day's timetable history stays available. Retention is saved with the game. At new day the completed NPC entries are removed.
+
+The string chart fits the planned service range: one hour before the earliest entry and one hour after the latest planned finish. Overnight schedules remain continuous beyond midnight. Dragging, zooming and pinned axes continue to work within that range.

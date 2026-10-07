@@ -52,6 +52,7 @@ internal sealed class WaybillSummaryWindow : MonoBehaviour, IProgrammaticWindow
 
     private void Build(UIPanelBuilder builder)
     {
+        ResponsiveModText.Install(builder._container);
         builder.AddTabbedPanels(tab, tabs =>
         {
             tabs.AddTab("Caboose consist", "consist", b => BuildSummary(b, false));

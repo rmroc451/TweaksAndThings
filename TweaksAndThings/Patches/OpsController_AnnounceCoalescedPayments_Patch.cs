@@ -83,6 +83,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
 
     private static void CarLoadCrewHelper(Car car, float deltaTime)
     {
+        if (NpcServiceCaboose.IsServiceCar(car)) return;
         float rate2 = 24 * 2 * 8;// carLoadRate = 8 crew hours in 30 min loading; (24h * 2 to get half hour chunks * 8 hours to load in those chunks)
         float num2 = 99999999; //QuantityInStorage for crew-hours (infinite where crew can be shuffling about)
         float quantityToLoad = Mathf.Min(num2, IndustryComponent.RateToValue(rate2, deltaTime));

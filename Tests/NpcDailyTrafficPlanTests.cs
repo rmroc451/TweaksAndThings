@@ -57,6 +57,15 @@ public class NpcDailyTrafficPlanTests
         => Assert.That(NpcTrafficPlanPolicy.InPlanningDay(departure, service, now), Is.EqualTo(expected));
 
     [Test]
+    public void AfterNewDayPlansTheCurrentOperatingDayRatherThanSkippingToTomorrow()
+    {
+        double midnight = 86400;
+        Assert.That(NpcTrafficPlanPolicy.InPlanningDay(midnight + 3600, midnight + 7200, midnight), Is.True);
+        Assert.That(NpcTrafficPlanPolicy.InPlanningDay(midnight + 85000, midnight + 87000, midnight), Is.True);
+        Assert.That(NpcTrafficPlanPolicy.InPlanningDay(midnight + 90000, midnight + 93000, midnight), Is.False);
+    }
+
+    [Test]
     public void BoardMarkersAreAddedOncePerBoardPerDayEvenIfPlayerDeletesThem()
     {
         var ledger = new Dictionary<string, int>();

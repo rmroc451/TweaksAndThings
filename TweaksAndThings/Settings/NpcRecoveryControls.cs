@@ -39,12 +39,14 @@ internal static class NpcRecoveryControls
                     foreach (var vehicle in owned.Where(c => c.IsDerailed))
                         StateManager.ApplyLocal(new Game.Messages.PropertyChange(vehicle.id, Game.Messages.PropertyChange.Control.Derailment, 0f));
                 });
-                NpcDeparturePlacement.MoveExisting(front, owned);
+                NpcDeparturePlacement.MoveExisting(front, NpcServiceCaboose.TravelOrder(service, owned));
             }
             var destination = Graph.Shared.ResolveLocationString(service.Phase == "Departing" ? service.Spawn : service.Target);
-            if ((service.Phase == "Approaching" || service.Phase == "Departing") && !NpcDeparturePlacement.FaceDeparture(service, destination))
+            bool travel = service.Phase == "Approaching" || service.Phase == "Departing" || service.Phase == "Parking power";
+            if (travel && !NpcDeparturePlacement.FaceDeparture(service, destination))
             { Toast.Present("Clear the departure end before reestablishing this NPC train."); return; }
-            NpcTrainOperations.Order(lead, destination, service.Phase == "Approaching" || service.Phase == "Departing");
+            if (travel) NpcTrainOperations.Order(lead, destination);
+            else NpcTrainOperations.Hold(lead);
             NpcTrafficRouting.Recalculate(lead);
             service.Suspended = false;
             NpcServiceStore.Save();

@@ -28,8 +28,17 @@ internal static class NpcSimulationSpeed
     private static float nextBarrierCheck;
     private static double? barrier;
     private static string barrierName = "";
+    private static bool destinationRun;
 
-    internal static string Status => rate > 1 ? $"Simulation {rate}× · clock and all trains" + (until.HasValue ? " · stop " + NpcRandomTrafficPolicy.Clock(until.Value) : " · stop when a selected train stops") : status;
+    private static List<BaseLocomotive> ControllingEngines() => TrainController.Shared == null ? new() :
+        TrainController.Shared.Cars.OfType<BaseLocomotive>().Where(c => SimulationSpeedPolicy.RequiresAutomatic(
+            ThroughTrafficGuard.IsGenerated(c), NpcPoolPower.IsPooled(c), c.IsMuEnabled, c.IsInBardo)).ToList();
+    private static bool Automatic(BaseLocomotive engine) => engine.AutoEngineerPlanner != null &&
+        engine.AutoEngineerPlanner._orders.Mode != AutoEngineerMode.Off;
+    private static string? ManualTrain() => ControllingEngines().FirstOrDefault(c => !Automatic(c))?.DisplayName;
+
+    internal static string Status => rate > 1 ? $"Simulation {rate}× · clock and all trains" + (until.HasValue ? " · stop " + NpcRandomTrafficPolicy.Clock(until.Value) : destinationRun ? " · stop when a selected train stops" : " · all locomotives in AE") : status;
+    internal static float InputTimingScale => rate > 1 && Mathf.Approximately(Time.timeScale, applied) ? rate : 1;
     private static List<BaseLocomotive> Running() => TrainController.Shared == null ? new List<BaseLocomotive>() :
         TrainController.Shared.Cars.OfType<BaseLocomotive>().Where(c => !c.IsInBardo && !c.IsMuEnabled && !ThroughTrafficGuard.IsGenerated(c) &&
             (c.AutoEngineerPlanner?._orders.Mode == AutoEngineerMode.Road || c.AutoEngineerPlanner?._orders.Mode == AutoEngineerMode.Waypoint)).ToList();
@@ -39,6 +48,14 @@ internal static class NpcSimulationSpeed
         builder.AddSection("Fast-forward simulation");
         builder.AddLabel("<style=Footnote>Clock and all movement accelerate together. Selected ROAD/WAYPOINT trains determine destination stops. Freight arrival–departure blocks are switching windows.");
         builder.AddLabel(() => Status, UIPanelBuilder.Frequency.Periodic);
+        builder.AddLabel(() => ManualTrain() is string manual ? "Fast-forward blocked: " + manual + " is in manual mode." :
+            "Fast-forward requires every player controlling locomotive to remain in AE mode; NPC and pooled power are exempt.", UIPanelBuilder.Frequency.Periodic);
+        builder.HStack(row =>
+        {
+            foreach (int speed in new[] { 2, 4, 8 })
+                row.AddButtonCompact(speed + "× fast clock", () => Start(speed, null, false)).Disable(!StateManager.IsHost);
+        });
+        builder.AddLabel("<style=Footnote>Fast clock also works with stopped trains and AE YARD mode. Player controlling locomotives in manual mode block acceleration; entering manual mode returns to normal. NPC and pooled power are exempt. Trailing MU engines follow their controlling engine.");
         var engines = Running();
         if (!selectedOnce) { foreach (var engine in engines) selected.Add(engine.id); selectedOnce = true; }
         builder.HVScrollView(list =>
@@ -59,29 +76,33 @@ internal static class NpcSimulationSpeed
         {
             var target = SimulationSpeedPolicy.StopClock(stopClock, TimeWeather.Now.TotalSeconds);
             if (!target.HasValue) { Toast.Present("Enter a stop time as HH:mm (00:00–23:59)."); return; }
-            Start(4, target);
+            Start(4, target, false);
         }).Disable(!StateManager.IsHost);
         builder.AddLabel("<style=Footnote>Returns to normal at NPC spawns, switching windows, or the requested stop. A destination run also stops at signals or other AE stops. Higher rates require more physics work.");
     }
 
-    private static void Start(int requested, double? stopAt)
+    private static void Start(int requested, double? stopAt, bool stopAtDestination = true)
     {
         if (!StateManager.IsHost || StateManager.Shared?.HasRestoredProperties != true || StateManager.Shared.IsWaiting ||
             !StateManager.CheckAuthorizedToSendMessage(default(WaitTime)) || Time.timeScale <= 0) return;
+        var all = ControllingEngines();
+        if (!SimulationSpeedPolicy.AllAutomatic(all.Select(Automatic)))
+        { Toast.Present(ManualTrain() is string manual ? "Fast-forward blocked: " + manual + " is in manual mode. Set every controlling locomotive to AE." : "No controlling locomotives in AE mode."); return; }
         var engines = Running().Where(e => selected.Contains(e.id)).ToList();
-        if (engines.Count == 0) { Toast.Present("Select at least one ROAD/WAYPOINT train."); return; }
+        if (stopAtDestination && engines.Count == 0) { Toast.Present("Select at least one ROAD/WAYPOINT train."); return; }
         double now = TimeWeather.Now.TotalSeconds;
         var window = SwitchingBoundary(now, out var name);
         if (window.HasValue && window.Value <= now + 1)
         { Toast.Present("Finish scheduled switching before fast-forward: " + name); return; }
         Stop("Normal speed");
+        destinationRun = stopAtDestination;
         watched.Clear(); foreach (var engine in engines) watched[engine.id] = engine.VelocityMphAbs > 0.5f;
         until = stopAt; barrier = window; barrierName = name; nextBarrierCheck = 0;
         storage = StateManager.Shared.KeyValueObjectForId(GameStorage.ObjectId);
         if (storage == null) return;
         storage[Key] = Value.Float(SimulationSpeedPolicy.Rate(requested));
         Apply(SimulationSpeedPolicy.Rate(requested));
-        ModDiagnosticLog.Write("FAST FORWARD", $"Started {rate}×; watching {string.Join(", ", engines.Select(e => e.DisplayName))}; stop time={stopAt?.ToString() ?? "first selected AE stop"}.");
+        ModDiagnosticLog.Write("FAST FORWARD", $"Started {rate}×; watching {string.Join(", ", engines.Select(e => e.DisplayName))}; stop time={stopAt?.ToString() ?? (destinationRun ? "first selected AE stop" : "manual stop or safety boundary")}.");
     }
 
     private static void Apply(int requested)
@@ -102,7 +123,7 @@ internal static class NpcSimulationSpeed
     {
         if (StateManager.IsHost && storage != null && !StateManager.IsUnloading) storage[Key] = Value.Float(1);
         bool accelerated = rate > 1;
-        Apply(1); until = null; watched.Clear(); status = reason;
+        Apply(1); until = null; watched.Clear(); destinationRun = false; status = reason;
         if (accelerated) ModDiagnosticLog.Write("FAST FORWARD", "Returned to normal: " + reason);
     }
 
@@ -128,6 +149,8 @@ internal static class NpcSimulationSpeed
             if (StateManager.IsHost) kv[Key] = Value.Float(1);
         }
         int requested = SimulationSpeedPolicy.Rate((int)(kv[Key].IsNull ? 1 : kv[Key].FloatValue));
+        if (StateManager.IsHost && requested > 1 && !SimulationSpeedPolicy.AllAutomatic(ControllingEngines().Select(Automatic)))
+        { Stop(ManualTrain() is string manual ? "Normal speed — " + manual + " entered manual mode" : "Normal speed — no controlling locomotives in AE"); Toast.Present(status); return; }
         Apply(requested);
         if (rate <= 1 || !StateManager.IsHost) return;
         if (StateManager.Shared.IsWaiting || Time.timeScale <= 0 || !Mathf.Approximately(Time.timeScale, applied))
@@ -138,7 +161,7 @@ internal static class NpcSimulationSpeed
         if (Time.realtimeSinceStartup >= nextBarrierCheck)
         { nextBarrierCheck = Time.realtimeSinceStartup + 0.25f; barrier = SwitchingBoundary(now, out barrierName); }
         if (barrier.HasValue && now + margin >= barrier.Value) { Stop("Scheduled switching: " + barrierName); Toast.Present(status); return; }
-        if (until.HasValue) return;
+        if (until.HasValue || !destinationRun) return;
         foreach (var id in watched.Keys.ToList())
         {
             if (!TrainController.Shared.TryGetCarForId(id, out var car) || !(car is BaseLocomotive engine)) { Stop("Selected train unavailable"); return; }
@@ -154,7 +177,7 @@ internal static class NpcSimulationSpeed
         description = ""; double? next = null;
         var controller = TimetableController.Shared;
         if (controller?.Current == null || StateManager.Shared?.PlayersManager == null) return null;
-        var symbols = Running().Select(e => StateManager.Shared.PlayersManager.TrainCrews.FirstOrDefault(c => c.Id == e.trainCrewId)?.TimetableSymbol)
+        var symbols = ControllingEngines().Where(e => !ThroughTrafficGuard.IsGenerated(e) && Automatic(e)).Select(e => StateManager.Shared.PlayersManager.TrainCrews.FirstOrDefault(c => c.Id == e.trainCrewId)?.TimetableSymbol)
             .Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
         var timetable = controller.Current.ToAbsolute();
         foreach (var symbol in symbols)

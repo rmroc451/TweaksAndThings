@@ -21,6 +21,7 @@ internal static class NpcPoolPower
 {
     internal const string Marker = "RMROC451.TweaksAndThings.PoolPower";
     private static readonly HashSet<string> held = new();
+    private static readonly HashSet<string> playerHauls = new();
     internal static bool IsPooled(Car? car) => car != null && !car.KeyValueObject[Marker].IsNull && car.KeyValueObject[Marker].StringValue.Length > 0;
     internal static bool SameUnit(Car a, Car b) => IsPooled(a) && IsPooled(b) && a.KeyValueObject[Marker].StringValue == b.KeyValueObject[Marker].StringValue;
     internal static bool ConnectionBlocked(Car car, string key)
@@ -62,6 +63,106 @@ internal static class NpcPoolPower
         ModDiagnosticLog.Write("POOL POWER", $"Parked unit {pool.Id}; interchange={pool.InterchangeId}; area={pool.AreaId}; power={power.Count}.");
     }
 
+    internal static bool SafeParkedUnit(NpcServiceRecord service, BaseLocomotive lead, TrackSpan span)
+    {
+        var cars = lead.EnumerateCoupled().ToList();
+        if (cars.Count != service.PowerIds.Count || cars.Any(c => !service.PowerIds.Contains(c.id) || !c.IsStopped() ||
+            !span.Contains(c.LocationF) || !span.Contains(c.LocationR))) return false;
+        var switches = span.GetSegments().SelectMany(s => new[] { s.a, s.b }).Distinct()
+            .Select(n => (node: n, clearance: NpcTrackClearance.Fouling(n))).Where(n => n.clearance > 0).ToList();
+        return cars.All(c => switches.All(n =>
+            Vector3.Distance(c.LocationF.GetPosition(), n.node.transform.GamePosition()) >= n.clearance + 5 &&
+            Vector3.Distance(c.LocationR.GetPosition(), n.node.transform.GamePosition()) >= n.clearance + 5 &&
+            Vector3.Distance(c.OpsLocation.GetPosition(), n.node.transform.GamePosition()) >= n.clearance + 5));
+    }
+
+    internal static bool TryOrderRepairParking(NpcServiceRecord service, BaseLocomotive lead)
+    {
+        var power = service.PowerIds.Select(id => TrainController.Shared.CarForId(id)).ToList();
+        if (lead.EnumerateCoupled().Any(c => !service.PowerIds.Contains(c.id))) return false;
+        var area = OpsController.Shared.ClosestArea(lead);
+        if (area == null) return false;
+        float length = TrainController.ApproximateLength(power.Select(c => c.Descriptor()));
+        var own = power.Select(c => c.id).ToHashSet();
+        int inspected = 0, occupied = 0, noRoom = 0, outside = 0, unreachable = 0;
+        foreach (var repair in UnityEngine.Resources.FindObjectsOfTypeAll<RepairTrack>()
+            .Where(r => r.gameObject.scene.IsValid() && !r.ProgressionDisabled)
+            .OrderBy(r => Vector3.SqrMagnitude(r.transform.position - lead.transform.position)))
+        foreach (var span in repair.TrackSpans)
+        foreach (var boundary in new[] { span.lower, span.upper })
+        {
+            inspected++;
+            if (!boundary.HasValue || !boundary.Value.IsValid || span.Length <= length + 15) { noRoom++; continue; }
+            try
+            {
+                // Approach the far end of the berth, rather than stopping ten
+                // metres before its entrance with the whole unit still outside.
+                var inward = boundary.Value;
+                var probe = Graph.Shared.LocationByMoving(inward, 1, checkSwitchAgainstMovement: false);
+                if (!probe.IsValid || !span.Contains(probe)) inward = inward.Flipped();
+                var switches = span.GetSegments().SelectMany(s => new[] { s.a, s.b }).Distinct()
+                    .Select(node => (node, clearance: NpcTrackClearance.Fouling(node)))
+                    .Where(item => item.clearance > 0).ToList();
+                // Search clear pockets from the far end back toward this
+                // entrance. Other cars on the span are permitted; only their
+                // occupied footprint and switch clearance exclude a pocket.
+                for (float offset = span.Length - 5; offset >= length + 5; offset -= 2)
+                {
+                var candidate = Graph.Shared.LocationByMoving(inward, offset, checkSwitchAgainstMovement: false);
+                if (!candidate.IsValid || !span.Contains(candidate)) { noRoom++; continue; }
+                var found = new HashSet<Car>();
+                bool safe = true;
+                for (float d = 0; d <= length + 5; d += 1)
+                {
+                    var point = Graph.Shared.LocationByMoving(candidate, -d, checkSwitchAgainstMovement: false);
+                    if (!point.IsValid || !span.Contains(point)) { safe = false; noRoom++; break; }
+                    if (!area.Contains(point.GetPosition())) { safe = false; outside++; break; }
+                    if (switches.Any(item => Vector3.Distance(point.GetPosition(), item.node.transform.GamePosition()) < item.clearance + 5))
+                    { safe = false; noRoom++; break; }
+                    TrainController.Shared.CheckForCarsAtPoint(point.GetPosition(), 2, found, point);
+                    if (found.Any(c => !own.Contains(c.id))) { safe = false; occupied++; break; }
+                }
+                if (!safe) continue;
+                if (!NpcTrainOperations.Route(lead.LocationF, candidate, out var route, out _) || route.Count == 0) { unreachable++; continue; }
+                var final = route.LastOrDefault(step => step.Location.IsValid).Location;
+                if (!final.IsValid || final.end != candidate.end) { unreachable++; continue; }
+                // A clear gap beyond parked cars cannot be reached through them.
+                foreach (var step in route.Where(s => s.Location.IsValid))
+                {
+                    for (float d = 0; d <= step.Distance; d += 2)
+                    {
+                        var point = new Location(step.Location.segment, step.Location.distance - d, step.Location.end);
+                        if (!span.Contains(point)) continue;
+                        TrainController.Shared.CheckForCarsAtPoint(point.GetPosition(), 2, found, point);
+                        if (found.Any(c => !own.Contains(c.id))) { safe = false; break; }
+                    }
+                    if (!safe) break;
+                }
+                if (!safe) { occupied++; continue; }
+                var target = candidate;
+                var rear = Graph.Shared.LocationByMoving(target, -length - 5, checkSwitchAgainstMovement: false);
+                if (!rear.IsValid || !span.Contains(target) || !span.Contains(rear) || !NpcDeparturePlacement.Fits(target, length + 5, own)) { noRoom++; continue; }
+                // Area membership uses the game's area classifier, not a radius.
+                if (!area.Contains(target.GetPosition()) || !area.Contains(rear.GetPosition())) { outside++; continue; }
+                if (!NpcDeparturePlacement.FaceDeparture(service, target)) { noRoom++; continue; }
+                service.Target = Graph.Shared.LocationToString(target);
+                service.ArrivalSpan = span.id;
+                service.Phase = "Parking power";
+                service.WaitingReason = string.Empty;
+                NpcTrainOperations.Order(lead, target);
+                NpcServiceStore.Save();
+                ModDiagnosticLog.Write("POOL POWER", $"{service.Id}: routing power to repair track {repair.Identifier}, span {span.id}, area {area.identifier}.");
+                return true;
+                }
+            }
+            catch (EndOfTrack) { }
+            catch (SwitchAgainstMovement) { }
+        }
+        NpcTrafficDiagnostics.Report("parking:" + service.Id,
+            $"Repair parking waiting: checked {inspected} track ends; occupied={occupied}, insufficient room/turning clearance={noRoom}, outside area={outside}, unreachable={unreachable}; unit length={length:N1} m.");
+        return false;
+    }
+
     internal static int Dispatch(Interchange interchange, List<Car> candidates, double now)
     {
         int assigned = 0;
@@ -74,17 +175,31 @@ internal static class NpcPoolPower
                 NpcTrafficDiagnostics.Report("pool:" + pool.Id, "Dispatch deferred: pool unit is moving or disconnected; waiting to safely assign power.");
                 continue;
             }
+            if (!power.Any(NpcServiceCaboose.IsServiceCar))
+            {
+                var descriptor = NpcServiceCaboose.Catalog();
+                if (!descriptor.HasValue) continue;
+                var id = Guid.NewGuid().ToString("N");
+                var temporary = new NpcServiceRecord { LeadId = power.First(c => c.IsLocomotive).id, PowerIds = pool.PowerIds.ToList() };
+                if (!NpcTrainOperations.Append(temporary, new List<CarDescriptor> { descriptor.Value }, new List<string> { id })) continue;
+                var added = TrainController.Shared.CarForId(id);
+                NpcTrainOperations.Trusted(() => { added.KeyValueObject[Marker] = Value.String(pool.Id); added.SetHandbrake(true); });
+                pool.PowerIds.Add(id); power.Add(added); NpcServiceStore.Save();
+            }
             var exit = Graph.Shared.ResolveLocationString(pool.ExitLocation);
             if (!NpcTrainOperations.Route(power[0].LocationF, exit, out var route, out _)) continue;
+            if (!NpcTimetableRegistry.InterchangeStations(power[0].LocationF, exit, out var origin, out var destination)) continue;
             float capacity = 0;
             NpcTrainOperations.TryCatalogPower(0, route, null, out _, installedPower: power, utilization: 0.9, reportCapacity: p => capacity = p);
+            float cabooseWeight = power.Where(NpcServiceCaboose.IsServiceCar).Sum(c => c.Weight);
+            capacity = Math.Max(0, capacity - cabooseWeight);
             float weight = 0, length = NpcPassingSidings.Length(power.Select(c => c.Descriptor()));
             float limit = NpcPassingSidings.Limit(route);
             var selected = candidates.Where(c => {
                 if (weight + c.Weight > capacity || length + c.carLength + 1 > limit) return false;
                 weight += c.Weight; length += c.carLength + 1; return true;
             }).ToList();
-            while (selected.Count > 0 && !NpcTrainOperations.TryCatalogPower(weight, route, null, out _, installedPower: power, utilization: 0.9, trainLength: length)) {
+            while (selected.Count > 0 && !NpcTrainOperations.TryCatalogPower(weight + cabooseWeight, route, null, out _, installedPower: power, utilization: 0.9, trainLength: length)) {
                 var last = selected[selected.Count - 1];
                 selected.RemoveAt(selected.Count - 1);
                 weight -= last.Weight;
@@ -95,9 +210,9 @@ internal static class NpcPoolPower
             // A steam engine and its actual coupled tender are inseparable for sizing.
             var available = power.ToList();
             for (int count = 1; count < available.Count; count++) {
-                var prefix = available.Take(count).ToList();
+                var prefix = available.Take(count).Concat(available.Where(NpcServiceCaboose.IsServiceCar)).Distinct().ToList();
                 if (available.OfType<SteamLocomotive>().Any(s => !s.TryGetTender(out var tender) || prefix.Contains(s) != prefix.Contains(tender))) continue;
-                if (!prefix.Any(c => c.IsLocomotive) || !NpcTrainOperations.TryCatalogPower(weight, route, null, out _, installedPower: prefix, utilization: 0.9,
+                if (!prefix.Any(c => c.IsLocomotive) || !NpcTrainOperations.TryCatalogPower(weight + cabooseWeight, route, null, out _, installedPower: prefix, utilization: 0.9,
                     trainLength: length)) continue;
                 power = prefix;
                 break;
@@ -106,8 +221,8 @@ internal static class NpcPoolPower
             var ordered = LeadingPower(power);
             if (ordered == null) { NpcTrafficDiagnostics.Report("pool:" + pool.Id, "Dispatch deferred: incomplete steam power unit"); continue; }
             var front = power[0].LocationA;
-            bool normalize = ordered[0] != power[0] || !ordered[0].FrontIsA;
-            if (normalize && !NpcDeparturePlacement.Fits(front, NpcPassingSidings.Length(power.Select(c => c.Descriptor())), new HashSet<string>(available.Select(c => c.id))))
+            bool normalize = ordered[0] != power[0] || !ordered[0].FrontIsA || remainder.Count > 0;
+            if (normalize && !NpcDeparturePlacement.Fits(front, NpcPassingSidings.Length(available.Select(c => c.Descriptor())), new HashSet<string>(available.Select(c => c.id))))
             { NpcTrafficDiagnostics.Report("pool:" + pool.Id, "Dispatch deferred: no room to orient the leading power unit"); continue; }
             // Service is allowed to release the unit from player cars and split
             // surplus engines, even though those internal controls are user-locked.
@@ -115,30 +230,24 @@ internal static class NpcPoolPower
                 Disconnect(available[0], Car.LogicalEnd.A);
                 Disconnect(available.Last(), Car.LogicalEnd.B);
             });
-            if (remainder.Count > 0) {
-                NpcTrainOperations.Trusted(() => {
-                    power.Last().ApplyEndGearChange(Car.LogicalEnd.B, Car.EndGearStateKey.IsCoupled, false);
-                    remainder[0].ApplyEndGearChange(Car.LogicalEnd.A, Car.EndGearStateKey.IsCoupled, false);
-                    power.Last().ApplyEndGearChange(Car.LogicalEnd.B, Car.EndGearStateKey.Anglecock, 0f);
-                    remainder[0].ApplyEndGearChange(Car.LogicalEnd.A, Car.EndGearStateKey.Anglecock, 0f);
-                });
-            }
             if (normalize) {
                 var leadingIds = new HashSet<string> { ordered[0].id };
                 if (ordered[0] is SteamLocomotive steam && steam.TryGetTender(out var tender)) leadingIds.Add(tender.id);
-                var descriptors = ordered.Select(c => {
+                var arranged = ordered.Concat(remainder).ToList();
+                var descriptors = arranged.Select(c => {
                     var source = c.Descriptor();
                     return new CarDescriptor(source.DefinitionInfo, source.Ident, source.Bardo, source.TrainCrewId,
                         leadingIds.Contains(c.id) ? false : source.Flipped, source.Properties);
                 }).ToList();
                 NpcTrainOperations.Trusted(() => {
-                    var moved = TrainController.Shared.HandleCreateCarsAsTrain(front, descriptors, ordered.Select(c => c.id).ToList(), null);
+                    var moved = TrainController.Shared.HandleCreateCarsAsTrain(front, descriptors, arranged.Select(c => c.id).ToList(), null);
                     TrainController.ConnectCars(moved);
                     TrainController.FillAir(moved);
                     moved[0].set.SetVelocity(0, moved);
                     NpcTrainOperations.SyncPlacement(moved);
                 });
             }
+            if (remainder.Count > 0) NpcTrainOperations.Trusted(() => Disconnect(ordered.Last(), Car.LogicalEnd.B));
             power = ordered;
             var service = new NpcServiceRecord { Id = Guid.NewGuid().ToString("N"), InterchangeId = interchange.Identifier,
                 PoolOutbound = true, PowerIds = power.Select(c => c.id).ToList(), LeadId = power.First(c => c.IsLocomotive).id, Spawn = pool.ExitLocation,
@@ -156,7 +265,7 @@ internal static class NpcPoolPower
             NpcTrainOperations.Trusted(() => {
                 foreach (var car in power) { car.KeyValueObject[Marker] = Value.Null(); car.SetHandbrake(false); }
             });
-            service.TrainSymbol = NpcTimetableRegistry.NewSymbol("NP");
+            service.TrainSymbol = NpcTimetableRegistry.NewFreightSymbol(origin, destination, 2, interchange: true);
             NpcTimetableRegistry.RegisterReturn(service);
             assigned += selected.Count;
             ModDiagnosticLog.Write("POOL POWER", $"Assigned unit {pool.Id}; interchange={interchange.Identifier}; engines={power.Count(c => c.IsLocomotive)}; vehicles={power.Count}; cars={selected.Count}; tons={weight / 2000:F1}; surplus vehicles={remainder.Count}.");
@@ -227,11 +336,33 @@ internal static class NpcPoolPower
         }
         if (blocked && held.Add(locomotive.id)) locomotive.PostNotice("tat-pool-limit", "Movement inhibited: attached pool power must remain in its parked game area. Uncouple at the unit's outer end to leave.");
         if (!blocked && held.Remove(locomotive.id)) locomotive.PostNotice("tat-pool-limit", "Pool power: movement within its parked game area permitted.");
+        bool playerAttached = coupled.Any(c => c.IsLocomotive && !IsPooled(c));
         NpcTrainOperations.Trusted(() => {
+            var firstHauls = pools.Select(c => c.KeyValueObject[Marker].StringValue).Distinct()
+                .Where(id => playerAttached ? playerHauls.Add(id) : playerHauls.Remove(id)).ToHashSet();
             foreach (var pool in pools) {
-                bool brake = blocked || !coupled.Any(c => c.IsLocomotive && !IsPooled(c));
+                bool brake = blocked || !playerAttached;
                 if (pool.HandbrakeApplied() != brake) pool.SetHandbrake(brake);
+                if (playerAttached && !blocked && pool is BaseLocomotive engine)
+                {
+                    // Hauled pool engines must not keep their independent brakes
+                    // applied or control the player's train brake pipe.
+                    if (!engine.locomotiveControl.air.IsCutOut)
+                        StateManager.ApplyLocal(new PropertyChange(engine.id, PropertyChange.Control.CutOut, true));
+                    if (engine.ControlHelper.LocomotiveBrake > 0) engine.ControlHelper.LocomotiveBrake = 0;
+                    if (engine.ControlHelper.TrainBrake > 0) engine.ControlHelper.TrainBrake = 0;
+                }
+                if (!playerAttached || !firstHauls.Contains(pool.KeyValueObject[Marker].StringValue)) continue;
+                foreach (var end in new[] { Car.LogicalEnd.A, Car.LogicalEnd.B })
+                {
+                    if (pool.CoupledTo(end) != null) continue;
+                    // Open cocks at an uncoupled end vent the entire connected
+                    // brake pipe. Seal free pool ends once when the haul starts.
+                    pool.ApplyEndGearChange(end, Car.EndGearStateKey.Anglecock, 0f);
+                }
             }
+            if (playerAttached && firstHauls.Count > 0)
+                ModDiagnosticLog.Write("POOL AIR", $"{locomotive.DisplayName}: preparing {firstHauls.Count} coupled pool units; free pool-end angle cocks sealed; hauled locomotive brake controls cut out; parking brakes released only inside the allowed area.");
         });
         if (blocked) locomotive.set.SetVelocity(0, coupled);
         return blocked;

@@ -21,6 +21,23 @@ internal static class NpcServiceHud
         string approach = interchange ? (service.Phase == "Departing" ? "approach-outbound" : "approach-inbound") : "approach-" + service.StopIndex;
         return NpcServicePolicy.TravelLabel(service.Phase, service.Announcements.Contains(approach));
     }
+    internal static string TransferStatus(NpcServiceRecord service)
+    {
+        if (service.Phase != "Setting out" && service.Phase != "Picking up") return DisplayPhase(service);
+        int setouts = System.Math.Max(0, service.Inbound.Count - service.SetoutDone);
+        int pickups = System.Math.Max(0, service.Outbound.Count - service.PickupDone);
+        if (!NpcServicePolicy.HasPendingTransfers(setouts, pickups)) return "Transfers complete" + (service.WaitingReason.Length > 0 ? " · waiting" : "");
+        string progress = service.Phase == "Setting out" ? $"Setout {service.SetoutDone}/{service.Inbound.Count}" :
+            $"Pickup {service.PickupDone}/{service.Outbound.Count}";
+        if (service.Suspended || service.WaitingReason.Length > 0) return progress + " · waiting";
+        double now = Game.TimeWeather.Now.TotalSeconds;
+        int batch = System.Math.Min(NpcServicePolicy.BatchSize, service.Phase == "Setting out" ? setouts : pickups);
+        double seconds = System.Math.Max(0, service.NextTransfer - now) +
+            System.Math.Max(0, setouts + pickups - batch) * service.TransferSecondsPerCar;
+        int minutes = (int)System.Math.Ceiling(seconds / 60);
+        int clockMinutes = (int)((now + seconds) / 60) % (24 * 60);
+        return progress + $" · done ~{clockMinutes / 60:00}:{clockMinutes % 60:00} ({minutes} min)";
+    }
     internal static void Update()
     {
         if (!StateManager.IsHost || TrainController.Shared == null || RestoreNotifier.Shared == null || !RestoreNotifier.Shared.HasRestored || Time.realtimeSinceStartup < nextRefresh) return;
@@ -40,6 +57,7 @@ internal static class NpcServiceHud
                 content += $"\nSetout {service.SetoutDone}/{service.Inbound.Count} · Pickup {service.Outbound.Take(service.PickupDone).Count(p => !p.Missed)}/{System.Math.Max(service.PickupSnapshot.Count, service.Outbound.Count)} · Missed {service.Outbound.Count(p => p.Missed)}" +
                     (service.TransferSecondsPerCar < NpcServicePolicy.SecondsPerCar ? "\nCaboose assist: 1 min/car · no charge" : "");
             if (service.WaitingReason.Length > 0) content += "\n" + service.WaitingReason;
+            if (service.Phase == "Setting out" || service.Phase == "Picking up") content += "\n" + TransferStatus(service);
             if (messages.TryGetValue(lead.id, out var old) && old == content) continue;
             lead.PostNotice(NoticeKey, content);
             messages[lead.id] = content;

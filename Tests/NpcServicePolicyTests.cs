@@ -6,6 +6,61 @@ namespace RMROC451.TweaksAndThings.Tests;
 [TestFixture]
 public sealed class NpcServicePolicyTests
 {
+    [TestCase(0, 0, 0, true)]
+    [TestCase(0, 0, 1, false)]
+    [TestCase(1, 0, 0, false)]
+    [TestCase(0, 1, 0, false)]
+    public void EmptyCompletedServicesParkInsteadOfReturning(int setouts, int pickups, int successful, bool park) =>
+        Assert.That(NpcServicePolicy.ShouldPoolPower(setouts, pickups, successful), Is.EqualTo(park));
+    [TestCase(0, 0, false)]
+    [TestCase(-1, 0, false)]
+    [TestCase(0, 1, true)]
+    public void CompletedTransfersDoNotHaveARetryCompletionEstimate(int setouts, int pickups, bool pending) =>
+        Assert.That(NpcServicePolicy.HasPendingTransfers(setouts, pickups), Is.EqualTo(pending));
+
+    [Test]
+    public void PickupsAndRejoinedSetoutsStayAheadOfTheRearCaboose()
+    {
+        var power = new[] { "engine", "tender", "caboose" };
+        var expected = new[] { "engine", "tender", "setout", "pickup", "caboose" };
+        Assert.That(NpcServicePolicy.ConsistOrder(new[] { "engine", "tender", "caboose", "setout", "pickup" },
+            power, c => c, c => c == "caboose"), Is.EqualTo(expected));
+        Assert.That(NpcServicePolicy.ConsistOrder(new[] { "pickup", "caboose", "setout", "tender", "engine" },
+            power, c => c, c => c == "caboose"), Is.EqualTo(new[] { "engine", "tender", "pickup", "setout", "caboose" }));
+        Assert.That(NpcServicePolicy.ConsistOrder(new[] { "caboose", "tender", "engine" },
+            power, c => c, c => c == "caboose"), Is.EqualTo(power));
+    }
+    [Test]
+    public void AlternatingWorkCompletesDeliveriesInAnInitiallyAlmostFullYard()
+    {
+        int capacity = 6, occupied = 5, inbound = 5, outbound = 4;
+        string phase = "Setting out";
+        for (int batch = 0; batch < 12 && (inbound > 0 || outbound > 0); batch++)
+        {
+            if (phase == "Setting out")
+            { int n = Math.Min(2, Math.Min(inbound, capacity - occupied)); occupied += n; inbound -= n; }
+            else { int n = Math.Min(2, outbound); occupied -= n; outbound -= n; }
+            Assert.That(occupied, Is.InRange(0, capacity));
+            phase = NpcServicePolicy.AfterBatch(phase, inbound, outbound);
+        }
+        Assert.That(inbound, Is.Zero);
+        Assert.That(outbound, Is.Zero);
+        Assert.That(occupied, Is.EqualTo(capacity));
+    }
+    [TestCase(1000, 900, 10, 5, 120, 3100)]
+    [TestCase(1000, 1300, 10, 5, 120, 3400)]
+    [TestCase(1000, 900, 0, 5, 60, 1600)]
+    public void ReturnPlanIncludesBothTransfersAndRepositioning(double due, double arrival, int setouts, int pickups, double rate, double expected) =>
+        Assert.That(NpcServicePolicy.ReturnDeparture(due, arrival, setouts, pickups, rate), Is.EqualTo(expected));
+    [Test]
+    public void OverdueServiceRemainsPendingUntilActuallyServiced()
+    {
+        // Passing the planned time is not evidence of successful service.
+        Assert.That(NpcServicePolicy.KeepPendingService(90000, 3600), Is.True);
+        Assert.That(NpcServicePolicy.KeepPendingService(90000, 90000), Is.False);
+        Assert.That(NpcServicePolicy.KeepPendingService(90000, 100000), Is.False);
+        Assert.That(NpcServicePolicy.WarpBoundary(95000, 100000, new[] { 89000d }), Is.EqualTo(95000));
+    }
     [TestCase(0, 0, false)]
     [TestCase(1, 0, true)]
     [TestCase(0, 1, true)]

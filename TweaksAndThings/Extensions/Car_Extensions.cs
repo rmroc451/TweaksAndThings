@@ -106,13 +106,15 @@ public static class Car_Extensions
 
     private static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false, bool requireLoad = true) =>
         (
-            car.CarCaboose() ?? car.CarsNearCurrentCar(timeNeeded, decrement).FindNearestCabooseFromNearbyCars()
+            (car.CarCaboose() is Car coupledCaboose && !NpcServiceCaboose.IsServiceCar(coupledCaboose) ? coupledCaboose : null) ??
+            car.CarsNearCurrentCar(timeNeeded, decrement).Where(p => !NpcServiceCaboose.IsServiceCar(p.car)).FindNearestCabooseFromNearbyCars()
         )?.CabooseWithSufficientCrewHours(timeNeeded: timeNeeded, requireLoad:requireLoad, decrement: decrement);
 
     public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool requireLoad, bool decrement = false)
     {
         Car? output = null;
         if (car is null || !car.IsCaboose()) return null;
+        if (NpcServiceCaboose.IsServiceCar(car)) return null;
         if (!requireLoad) return car;
 
         List<LoadSlot> loadSlots = car.Definition.LoadSlots;

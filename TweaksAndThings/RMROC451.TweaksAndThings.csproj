@@ -21,6 +21,7 @@
     <GameAssembly Include="Unity.InputSystem" />
     <GameAssembly Include="UnityEngine" />
     <GameAssembly Include="UnityEngine.CoreModule" />
+    <GameAssembly Include="UnityEngine.AnimationModule" />
     <GameAssembly Include="UnityEngine.UI" />
     <GameAssembly Include="UnityEngine.UIModule" />
     <GameAssembly Include="UnityEngine.InputLegacyModule" />

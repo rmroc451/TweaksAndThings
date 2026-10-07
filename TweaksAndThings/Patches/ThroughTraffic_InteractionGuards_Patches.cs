@@ -32,6 +32,8 @@ internal static class ThroughTraffic_TrainController_Couple_Patch
         __state = false;
         if (ThroughTrafficGuard.IsTrustedMutation) return true;
         var cars = __args.OfType<Car>().ToList();
+        if (cars.Count == 2 && cars.All(AeLocalService.Owns) && cars[0].KeyValueObject[AeLocalService.Marker].StringValue == cars[1].KeyValueObject[AeLocalService.Marker].StringValue)
+        { ThroughTrafficGuard.BeginTrustedMutation(); __state = true; return true; }
         if (cars.Count == 2 && cars.Any(NpcPoolPower.IsPooled) && cars.All(c => !ThroughTrafficGuard.IsGenerated(c) || NpcPoolPower.IsPooled(c)))
         {
             ThroughTrafficGuard.BeginTrustedMutation();

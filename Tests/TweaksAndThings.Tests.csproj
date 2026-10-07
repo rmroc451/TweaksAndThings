@@ -5,6 +5,14 @@
     <RootNamespace>RMROC451.TweaksAndThings.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\TweaksAndThings\Settings\AeLocalPolicy.cs" Link="Settings\AeLocalPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\TimetableConnectivityPolicy.cs" Link="Settings\TimetableConnectivityPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcTimetablePacingPolicy.cs" Link="Settings\NpcTimetablePacingPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\ModJoinPolicy.cs" Link="Settings\ModJoinPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\StartingProgressionPolicy.cs" Link="Settings\StartingProgressionPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\LogImportPolicy.cs" Link="Settings\LogImportPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcWarpBoundaryPolicy.cs" Link="Settings\NpcWarpBoundaryPolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcIndustryPlanningGate.cs" Link="Settings\NpcIndustryPlanningGate.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcPoolPowerPolicy.cs" Link="Settings\NpcPoolPowerPolicy.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcTrackAccessPolicy.cs" Link="Settings\NpcTrackAccessPolicy.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcTimetablePlanPolicy.cs" Link="Settings\NpcTimetablePlanPolicy.cs" />
@@ -13,6 +21,7 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
   </ItemGroup>
   <ItemGroup>
+
     <Compile Include="..\TweaksAndThings\Settings\Settings.cs" Link="Settings\Settings.cs" />
     <Compile Include="..\TweaksAndThings\Enums\CrewHourLoadMethod.cs" Link="Enums\CrewHourLoadMethod.cs" />
     <Compile Include="..\TweaksAndThings\Enums\EngineRosterFuelDisplayColumn.cs" Link="Enums\EngineRosterFuelDisplayColumn.cs" />
@@ -20,6 +29,7 @@
     <Compile Include="..\TweaksAndThings\Settings\FeaturePolicies.cs" Link="Settings\FeaturePolicies.cs" />
     <Compile Include="..\TweaksAndThings\Settings\ThroughTrafficPolicy.cs" Link="Settings\ThroughTrafficPolicy.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcServicePolicy.cs" Link="Settings\NpcServicePolicy.cs" />
+    <Compile Include="..\TweaksAndThings\Settings\NpcIdentityPolicy.cs" Link="Settings\NpcIdentityPolicy.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcPowerSelection.cs" Link="Settings\NpcPowerSelection.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcRandomTrafficPolicy.cs" Link="Settings\NpcRandomTrafficPolicy.cs" />
     <Compile Include="..\TweaksAndThings\Settings\NpcTimetableProtection.cs" Link="Settings\NpcTimetableProtection.cs" />

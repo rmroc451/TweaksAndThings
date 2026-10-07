@@ -6,6 +6,18 @@ namespace RMROC451.TweaksAndThings.Tests;
 public class NpcTimetableProtectionTests
 {
     [Test]
+    public void OwnershipFilterCannotRemoveNpcLockedCallsButStillFiltersPlayerTrains()
+    {
+        var captured = new Dictionary<string, string> { ["NI0001"] = "Sylva,Dillsboro,Whittier" };
+        var filtered = new Dictionary<string, string> { ["PLAYER"] = "Whittier" };
+        NpcTimetableProtection.Merge(filtered, captured, s => s);
+        Assert.That(filtered["NI0001"], Is.EqualTo("Sylva,Dillsboro,Whittier"));
+        Assert.That(filtered["PLAYER"], Is.EqualTo("Whittier"));
+        filtered["NI0001"] = "Whittier";
+        NpcTimetableProtection.Merge(filtered, captured, s => s);
+        Assert.That(filtered["NI0001"], Is.EqualTo("Sylva,Dillsboro,Whittier"));
+    }
+    [Test]
     public void RestoresDeletedAndEditedNpcsWithoutDiscardingPlayerEdits()
     {
         var saved = new Dictionary<string, string> { ["NPC-A"] = "original A", ["NPC-B"] = "original B" };

@@ -11,8 +11,8 @@ internal static class TimetableForecastPolicy
         double speed = currentMph >= 0.5 ? Math.Min(currentMph, trackMph) : trackMph;
         return speed > 0 ? meters / (speed * 0.44704) : (double?)null;
     }
-    internal static double Departure(double arrival, double dwell, double scheduled, double meet, double ready)
-        => Math.Max(Math.Max(arrival + Math.Max(0, dwell), scheduled), Math.Max(meet, ready));
+    internal static double Departure(double arrival, double dwell, double scheduled, double meet, double ready, bool passing = false)
+        => Math.Max(Math.Max(arrival + Math.Max(0, dwell), passing ? arrival : scheduled), Math.Max(meet, ready));
     internal static double ClockNear(double clockMinutes, double referenceMinutes)
     {
         double value = Math.Floor(referenceMinutes / 1440) * 1440 + (clockMinutes % 1440 + 1440) % 1440;

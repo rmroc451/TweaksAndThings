@@ -21,6 +21,28 @@ namespace RMROC451.TweaksAndThings;
 
 internal static class NpcTrainOperations
 {
+    private static readonly Dictionary<string, float> rollingSpawns = new();
+    internal static void ArmRollingSpawn(BaseLocomotive lead) => rollingSpawns[lead.id] = Time.realtimeSinceStartup + 5;
+    internal static void ApplyRollingSpawn(AutoEngineer engineer)
+    {
+        var lead = engineer.Locomotive;
+        if (!rollingSpawns.TryGetValue(lead.id, out var expires)) return;
+        if (Time.realtimeSinceStartup > expires || !ThroughTrafficGuard.IsGenerated(lead) || NpcPoolPower.IsPooled(lead))
+        { rollingSpawns.Remove(lead.id); return; }
+        if (engineer._config == null) return;
+        rollingSpawns.Remove(lead.id);
+        var cars = lead.EnumerateCoupled().ToList();
+        if (cars.Any(c => !ThroughTrafficGuard.IsGenerated(c) || c.IsDerailed || c.air.handbrakeApplied)) return;
+        float trackMph = cars.SelectMany(c => new[] { c.LocationF.segment, c.LocationR.segment })
+            .Min(s => s.GetExpectedSpeedLimit());
+        // Native AE includes signal, obstruction and braking-distance targets.
+        // Its signed velocity is relative to the locomotive's physical front.
+        float nativeVelocity = engineer.ContextualTargetVelocity();
+        float velocity = Mathf.Sign(nativeVelocity) * Mathf.Min(Mathf.Abs(nativeVelocity), Math.Max(0, trackMph) * 0.44704f);
+        Trusted(() => lead.set.SetVelocity(lead.FrontIsA ? -velocity : velocity, cars));
+        SyncPlacement(cars);
+        ModDiagnosticLog.Write("ROLLING SPAWN", $"{lead.DisplayName}: initial speed={Mathf.Abs(velocity) / 0.44704f:F1} mph; track={trackMph:F0} mph; native AE/signal limits applied.");
+    }
     [ThreadStatic] private static int trackAccessDepth;
     internal static bool HasTrackAccess => trackAccessDepth > 0;
     internal static bool CanPlaceAt(Location location, float length)
@@ -263,6 +285,13 @@ internal static class NpcTrainOperations
         }
     }
 
+    internal static double OwnedDieselShare()
+    {
+        var roster = TrainController.Shared.Cars.Where(c => c.IsLocomotive && c.IsOwnedByPlayer && !ThroughTrafficGuard.IsGenerated(c)).ToList();
+        int steam = roster.Count(c => c is SteamLocomotive), diesel = roster.Count(c => c is DieselLocomotive);
+        return steam + diesel == 0 ? 0 : (double)diesel / (steam + diesel);
+    }
+
     internal static bool TryCatalogPower(float weight, List<RouteSearch.Step> route, string? crewId, out List<CarDescriptor> power,
         List<RouteSearch.Step>? returnRoute = null, float returnWeight = 0, IReadOnlyList<Car>? installedPower = null, double utilization = 1, Action<float>? reportCapacity = null,
         float trainLength = 100, float returnTrainLength = 100)
@@ -334,6 +363,15 @@ internal static class NpcTrainOperations
             NpcTrafficDiagnostics.Report("power", $"No feasible power combination: {candidates.Count} catalog candidates, {weight / 2000:N0} tons, peak demand {requirements.Max(r => r.demand):N2} HP/tonne");
             return false;
         }
+        // Keep the minimum feasible engine count, then draw a steam/diesel mix
+        // from the company's roster and choose the closest feasible makeup.
+        double dieselShare = OwnedDieselShare();
+        int desiredDiesels = dieselShare <= 0 ? 0 : dieselShare >= 1 ? selected.Count :
+            (int)Math.Floor(selected.Count * dieselShare + UnityEngine.Random.value);
+        selected = NpcPowerSelection.Select(candidates.Select(c => c.capacity).ToList(),
+            requirements.Select(r => r.demand * NpcServicePolicy.Tonnes(r.weight)).ToArray(), selected.Count,
+            candidates.Select(c => c.definitions[0].Definition is DieselLocomotiveDefinition).ToList(), desiredDiesels) ?? selected;
+        ModDiagnosticLog.Write("POWER MIX", $"Owned diesel share={dieselShare:P0}; requested {desiredDiesels}/{selected.Count} diesel units; selected {selected.Count(i => candidates[i].definitions[0].Definition is DieselLocomotiveDefinition)}/{selected.Count}; minimum feasible engine count preserved.", "power-mix", 30);
         foreach (int index in selected)
         {
             bool trailing = power.Count > 0;
@@ -401,8 +439,17 @@ internal static class NpcTrainOperations
                 maybeWaypoint: (target, (string)null!)));
     }
 
+    internal static void Hold(BaseLocomotive lead)
+    {
+        // A zero-speed ROAD order brakes in place without creating a new
+        // waypoint relative to a locomotive that is still settling to a stop.
+        Trusted(() => new AutoEngineerOrdersHelper(lead, new AutoEngineerPersistence(lead.KeyValueObject))
+            .SetOrdersValue(mode: AutoEngineerMode.Road, forward: true, maxSpeedMph: 0));
+    }
+
     internal static void PlacePower(Location spawn, List<CarDescriptor> descriptors, List<string> ids)
     {
+        NpcEquipmentIdentity.Assign(descriptors);
         try
         {
             Trusted(() => TrainController.Shared.PlaceTrain(spawn, descriptors, ids));
@@ -437,7 +484,7 @@ internal static class NpcTrainOperations
         ModDiagnosticLog.Write("PLACEMENT", $"lead={lead.id}; physical front={Graph.Shared.LocationToString(lead.LocationF)}; logical front={Graph.Shared.LocationToString(lead.LocationA)}; flipped={descriptors[0].Flipped}; speed={lead.VelocityMphAbs:F2} mph.");
     }
 
-    private static void ConfigurePower(BaseLocomotive lead)
+    internal static void ConfigurePower(BaseLocomotive lead)
     {
         Trusted(() =>
         {
@@ -458,7 +505,11 @@ internal static class NpcTrainOperations
     internal static bool Arrived(BaseLocomotive lead, Location target) => lead.VelocityMphAbs < 0.5f &&
         Graph.Shared.CheckSameRoute(lead.LocationF, target, 60f);
 
-    internal static void Marker(Car car, bool npc) => Trusted(() => car.KeyValueObject[ThroughTrafficGuard.MarkerKey] = Value.Bool(npc));
+    internal static void Marker(Car car, bool npc)
+    {
+        Trusted(() => car.KeyValueObject[ThroughTrafficGuard.MarkerKey] = Value.Bool(npc));
+        if (npc) NpcMaintenance.ClearHotbox(car);
+    }
 
     internal static Car Tail(NpcServiceRecord service) => TrainController.Shared.CarForId(service.LeadId).EnumerateCoupled().Last();
 

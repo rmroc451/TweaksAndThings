@@ -58,8 +58,8 @@ internal static class TimetableHistory
         if (history.TryGetValue(train.Name, out var existing) && existing.Count > 0 &&
             forecast.Now >= existing[existing.Count - 1].Minute && forecast.Now - existing[existing.Count - 1].Minute < 1) return;
         var anchors = new List<(double meters, string code)>();
-        foreach (var station in TimetableController.Shared.GetAllStations(includeDuplicates: false)) {
-            if (forecast.Route.Project(TimetableLiveForecast.Station(station.code), out double meters)) anchors.Add((meters, station.code));
+        foreach (var station in TimetableController.Shared.GetAllStations(includeDisabled: true, includeDuplicates: false)) {
+            if (forecast.Route.Anchor(TimetableLiveForecast.Station(station.code), out double meters)) anchors.Add((meters, station.code));
         }
         if (!anchors.Any(a => a.code == forecast.Route.FromCode)) anchors.Add((0, forecast.Route.FromCode));
         if (!anchors.Any(a => a.code == forecast.Route.ToCode)) anchors.Add((forecast.Route.Meters, forecast.Route.ToCode));

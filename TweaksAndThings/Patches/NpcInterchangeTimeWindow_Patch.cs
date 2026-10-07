@@ -33,7 +33,7 @@ internal static class NpcInterchangeTimeWindow_Patch
             if (NpcInterchangeWarp.Enabled)
             {
                 builder.AddButton("Next interchange AI", NpcInterchangeWarp.Request)
-                    .Tooltip("Next interchange AI", "Wait until the earliest needed AI interchange train spawns, including its travel lead time.");
+                    .Tooltip("Next interchange AI", "Wait until the earliest needed AI interchange train spawns. With no AI demand, use the normal interchange service time. At midnight, finish industry evaluation and publish the current day's timetables before continuing to the recalculated dispatch time.");
                 builder.AddLabel(NpcInterchangeWarp.Summary, UIPanelBuilder.Frequency.Periodic);
             }
             else builder.AddButton("Sleep", () =>

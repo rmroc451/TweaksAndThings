@@ -75,7 +75,7 @@ internal static class ThroughTrafficSpawner
         foreach (int index in operating)
         {
             var entry = train.Entries[index];
-            if (!TimetableController.Shared.TryGetStation(entry.Station, out var station) || !station.IsEnabled ||
+            if (!TimetableController.Shared.TryGetStation(entry.Station, out var station) ||
                 !TryGetStationLocation(station, out var location)) return false;
             stations.Add(station);
             locations.Add(location);
@@ -186,6 +186,7 @@ internal static class ThroughTrafficSpawner
         NpcServiceStore.State.Services.Add(service);
         NpcTimetableRegistry.Register(service, train);
         NpcTrainOperations.Order(loco, locations[1]);
+        NpcTrainOperations.ArmRollingSpawn(loco);
         NpcTrafficMessages.Send(service, "depart-1", $"On the move from {stations[0].name} toward {stations[1].name}.");
         return true;
     }
@@ -329,7 +330,7 @@ internal static class ThroughTrafficSpawner
         return new[] { station.code, station.name, station.mapFeature?.name, station.mapFeature?.DisplayName }.Select(Normalize).Any(n => n.Length > 0 && names.Contains(n));
     }
 
-    internal static bool IsInterchange(TimetableStation station) => OpsController.Shared?.EnabledInterchanges.Any(i => MatchesInterchange(station, i)) == true;
+    internal static bool IsInterchange(TimetableStation station) => OpsController.Shared?.AllInterchanges.Any(i => MatchesInterchange(station, i)) == true;
 
     internal static bool TrySpawnRandom(NpcRandomDeparture departure, Settings settings)
     {
@@ -351,15 +352,38 @@ internal static class ThroughTrafficSpawner
     internal static bool TryGetStationLocation(TimetableStation station, out Location location)
     {
         location = Location.Invalid;
+        if (station == null || Graph.Shared == null || !Graph.Shared.HasPopulatedCollections) return false;
         var span = station.passengerStop?.TrackSpans?.FirstOrDefault();
-        if (span != null && Graph.Shared.TryGetLocationFromPoint(span.GetSegments().FirstOrDefault(), span.GetCenterPoint(), 200f, out location)) return true;
-        var interchange = OpsController.Shared?.EnabledInterchanges.FirstOrDefault(i => MatchesInterchange(station, i));
+        if (TryGetSpanLocation(span, out location)) return true;
+        var interchange = OpsController.Shared?.AllInterchanges.FirstOrDefault(i => MatchesInterchange(station, i));
         span = interchange?.TrackSpans.FirstOrDefault();
-        if (span != null && Graph.Shared.TryGetLocationFromPoint(span.GetSegments().FirstOrDefault(), span.GetCenterPoint(), 200f, out location)) return true;
+        if (TryGetSpanLocation(span, out location)) return true;
         var feature = station.mapFeature;
         if (feature == null) return false;
         if (feature.GetType().GetProperty("CenterPoint")?.GetValue(feature, null) is UnityEngine.Vector3 point)
-            return Graph.Shared.TryGetLocationFromGamePoint(point, 200f, out location);
-        return false;
+            if (Graph.Shared.TryGetLocationFromGamePoint(point, 200f, out location)) return true;
+        return Graph.Shared.TryGetLocationFromGamePoint(Helpers.WorldTransformer.WorldToGame(feature.transform.position), 200f, out location);
+    }
+
+    private static bool TryGetSpanLocation(TrackSpan? span, out Location location)
+    {
+        location = Location.Invalid;
+        if (span == null || Graph.Shared == null) return false;
+        // Locked spans can have an empty native segment cache. Never pass its
+        // FirstOrDefault (null) to TryGetLocationFromPoint.
+        var segment = span.GetSegments()?.FirstOrDefault(s => s != null);
+        if (segment != null && Graph.Shared.TryGetLocationFromPoint(segment, span.GetCenterPoint(), 200f, out location)) return true;
+        var lower = span._lower;
+        if (!string.IsNullOrEmpty(lower.segmentId) && Graph.Shared.segments.TryGetValue(lower.segmentId, out segment) && segment != null) {
+            location = new Location(segment, lower.distance, lower.end);
+            var upper = span._upper;
+            if (upper.segmentId == lower.segmentId) {
+                var end = new Location(segment, upper.distance, upper.end).WithEnd(lower.end);
+                location = new Location(segment, (lower.distance + end.distance) / 2, lower.end);
+            }
+            if (location.IsValid) return true;
+        }
+        // The authoring transform is a final fallback for an unresolved span.
+        return Graph.Shared.TryGetLocationFromGamePoint(Helpers.WorldTransformer.WorldToGame(span.transform.position), 200f, out location);
     }
 }
