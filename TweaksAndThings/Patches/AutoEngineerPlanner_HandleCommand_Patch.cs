@@ -30,7 +30,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class AutoEngineerPlanner_HandleCommand_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<AutoEngineerPlanner_HandleCommand_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<AutoEngineerPlanner_HandleCommand_Patch>();
     private static int governedSpeed = 20;
 
     static bool Prefix(AutoEngineerPlanner __instance, ref AutoEngineerCommand command, ref IPlayer sender)
@@ -108,7 +108,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
         }
         catch (Exception exception)
         {
-            Log.Error(exception, "Couldn't get location from waypoint: {locStr}", waypoint.LocationString);
+            ModLog.Error(exception, "Couldn't get location from waypoint: {locStr}", waypoint.LocationString);
             return false;
         }
     }

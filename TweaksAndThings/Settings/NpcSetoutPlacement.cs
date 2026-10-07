@@ -23,7 +23,7 @@ internal static class NpcSetoutPlacement
             foreach (var step in route) {
                 string key = step.Location.segment.id;
                 if (!reserved.TryGetValue(key, out var intervals)) reserved[key] = intervals = new();
-                float clearance = step.Node == null ? 25 : Math.Max(25, Graph.Shared.CalculateFoulingDistance(step.Node) + 10);
+                float clearance = step.Node == null ? 25 : Math.Max(25, NpcTrainOperations.FoulingDistance(step.Node) + 10);
                 intervals.Add((step.Location.distance - step.Distance - clearance, step.Location.distance + clearance, step.Location.end));
             }
         }

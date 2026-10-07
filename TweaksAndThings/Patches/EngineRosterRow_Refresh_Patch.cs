@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using Model;
 using Model.Definition.Data;
 using Model.Ops;
@@ -24,7 +24,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class EngineRosterRow_Refresh_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<EngineRosterRow_Refresh_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<EngineRosterRow_Refresh_Patch>();
 
     public static void Postfix(EngineRosterRow __instance)
     {
@@ -119,7 +119,7 @@ internal class EngineRosterRow_Refresh_Patch
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error Detecting oiling consist status for engine roster");
+                ModLog.Error(ex, "Error Detecting oiling consist status for engine roster");
             }
 
             switch (rosterFuelColumnSettings.EngineRosterFuelStatusColumn)
@@ -140,7 +140,7 @@ internal class EngineRosterRow_Refresh_Patch
         catch (Exception ex)
         {
             rosterFuelColumnSettings.EngineRosterFuelStatusColumn = EngineRosterFuelDisplayColumn.None;
-            Log.Error(ex, "Error Detecting fuel status for engine roster");
+            ModLog.Error(ex, "Error Detecting fuel status for engine roster");
         }
     }
 

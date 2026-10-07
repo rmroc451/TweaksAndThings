@@ -1,4 +1,4 @@
-﻿using Game.Messages;
+using Game.Messages;
 using Game.State;
 using Helpers;
 using Model;
@@ -147,7 +147,7 @@ public static class Car_Extensions
             .Union(car.EnumerateCoupled())
             .Where(c => c.IsCaboose());
 
-        if (cabeese?.Any() ?? false) Log.Debug($"{nameof(CarsNearCurrentCar)}[{car.DisplayName}] => {cabeese.Count()}");
+        if (cabeese?.Any() ?? false) ModLog.Debug($"{nameof(CarsNearCurrentCar)}[{car.DisplayName}] => {cabeese.Count()}");
 
         List<(Car car, bool crewCar, float distance)> source =
             cabeese.Select(c => (car: c, crewCar: c.IsCrewCar(), distance: car.Distance(c))).ToList();

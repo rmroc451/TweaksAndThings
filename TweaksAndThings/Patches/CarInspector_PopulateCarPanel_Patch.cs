@@ -33,7 +33,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class CarInspector_PopulateCarPanel_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<CarInspector_PopulateCarPanel_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<CarInspector_PopulateCarPanel_Patch>();
     internal static IEnumerable<LogicalEnd> ends = Enum.GetValues(typeof(LogicalEnd)).Cast<LogicalEnd>();
 
     /// <summary>

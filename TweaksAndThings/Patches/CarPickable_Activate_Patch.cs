@@ -1,4 +1,4 @@
-﻿using Core;
+using Core;
 using HarmonyLib;
 using Model;
 using Model.Ops;
@@ -31,7 +31,7 @@ enum MrocAction
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class CarPickable_Activate_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<CarPickable_Activate_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<CarPickable_Activate_Patch>();
 
     static float clicked = 0;
     static float clicktime = 0;

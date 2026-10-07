@@ -43,7 +43,47 @@ internal static class NpcTrainOperations
         internal IEnumerator? Work;
     }
     private static readonly Dictionary<string, Approach> approaches = new Dictionary<string, Approach>();
+    private static readonly Dictionary<TrackNode, float> foulingDistanceCache = new();
+    private static Graph? foulingDistanceGraph;
+    private const float UndecodableSwitchClearanceMeters = 75f;
     internal static int SpeedMph => AutoEngineerMode.Waypoint.MaxSpeedMph();
+
+    internal static void InvalidateTrackGeometryCache()
+    {
+        foulingDistanceCache.Clear();
+        foulingDistanceGraph = Graph.Shared;
+    }
+
+    internal static float FoulingDistance(TrackNode? node)
+    {
+        if (node == null) return 0f;
+        var currentGraph = Graph.Shared;
+        if (currentGraph == null) return UndecodableSwitchClearanceMeters;
+        if (foulingDistanceGraph != currentGraph)
+        {
+            foulingDistanceGraph = currentGraph;
+            foulingDistanceCache.Clear();
+        }
+        if (foulingDistanceCache.TryGetValue(node, out float cached)) return cached;
+
+        float distance;
+        try
+        {
+            distance = Math.Max(0f, currentGraph.CalculateFoulingDistance(node));
+        }
+        catch (ArgumentException exception) when (exception.Message.StartsWith("Failed to decode switch node", StringComparison.Ordinal))
+        {
+            // A few map nodes are routeable by the native Auto Engineer pathfinder
+            // but cannot be decoded by the separate fouling-distance helper. Keep
+            // the route and destination handling native, and protect the node with
+            // a conservative fallback instead of aborting the interchange service.
+            distance = UndecodableSwitchClearanceMeters;
+            ModDiagnosticLog.Write("ROUTING", $"Switch {node.id} has undecodable fouling geometry; using {distance:N0} m clearance while retaining the Auto Engineer route.");
+        }
+
+        foulingDistanceCache[node] = distance;
+        return distance;
+    }
 
     internal static string ApproachStatus(string id)
     {
@@ -95,6 +135,8 @@ internal static class NpcTrainOperations
     {
         steps = new List<RouteSearch.Step>();
         meters = 0;
+        // Use Railroader's Auto Engineer cost model for service destinations too;
+        // this is the same native track-navigation policy used by Waypoint mode.
         if (!from.IsValid || !to.IsValid || !Graph.Shared.FindRoute(from, to, HeuristicCosts.AutoEngineer,
                 steps, out var metrics, checkForCars: false) || steps.Count == 0) return false;
         meters = metrics.Distance;

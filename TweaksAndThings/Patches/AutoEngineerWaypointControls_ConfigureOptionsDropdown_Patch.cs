@@ -30,7 +30,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
 {
     private const string RunaroundDestinationPrefix = "__RUNAROUND__:";
-    private static Serilog.ILogger _log => Log.ForContext<LocomotiveControlsUIAdapter_UpdateCarText_Postfix>();
+    private static Serilog.ILogger _log => ModLog.ForContext<LocomotiveControlsUIAdapter_UpdateCarText_Postfix>();
     private static int lastSeenIntegrationSetCount = default;
     private static string? lastLocoSeenCarId = default;
     private static Coroutine? watchyWatchy = null;
@@ -56,7 +56,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             }
             string? currentLocomotiveId = controlledLocomotive?.id;
             bool shouldRun = FeaturePolicies.ShouldRunWaypointRefresh(
-                __instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint,
+                TryGetWaypointMode(__instance),
                 controlledLocomotive != null);
 
             if (lastLocoSeenCarId != null &&
@@ -98,7 +98,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         {
             var waypointControls = __instance.aiWaypointControls as AutoEngineerWaypointControls;
             if (!FeaturePolicies.ShouldRunWaypointRefresh(
-                    __instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint,
+                    TryGetWaypointMode(__instance),
                     waypointControls?.Locomotive != null))
                 yield break;
 
@@ -153,6 +153,20 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             __instance.optionsDropdown.Configure(list, action);
             ((Selectable)__instance.optionsDropdown).interactable = list.Count > 0;
             yield return wait;
+        }
+    }
+
+    private static bool TryGetWaypointMode(LocomotiveControlsUIAdapter instance)
+    {
+        try
+        {
+            return instance._persistence.Orders.Mode == AutoEngineerMode.Waypoint;
+        }
+        catch (NullReferenceException)
+        {
+            // Controls can refresh before Auto Engineer persistence is initialized or after
+            // its locomotive is detached. In either case, there is no waypoint menu to refresh.
+            return false;
         }
     }
 

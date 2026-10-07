@@ -121,7 +121,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             var passengerStops = __instance.AllIndustries
                 .Where(i => i != null)
                 .SelectMany(i => i.TrackDisplayables.Where(t => t != null && refillLocations.Contains(t.GetType())));
-            //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
+            //ModLog.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops => {string.Join(",", passengerStops)}");
 
             // The native segment cache is not ready during initial industry callbacks.
             // Check caboose locations directly and materialize once (also avoiding duplicate refills).
@@ -129,7 +129,7 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             var spans = passengerStops.SelectMany(t => t.TrackSpans ?? Enumerable.Empty<Track.TrackSpan>())
                 .Where(s => s != null && s.IsValid).ToList();
             var cabeese = cabooses.Where(c => spans.Any(s => s.Contains(c.OpsLocation))).ToList();
-            //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
+            //ModLog.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper => PassengerStops Cabeese => {string.Join(",", cabeese?.Select(c => $"{c.t} : {c.c2}") ?? [])}");
 
             var refillIds = new HashSet<string>(cabeese.Select(c => c.id));
             CrewCarDict = PerformancePolicies.RetainActiveCrewStatuses(CrewCarDict, refillIds);
@@ -137,13 +137,13 @@ internal class OpsController_AnnounceCoalescedPayments_Patch
             var deltaTime = Math.Max(0f, (float)(TimeWeather.Now.TotalSeconds - dateTime.TotalSeconds));
             foreach (var caboose in cabeese)
             {
-                //Log.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
+                //ModLog.Debug($"{nameof(OpsController_AnnounceCoalescedPayments_Patch)} => Caboose Helper ({deltaTime}) => {caboose.t} : {caboose.c2}");
                 CarLoadCrewHelper(caboose, deltaTime);
             }
             dateTime = TimeWeather.Now;
         } catch (System.Exception ex)
         {
-            Log.Error(ex, "error with announce caboose helper");
+            ModLog.Error(ex, "error with announce caboose helper");
         }
 
         return true;

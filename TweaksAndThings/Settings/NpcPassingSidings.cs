@@ -28,7 +28,7 @@ internal static class NpcPassingSidings
             new HashSet<string>(steps.Select(s => s.Location.segment.id)),
             (node, a, b) => nodes[node].SegmentCanReachSegment(byId[a], byId[b]),
             junctions: new HashSet<string>(steps.Where(s => s.Node != null && Graph.Shared.DecodeSwitchAt(s.Node, out _, out _, out _)).Select(s => s.Node!.id)),
-            foulingClearance: (a, b) => System.Math.Max(20, Graph.Shared.CalculateFoulingDistance(nodes[a]) + Graph.Shared.CalculateFoulingDistance(nodes[b])));
+            foulingClearance: (a, b) => System.Math.Max(20, NpcTrainOperations.FoulingDistance(nodes[a]) + NpcTrainOperations.FoulingDistance(nodes[b])));
         cache[key] = (limit, Time.realtimeSinceStartup + 30);
         return limit;
     }

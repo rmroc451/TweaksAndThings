@@ -72,7 +72,7 @@ internal static class NpcTrafficRouting
             // Only replace a far grant when admission actually shortened it.
             var stop = pair.Value;
             if (!grantedEnds.TryGetValue(pair.Key, out var previous) || !stop.route.Skip(stop.end + 1).Any(s => s.Location.segment == previous.segment)) continue;
-            grantedEnds[pair.Key] = StopAlongRoute(stop.route, stop.end, Math.Max(50, Graph.Shared.CalculateFoulingDistance(stop.route[stop.end].Node) + 25));
+            grantedEnds[pair.Key] = StopAlongRoute(stop.route, stop.end, Math.Max(50, NpcTrainOperations.FoulingDistance(stop.route[stop.end].Node) + 25));
             exitNodes[pair.Key] = stop.route[stop.end].Node;
             sidingTracks[pair.Key] = (stop.route[stop.entrance].Node, stop.route.Skip(stop.entrance + 1).Take(stop.end - stop.entrance).Select(s => s.Location.segment.id).ToHashSet());
             ModDiagnosticLog.Write("ROUTING", pair.Key + ": distant authority shortened for spawn; next refuge=" + stop.route[stop.end].Node.id);
@@ -179,12 +179,16 @@ internal static class NpcTrafficRouting
                     route[grantedIndex].Distance - (route[grantedIndex].Location.distance - granted.distance);
                 if (!yielding.Contains(lead.id) && grantedIndex >= 0 &&
                     remaining > Math.Max(500, engineer.CalculateLookaheadDistance() + 100) && lookaheadDepth == 0) return;
-                bool tailClear = own.All(c => Vector3.Distance(c.LocationA.GetPosition(), exit.transform.GamePosition()) > Graph.Shared.CalculateFoulingDistance(exit) + 5 &&
-                    Vector3.Distance(c.LocationB.GetPosition(), exit.transform.GamePosition()) > Graph.Shared.CalculateFoulingDistance(exit) + 5);
+                float exitClearance = NpcTrainOperations.FoulingDistance(exit) + 5;
+                bool tailClear = own.All(c => Vector3.Distance(c.LocationA.GetPosition(), exit.transform.GamePosition()) > exitClearance &&
+                    Vector3.Distance(c.LocationB.GetPosition(), exit.transform.GamePosition()) > exitClearance);
                 if (sidingTracks.TryGetValue(lead.id, out var siding))
+                {
+                    float entranceClearance = NpcTrainOperations.FoulingDistance(siding.entrance) + 5;
                     tailClear &= ownSegments.IsSubsetOf(siding.segments) && own.All(c =>
-                        Vector3.Distance(c.LocationA.GetPosition(), siding.entrance.transform.GamePosition()) > Graph.Shared.CalculateFoulingDistance(siding.entrance) + 5 &&
-                        Vector3.Distance(c.LocationB.GetPosition(), siding.entrance.transform.GamePosition()) > Graph.Shared.CalculateFoulingDistance(siding.entrance) + 5);
+                        Vector3.Distance(c.LocationA.GetPosition(), siding.entrance.transform.GamePosition()) > entranceClearance &&
+                        Vector3.Distance(c.LocationB.GetPosition(), siding.entrance.transform.GamePosition()) > entranceClearance);
+                }
                 int throatIndex = route.FindIndex(s => s.Node == exit);
                 bool opposing = OpposingApproach(lead, route.Take(throatIndex < 0 ? route.Count : throatIndex + 1).ToList(), exit);
                 refugeStopDistance = Math.Max(0, remaining);
@@ -221,7 +225,7 @@ internal static class NpcTrafficRouting
         if (clear) {
             yielding.Remove(lead.id);
             var finish = route[end].Location;
-            float clearance = route[end].Node == null ? 25 : Math.Max(50, Graph.Shared.CalculateFoulingDistance(route[end].Node) + 25);
+            float clearance = route[end].Node == null ? 25 : Math.Max(50, NpcTrainOperations.FoulingDistance(route[end].Node) + 25);
             grantedEnds[lead.id] = StopAlongRoute(route, end, clearance);
             if (end < route.Count - 1 && route[end].Node != null) {
                 exitNodes[lead.id] = route[end].Node;
@@ -367,7 +371,7 @@ internal static class NpcTrafficRouting
         NpcPassingSidingPolicy.Longest(edges, ids,
             (n, x, y) => nodes[n].SegmentCanReachSegment(segments[x], segments[y]),
             junctions: switches.Select(p => p.step.Node.id).ToHashSet(),
-            foulingClearance: (a, b) => Math.Max(20, Graph.Shared.CalculateFoulingDistance(nodes[a]) + Graph.Shared.CalculateFoulingDistance(nodes[b])),
+            foulingClearance: (a, b) => Math.Max(20, NpcTrainOperations.FoulingDistance(nodes[a]) + NpcTrainOperations.FoulingDistance(nodes[b])),
             found: (a, b, usable) => { if (!passingPairs.TryGetValue((a, b), out var old) || usable > old) passingPairs[(a, b)] = usable; });
         int end = route.Count - 1;
         for (int b = 1; b < switches.Count; b++) {
@@ -377,7 +381,7 @@ internal static class NpcTrafficRouting
                 // even when the train starts outside signal coverage.
                 if (!ctcSegments.Contains(right.step.Location.segment)) continue;
                 float mainLength = route.Skip(left.index + 1).Take(right.index - left.index).Sum(s => s.Distance);
-                float clearance = Math.Max(20, Graph.Shared.CalculateFoulingDistance(left.step.Node) + Graph.Shared.CalculateFoulingDistance(right.step.Node)) + 50;
+                float clearance = Math.Max(20, NpcTrainOperations.FoulingDistance(left.step.Node) + NpcTrainOperations.FoulingDistance(right.step.Node)) + 50;
                 if (mainLength - clearance < length) continue;
                 if (!passingPairs.TryGetValue((left.step.Node.id, right.step.Node.id), out var alternate) || alternate < length) continue;
                 end = right.index; entrance = left.index; break;

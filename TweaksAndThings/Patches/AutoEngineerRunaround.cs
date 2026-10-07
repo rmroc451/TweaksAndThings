@@ -117,9 +117,9 @@ internal static class AutoEngineerRunaround
             }
             catch (Exception stopException)
             {
-                Log.Error(stopException, "Could not stop locomotive {LocomotiveId} after a run-around command failed", locoId);
+                ModLog.Error(stopException, "Could not stop locomotive {LocomotiveId} after a run-around command failed", locoId);
             }
-            Log.Error(ex, "Could not start Auto Engineer run-around for {LocomotiveId}", locoId);
+            ModLog.Error(ex, "Could not start Auto Engineer run-around for {LocomotiveId}", locoId);
             return false;
         }
     }
@@ -151,7 +151,7 @@ internal static class AutoEngineerRunaround
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Could not restore the saved Auto Engineer destination for {LocomotiveId}", pair.Key);
+                ModLog.Error(ex, "Could not restore the saved Auto Engineer destination for {LocomotiveId}", pair.Key);
                 Pending.Remove(pair.Key);
             }
         }

@@ -29,14 +29,11 @@ public sealed class TweaksAndThingsPlugin
     internal static void LogException(string message, Exception exception)
     {
         ModDiagnosticLog.Write("ERROR", message + "\n" + exception, "exception:" + message + exception.Message);
-        modEntry?.Logger.LogException(message, exception);
-        modEntry?.Logger.Log(exception.ToString());
     }
 
     internal static void LogDiagnostic(string message)
     {
         ModDiagnosticLog.Write("INFO", message);
-        modEntry?.Logger.Log(message);
     }
 
     private TweaksAndThingsPlugin() { }
@@ -46,7 +43,8 @@ public sealed class TweaksAndThingsPlugin
         try
         {
             modEntry = entry;
-            ModDiagnosticLog.Initialize(entry.Path, text => entry.Logger.Log(text));
+            ModDiagnosticLog.Initialize(entry.Path);
+            ModLog.Initialize();
             ModDiagnosticLog.Write("SESSION", $"Mod {entry.Info.Version}; directory={entry.Path}; Unity={Application.unityVersion}");
             Instance = new TweaksAndThingsPlugin
             {
@@ -68,12 +66,12 @@ public sealed class TweaksAndThingsPlugin
                 Instance.IsEnabled = true;
             }
 
-            entry.Logger.Log("Tweaks and Things loaded for UnityModManager.");
+            ModDiagnosticLog.Write("SESSION", "Tweaks and Things loaded for UnityModManager.");
             return true;
         }
         catch (Exception exception)
         {
-            entry.Logger.LogException("Failed to load Tweaks and Things", exception);
+            ModDiagnosticLog.Write("ERROR", "Failed to load Tweaks and Things\n" + exception);
             return false;
         }
     }
@@ -112,6 +110,8 @@ public sealed class TweaksAndThingsPlugin
                 NpcTrafficRouting.Reset();
                 NpcTrafficWindow.Hide();
                 BrysonCtcMirrors.Remove();
+                DoubleMainlineCtc.UpdateTrainMarker(false);
+                DoubleMainlineHudOverlay.Update(false);
                 harmony.UnpatchAll(entry.Info.Id);
             }
             plugin.IsEnabled = value;
@@ -119,7 +119,7 @@ public sealed class TweaksAndThingsPlugin
         }
         catch (Exception exception)
         {
-            entry.Logger.LogException(value ? "Failed to enable Tweaks and Things" : "Failed to disable Tweaks and Things", exception);
+            ModDiagnosticLog.Write("ERROR", (value ? "Failed to enable Tweaks and Things" : "Failed to disable Tweaks and Things") + "\n" + exception);
             return false;
         }
     }
@@ -143,7 +143,6 @@ public sealed class TweaksAndThingsPlugin
         double milliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - start) * 1000d / System.Diagnostics.Stopwatch.Frequency;
         if (milliseconds < 50 || UnityEngine.Time.realtimeSinceStartup < nextSlowUpdateNotice[component]) return;
         nextSlowUpdateNotice[component] = UnityEngine.Time.realtimeSinceStartup + 30;
-        entry.Logger.Log($"Slow mod update: {name} took {milliseconds:F1} ms.");
         ModDiagnosticLog.Write("PERFORMANCE", $"{name} took {milliseconds:F1} ms.");
     }
 
@@ -154,6 +153,9 @@ public sealed class TweaksAndThingsPlugin
         try
         {
             long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            DoubleMainlineRuntime.Update();
+            DoubleMainlineCtc.UpdateTrainMarker(plugin.settings.AutoFollowTrainCtcMarker);
+            DoubleMainlineHudOverlay.Update(plugin.settings.ShowCtcHudOverlayButton);
             NpcSimulationSpeed.Update();
             if (StateManager.IsHost) NpcDailyTrafficPlans.Tick(plugin.settings, Game.TimeWeather.Now.TotalSeconds);
             ThroughTrafficSpawner.Tick(plugin.settings, deltaTime);
@@ -177,7 +179,7 @@ public sealed class TweaksAndThingsPlugin
     }
 
     private static int selectedTab;
-    private static readonly string[] Tabs = { "Caboose Mods", "UI", "Webhooks", "Crew Update", "Keybindings", "AI Traffic" };
+    private static readonly string[] Tabs = { "Caboose Mods", "UI", "Webhooks", "Crew Update", "Keybindings", "AI Traffic", "Experimental" };
     private static readonly string[] CrewLoadMethods = { "Tracks", "Daily" };
     private static readonly string[] FuelColumns = { "None", "Engine", "Crew", "Status" };
     private static string crewUpdateMessage = string.Empty;
@@ -208,6 +210,14 @@ public sealed class TweaksAndThingsPlugin
                 GUILayout.Label("AI traffic and interchange controls are in their own game window, opened with the leftmost AI button in the top-right toolbar.");
                 if (GUILayout.Button("Open AI traffic / interchanges")) NpcTrafficWindow.Show();
                 GUILayout.Label("Diagnostic log: " + ModDiagnosticLog.FilePath);
+                break;
+            case 6:
+                GUILayout.Label("EXTREMELY WIP — experimental second-mainline progressions");
+                GUILayout.Label("This feature can create broken, colliding, or invisible track and unfinished CTC signaling. It is disabled by default.");
+                settings.EnableExperimentalSecondMainlineProgressions = GUILayout.Toggle(
+                    settings.EnableExperimentalSecondMainlineProgressions,
+                    "Enable second-mainline progressions (EXTREMELY WIP)");
+                GUILayout.Label("Changing this setting takes effect after you save settings and reload the railroad.");
                 break;
         }
     }
@@ -331,6 +341,12 @@ public sealed class TweaksAndThingsPlugin
         settings.ShowWaypointSetNotifications = GUILayout.Toggle(settings.ShowWaypointSetNotifications, "Show WP SET notifications");
         settings.TrainBrakeDisplayShowsColorsInCalloutMode = GUILayout.Toggle(settings.TrainBrakeDisplayShowsColorsInCalloutMode, "Show train brake colors in callout mode");
         settings.DisableWaypointControls = GUILayout.Toggle(settings.DisableWaypointControls, "Disable waypoint controls");
+        settings.AutoFollowTrainCtcMarker = GUILayout.Toggle(
+            settings.AutoFollowTrainCtcMarker,
+            "Auto-follow train marker on CTC panel");
+        settings.ShowCtcHudOverlayButton = GUILayout.Toggle(
+            settings.ShowCtcHudOverlayButton,
+            "Show CTC panel HUD overlay button");
 
         GUILayout.Space(6f);
         GUILayout.Label("Fuel display in engine roster");

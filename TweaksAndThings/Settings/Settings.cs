@@ -87,6 +87,9 @@ public class Settings : UnityModManager.ModSettings
     public KeyBinding ClickAltBinding = new KeyBinding { keyCode = KeyCode.LeftAlt };
     public KeyBinding ClickControlBinding = new KeyBinding { keyCode = KeyCode.LeftControl };
     public KeyBinding ClickShiftBinding = new KeyBinding { keyCode = KeyCode.LeftShift };
+    public bool AutoFollowTrainCtcMarker;
+    public bool ShowCtcHudOverlayButton;
+    public bool EnableExperimentalSecondMainlineProgressions;
 
     internal void AddAnotherRow()
     {

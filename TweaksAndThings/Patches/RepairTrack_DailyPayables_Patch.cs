@@ -1,4 +1,4 @@
-﻿using Game;
+using Game;
 using Game.State;
 using HarmonyLib;
 using Model;
@@ -20,7 +20,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class RepairTrack_DailyPayables_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<RepairTrack_DailyPayables_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<RepairTrack_DailyPayables_Patch>();
     private static Serilog.ILogger ContextualLogger(RepairTrack __instance) =>
         _log.ForContext("RepairTrackIdentifier", __instance?.Identifier ?? "???")
         .ForContext("RepairTrackName", __instance?.name ?? "???")
@@ -63,7 +63,7 @@ internal class RepairTrack_DailyPayables_Patch
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class RepairTrack_NeedsRepair_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<RepairTrack_NeedsRepair_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<RepairTrack_NeedsRepair_Patch>();
     public static void Postfix(RepairTrack __instance, ref IEnumerable<Car> __result)
     {
         TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;

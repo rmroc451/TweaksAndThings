@@ -19,6 +19,7 @@ The expanded traffic and railroad-management features have dedicated Markdown gu
 | [Freight and industries](FREIGHT-AND-INDUSTRIES.md) | Held orders without duplicates, declining delivery premiums, delinquent pickup penalties, purchased coal pickups, pulpwood orders/fees and switch-list accounting. |
 | [Timetable and time controls](TIMETABLE-AND-TIME.md) | String charts, planned meets, current positions, forecasts, actual running/variance, protected daily schedules, dispatch-board markers and 2×/4×/8× simulation. |
 | [Player tools](PLAYER-TOOLS.md) | Expanded load/speed/status tags, compact inspector helpers, waybill summaries, first-waypoint selection, random consist generation, crew-hours migration and Bryson mirrored CTC controls. |
+| [Second mainline follow-up](SECOND-MAINLINE-FOLLOWUP.md) | Agreed route geometry, scenery, passing siding, crossings, progression, CTC behavior and in-game verification checklist for the code-generated second mainline. |
 | [Installation and releases](INSTALLATION-AND-RELEASES.md) | UMM installation/update checking, multiplayer authority, local assembly references, automatic ZIP output and publishing releases after 2.1.9. |
 | [Troubleshooting and bug reports](TROUBLESHOOTING.md) | Missing trains/cars, clearance holds, stalled transfers, pool restrictions, accounting problems, lag, UI/build errors and exactly which logs to attach. |
 

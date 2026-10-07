@@ -1,4 +1,4 @@
-﻿using Game;
+using Game;
 using Game.State;
 using HarmonyLib;
 using Model;
@@ -21,7 +21,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class ExpandedConsole_Add_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<ExpandedConsole_Add_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<ExpandedConsole_Add_Patch>();
     private static void Prefix(ref UI.Console.Console.Entry entry)
     {
         bool internalDiagnostic = entry.Text.StartsWith("[TweaksAndThings] ");
@@ -127,7 +127,7 @@ internal class ExpandedConsole_Add_Patch
         }
         catch (Exception ex)
         {
-            Log.Error(ex, ex.Message);
+            ModLog.Error(ex, ex.Message);
         }
     }
 

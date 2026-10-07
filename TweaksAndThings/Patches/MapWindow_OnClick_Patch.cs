@@ -31,7 +31,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class MapWindow_OnClick_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<MapWindow_OnClick_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<MapWindow_OnClick_Patch>();
     private static GameObject _prefabHolder;
     private static MapIcon _waypointPrefab;
     private static Dictionary<string, MapIcon> wps = new Dictionary<string, MapIcon>();

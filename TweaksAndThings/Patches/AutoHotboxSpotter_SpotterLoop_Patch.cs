@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using Model.AI;
 using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
@@ -11,7 +11,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class AutoHotboxSpotter_SpotterLoop_Patch
 {
-    private static ILogger _log => Log.ForContext<AutoHotboxSpotter_SpotterLoop_Patch>();
+    private static ILogger _log => ModLog.ForContext<AutoHotboxSpotter_SpotterLoop_Patch>();
 
     public static bool Prefix(AutoHotboxSpotter __instance, ref IEnumerator __result)
     {

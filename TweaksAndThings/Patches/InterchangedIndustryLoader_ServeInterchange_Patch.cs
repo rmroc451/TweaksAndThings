@@ -88,7 +88,7 @@ internal static class InterchangedIndustryLoader_ServeInterchange_Patch
                 }
                 catch (Exception exception)
                 {
-                    Log.ForContext(typeof(InterchangedIndustryLoader_ServeInterchange_Patch))
+                    ModLog.ForContext(typeof(InterchangedIndustryLoader_ServeInterchange_Patch))
                         .Warning(exception, "{Car} issue detecting interchange service waybill", car.DisplayName);
                     continue;
                 }
