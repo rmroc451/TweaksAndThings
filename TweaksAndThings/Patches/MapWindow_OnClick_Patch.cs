@@ -1,23 +1,32 @@
-﻿using HarmonyLib;
+using HarmonyLib;
+using Game.Notices;
+using Game.Messages;
+using Game.State;
 using Helpers;
 using Map.Runtime;
 using Model;
 using Model.AI;
-using Railloader;
+using Network;
+using Network.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Track;
+using Track.Search;
 using UI;
 using UI.EngineControls;
 using UI.Map;
 using UnityEngine;
 using UnityEngine.Pool;
 using UnityEngine.UI;
-using static UI.AutoEngineerDestinationPicker;
+using static UI.Waypoints.AutoEngineerDestinationPicker;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
+using Object = UnityEngine.Object;
+using UI.Waypoints;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -26,18 +35,31 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class MapWindow_OnClick_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<MapWindow_OnClick_Patch>();
+    private static readonly MethodInfo? loadImage = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")?
+        .GetMethod("LoadImage", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Texture2D), typeof(byte[]) }, null);
+    private readonly struct Hit
+    {
+        internal readonly Location Location;
+        internal readonly (Car car, Car.End end)? CarInfo;
+
+        internal Hit(Location location, (Car car, Car.End end)? carInfo)
+        {
+            Location = location;
+            CarInfo = carInfo;
+        }
+    }
+    private static Serilog.ILogger _log => ModLog.ForContext<MapWindow_OnClick_Patch>();
     private static GameObject _prefabHolder;
     private static MapIcon _waypointPrefab;
     private static Dictionary<string, MapIcon> wps = new Dictionary<string, MapIcon>();
 
     public static Sprite? LoadTexture(string fileName, string name)
     {
-        string path = Path.Combine(SingletonPluginBase<TweaksAndThingsPlugin>.Shared.ModDirectory, fileName);
+        string path = Path.Combine(TweaksAndThingsPlugin.Instance!.ModDirectory, fileName);
         Texture2D texture2D = new Texture2D(128, 128, TextureFormat.DXT5, mipChain: false);
         texture2D.name = name;
         texture2D.wrapMode = TextureWrapMode.Clamp;
-        if (!ImageConversion.LoadImage(texture2D, File.ReadAllBytes(path)))
+        if (!(loadImage?.Invoke(null, new object[] { texture2D, File.ReadAllBytes(path) }) is bool loaded) || !loaded)
         {
             _log.Debug($"Unable to load {name} icon!");
             return null;
@@ -93,36 +115,50 @@ internal class MapWindow_OnClick_Patch
 
     static bool Prefix(MapWindow __instance, Vector2 viewportNormalizedPoint)
     {
-        if (GameInput.IsControlDown && GameInput.IsAltDown)
+        if (HotkeyBindings.ControlDown && HotkeyBindings.AltDown)
         {
-            Ray ray = RayForViewportNormalizedPoint(__instance, viewportNormalizedPoint);
-            Vector3 gamePoint = MapManager.Instance.FindTerrainPointForXZ(WorldTransformer.WorldToGame(ray.origin));
             var selectedLoco = TrainController.Shared?.SelectedLocomotive;
-            if (selectedLoco != null)
+            if (selectedLoco == null) return true;
+            if (ThroughTrafficGuard.BlockInteraction(selectedLoco)) return false;
+
+            Ray ray = RayForViewportNormalizedPoint(__instance, viewportNormalizedPoint);
+            if (!MapManager.Instance.TryFindTerrainPointForXZ(WorldTransformer.WorldToGame(ray.origin), out Vector3 gamePoint)) return true;
+            Camera _camera = null;
+            if (MainCameraHelper.TryGetIfNeeded(ref _camera) &&
+                Graph.Shared.TryGetLocationFromGamePoint(gamePoint, 200f, out Location location))
             {
                 Hit? valueOrDefault = null;
-                Camera _camera = null;
-                if (MainCameraHelper.TryGetIfNeeded(ref _camera))
+                Hit? hit = HitLocation(location, selectedLoco);
+                if (hit.HasValue)
                 {
-                    float rad = 200f;
-                    if (Graph.Shared.TryGetLocationFromGamePoint(gamePoint, rad, out Location location))
-                    {
-                        Hit? hit = HitLocation(location, selectedLoco);
-                        if (hit.HasValue)
-                        {
-                            valueOrDefault = hit.GetValueOrDefault();
-                            location =  valueOrDefault.Value.Location;
-                        }
-                        var aeoh = new AutoEngineerOrdersHelper(persistence: new AutoEngineerPersistence(selectedLoco.KeyValueObject), locomotive: selectedLoco);
-                        var mw = (location: (Location)location, carId: valueOrDefault?.CarInfo?.car?.id ?? string.Empty);
-                        
-                        aeoh.SetWaypoint(mw.location, mw.carId);
-                        aeoh.SetOrdersValue(maybeWaypoint: mw);
-                        AutoEngineerDestinationPicker.Shared.Cancel();
-                    }
+                    valueOrDefault = hit.Value;
+                    location = valueOrDefault.Value.Location;
                 }
+
+                var start = selectedLoco.AutoEngineerPlanner.RouteStartLocation(out float momentum);
+                var length = AutoEngineerPlanner.CalculateTotalLength(selectedLoco.EnumerateCoupled().ToList());
+                bool routeFound = Graph.Shared.FindRoute(start, location, HeuristicCosts.AutoEngineer,
+                    null, out _, checkForCars: false, length, momentum);
+                bool safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco);
+                if (!FeaturePolicies.CanSetWaypointFromMap(routeFound, safetyFirst))
+                {
+                    if (safetyFirst)
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer, "Safety First, find yourself a caboose!", AlertLevel.Error);
+                    else
+                    {
+                        bool routeWithoutTrainLength = Graph.Shared.FindRoute(start, location, HeuristicCosts.AutoEngineer, null, out _);
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            routeWithoutTrainLength ? $"{selectedLoco.DisplayName} Train too long to navigate to waypoint." : $"{selectedLoco.DisplayName} Unable to find a path to waypoint.", AlertLevel.Error);
+                    }
+                    return false;
+                }
+
+                var aeoh = new AutoEngineerOrdersHelper(persistence: new AutoEngineerPersistence(selectedLoco.KeyValueObject), locomotive: selectedLoco);
+                var waypoint = new OrderWaypoint(Graph.LocationToString(location), valueOrDefault?.CarInfo?.car?.id ?? string.Empty);
+                aeoh.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: waypoint);
+                AutoEngineerDestinationPicker.Shared.Cancel();
+                return false;
             }
-            return false;
         }
         return true;
     }
@@ -132,7 +168,7 @@ internal class MapWindow_OnClick_Patch
 
     private static Hit? HitLocation(Location? location, BaseLocomotive selectedLoco)
     {
-        var _graph = TrainController.Shared.graph;
+        var _graph = TrainController.Shared.Graph;
         if (location.HasValue)
         {
             Location valueOrDefault = location.GetValueOrDefault();
@@ -140,13 +176,14 @@ internal class MapWindow_OnClick_Patch
             Vector3 position = _graph.GetPosition(valueOrDefault);
             float num = 2f;
             Hit? result = null;
+            var selectedConsist = PerformancePolicies.SnapshotSet(selectedLoco.EnumerateCoupled());
             HashSet<Car> value;
             using (CollectionPool<HashSet<Car>, Car>.Get(out value))
             {
                 shared.CheckForCarsAtPoint(position, 2f, value, valueOrDefault);
                 foreach (Car item in value)
                 {
-                    if (selectedLoco.EnumerateCoupled().ToHashSet().Contains(item))
+                    if (selectedConsist.Contains(item))
                     {
                         continue;
                     }

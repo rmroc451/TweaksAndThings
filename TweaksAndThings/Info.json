@@ -1,0 +1,9 @@
+{
+  "identifier": "rmroc451/tweaks-and-things",
+  "version": "__ASSEMBLY_VERSION__",
+  "name": "RMROC451's Tweaks and Things",
+  "assemblies": ["RMROC451.TweaksAndThings.dll"],
+  "dependencies": {
+    "required": ["rr/game >=0.6.0"]
+  }
+}

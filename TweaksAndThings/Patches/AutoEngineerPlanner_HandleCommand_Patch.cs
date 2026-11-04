@@ -1,4 +1,4 @@
-﻿using Game;
+using Game;
 using Game.Messages;
 using Game.Notices;
 using Game.State;
@@ -6,9 +6,10 @@ using HarmonyLib;
 using Model;
 using Model.AI;
 using Model.Definition;
+using Model.Ops;
+using Model.Ops.Timetable;
 using Network;
 using Network.Messages;
-using Railloader;
 using RMROC451.TweaksAndThings.Extensions;
 using Serilog;
 using System;
@@ -21,7 +22,6 @@ using UI.EngineControls;
 using UI.EngineRoster;
 using UnityEngine;
 using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
-using static UnityEngine.InputSystem.InputRemoting;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -30,12 +30,16 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class AutoEngineerPlanner_HandleCommand_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<AutoEngineerPlanner_HandleCommand_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<AutoEngineerPlanner_HandleCommand_Patch>();
     private static int governedSpeed = 20;
 
     static bool Prefix(AutoEngineerPlanner __instance, ref AutoEngineerCommand command, ref IPlayer sender)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        if (AeLocalService.CaptureSetupCommand(__instance._locomotive, command)) return false;
+        if (ThroughTrafficGuard.BlockInteraction(__instance._locomotive)) return false;
+        // Visiting railroads operate under their own rules; native track and signal limits still apply.
+        if (ThroughTrafficGuard.IsGenerated(__instance._locomotive)) return true;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         LocoNoticeWPSet(__instance, command, sender);
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.SafetyFirst() || (sender.IsRemote && !tweaksAndThings.SafetyFirstClientEnforce()) || command.MaxSpeedMph <= governedSpeed) return true;
         BaseLocomotive loco = __instance._locomotive;
@@ -69,6 +73,8 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
     private static void LocoNoticeWPSet(AutoEngineerPlanner __instance, AutoEngineerCommand command, IPlayer sender)
     {
+        if (!FeaturePolicies.ShouldShowWaypointSetNotification(TweaksAndThingsPlugin.Instance?.settings)) return;
+
         OrderWaypoint? wp =
                     string.IsNullOrEmpty(command.WaypointLocationString) ?
                     null :
@@ -103,7 +109,7 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
         }
         catch (Exception exception)
         {
-            Log.Error(exception, "Couldn't get location from waypoint: {locStr}", waypoint.LocationString);
+            ModLog.Error(exception, "Couldn't get location from waypoint: {locStr}", waypoint.LocationString);
             return false;
         }
     }
@@ -115,20 +121,20 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
 
         if (loco.EnumerateCoupled().All(c => c.IsCaboose() || c.MotivePower())) return false;
 
-        bool cabooseReq = SingletonPluginBase<TweaksAndThingsPlugin>.Shared.RequireConsistCabooseForOilerAndHotboxSpotter();
+        bool safetyFirstEnabled = TweaksAndThingsPlugin.Instance!.SafetyFirst();
         string logMessage = $"\n{nameof(SafetyFirstGoverningApplies)}:{Enum.GetName(typeof(AutoEngineerMode), OrdersHelper.Mode)}[{loco.DisplayName}] ";
         Func<bool> firstClass = () =>
         {
-            var output = TrainController.Shared.SelectedEngineExpress();
+            var output = loco.TryGetTimetableTrain(out Timetable.Train train) && train.TrainClass == Timetable.TrainClass.First;
             logMessage += $"\nfirst class {output}";
             return output;
         };
 
         Func<bool> FreightConsist = () =>
         {
-            bool output = !loco.EnumerateCoupled().ConsistNoFreight();
+            bool output = loco.EnumerateCoupled().ConsistFreight();
             logMessage += $"\nFreightConsist? {output}";
-            logMessage += " " + string.Join(" / ", loco.EnumerateCoupled().Where(c => !c.MotivePower()).Select(c => $"{c.id} {Enum.GetName(typeof(CarArchetype), c.Archetype)}"));
+            logMessage += " " + string.Join(" / ", loco.EnumerateCoupled().Where(c => !c.MotivePower()).Select(c => $"{c.id} {c.CarType.ToString()}"));
             return output;
         };
 
@@ -139,13 +145,14 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
             return output;
         };
 
-        logMessage += $"\nCaboose Required {cabooseReq}";
+        logMessage += $"\nSafety First Enabled {safetyFirstEnabled}";
 
-        bool output =
-            cabooseReq &&
-            !firstClass() &&
-            FreightConsist() &&
-            noCaboose();
+        bool output = FeaturePolicies.ShouldSafetyFirstGovern(
+            safetyFirstEnabled,
+            hasNonMotiveCars: loco.EnumerateCoupled().Any(c => !c.MotivePower()),
+            expressTrain: firstClass(),
+            allCarsFreight: FreightConsist(),
+            hasCaboose: !noCaboose());
 
         logMessage += $"\nGovern AE? {output}";
         if (_log.IsEnabled(Serilog.Events.LogEventLevel.Verbose))
@@ -156,4 +163,3 @@ internal class AutoEngineerPlanner_HandleCommand_Patch
         return output;
     }
 }
-

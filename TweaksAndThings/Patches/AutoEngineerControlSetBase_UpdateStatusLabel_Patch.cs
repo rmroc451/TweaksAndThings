@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using Railloader;
 using UI.Builder;
 using UI.EngineControls;
 
@@ -12,7 +11,7 @@ internal class AutoEngineerControlSetBase_UpdateStatusLabel_Patch
 {
     static void Postfix(AutoEngineerControlSetBase __instance)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled() || !AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(__instance.Locomotive)) return;
 
         string orig = __instance.statusLabel.text;

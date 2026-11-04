@@ -1,10 +1,10 @@
-﻿using Game;
+using Game.History;
+using Game;
 using Game.State;
 using HarmonyLib;
 using Model;
 using Model.Ops;
 using Network;
-using Railloader;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -21,7 +21,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class RepairTrack_DailyPayables_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<RepairTrack_DailyPayables_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<RepairTrack_DailyPayables_Patch>();
     private static Serilog.ILogger ContextualLogger(RepairTrack __instance) =>
         _log.ForContext("RepairTrackIdentifier", __instance?.Identifier ?? "???")
         .ForContext("RepairTrackName", __instance?.name ?? "???")
@@ -29,7 +29,7 @@ internal class RepairTrack_DailyPayables_Patch
 
     public static bool Prefix(RepairTrack __instance, GameDateTime now, IIndustryContext ctx)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled() || !tweaksAndThings.ServiceFundPenalties()) return true;
 
 
@@ -45,7 +45,7 @@ internal class RepairTrack_DailyPayables_Patch
         {
             int num = Mathf.CeilToInt(rateState.PayDue);
             rateState.PaidCurrent = shared.CanAfford(num);
-            int penalty = Mathf.CeilToInt(!rateState.PaidCurrent ? num * 0.2f : 0);
+            int penalty = FeaturePolicies.CalculateServicingOverdraftFee(num, rateState.PaidCurrent);
             Multiplayer.Broadcast($"{Hyperlink.To(__instance.Industry)}: Paid {num:C0} wages for shop crew${(penalty > 0 ? $"; Overdraft fee of {penalty:C0}" : ".")}");
 
             __instance.Industry.ApplyToBalance(-num, Ledger.Category.WagesRepair, null, 0, quiet: true);
@@ -64,10 +64,10 @@ internal class RepairTrack_DailyPayables_Patch
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class RepairTrack_NeedsRepair_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<RepairTrack_NeedsRepair_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<RepairTrack_NeedsRepair_Patch>();
     public static void Postfix(RepairTrack __instance, ref IEnumerable<Car> __result)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return;
 
         __result = EnumerateCarsActualPatched(__result);
@@ -78,8 +78,8 @@ internal class RepairTrack_NeedsRepair_Patch
 
     internal static bool NeedsRepairPatched(Car car)
     {
-        bool result = TryGetRepairDestination(car, out var overrideTag);
-        return result;
+        bool hasRepairWorkOrder = TryGetRepairDestination(car, out var overrideTag);
+        return FeaturePolicies.IsRepairEligible(hasRepairWorkOrder, TweaksAndThingsPlugin.Instance?.settings);
     }
 }
 
@@ -90,7 +90,7 @@ internal class RepairTrack_BuildCars_Patch
 {
     public static bool Prefix(RepairTrack __instance, UIPanelBuilder builder)
     {
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
 
         BuildCarsPatched(__instance, builder);
@@ -101,7 +101,7 @@ internal class RepairTrack_BuildCars_Patch
     public static IEnumerable<Car> EnumerateCarsActualOrig(RepairTrack __instance, IIndustryContext ctx)
     {
         TrainController trainController = TrainController.Shared;
-        return from car in __instance.EnumerateCars(ctx)
+        return from car in __instance.EnumerateCars(ctx, IndustryComponent.CarFilter.CarTypeMatches)
                select trainController.CarForId(car.Id);
     }
 
@@ -164,6 +164,6 @@ internal class RepairTrack_BuildCars_Patch
                     });
                 }
             }
-        }).Padding(new RectOffset(20, 0, 0, 0));
+        });
     }
 }

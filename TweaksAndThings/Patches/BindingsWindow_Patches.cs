@@ -1,5 +1,4 @@
 ﻿using HarmonyLib;
-using Railloader;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -18,7 +17,7 @@ internal class BindingsWindow_Build_Patch
     public static bool Prefix(BindingsWindow __instance, UIPanelBuilder builder)
     {
         return true;
-        //TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        //TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         //if (!tweaksAndThings.IsEnabled) return true;
 
         //(string title, InputAction[] actions)[] rebindableActions = BindingsWindow.RebindableActions;

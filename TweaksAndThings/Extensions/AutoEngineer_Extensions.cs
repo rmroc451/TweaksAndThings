@@ -1,4 +1,5 @@
 ﻿using Game.Messages;
+using Game.State;
 using Model.AI;
 using Network;
 using System;
@@ -56,8 +57,6 @@ namespace RMROC451.TweaksAndThings.Extensions
                             car.OffsetOiled(num2);
                             float num3 = num2 * AutoOiler.TimeToFullyOil.CabooseHalvedFloat(foundCaboose);
                             num += num3;
-                            oiler._pendingRunDuration += num3;
-                            oiler._oiledCount++;
                             _log.Debug("AutoOiler {name}: oiled {car} from {orig} => {new}", oiler.name, car, origOil, car.Oiled);
                         }
                         if (car.HasHotbox && car.Oiled == 1f && cabooseRequired && foundCaboose)
@@ -67,14 +66,12 @@ namespace RMROC451.TweaksAndThings.Extensions
                             car.SendPropertyChange(PropertyChange.Control.Hotbox, false);
                         }
                         num += adjustedTimeToWalk;
-                        oiler._pendingRunDuration += adjustedTimeToWalk;
                         yield return new WaitForSeconds(num);
                     }
                     carIndex = oiler.NextIndex(carIndex);
                 }
                 while (oiler.InBounds(carIndex));
                 oiler._reverse = !oiler._reverse;
-                oiler.PayWages();
             }
         }
 

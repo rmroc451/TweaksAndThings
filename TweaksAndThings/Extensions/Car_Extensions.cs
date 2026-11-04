@@ -1,4 +1,4 @@
-﻿using Game.Messages;
+using Game.Messages;
 using Game.State;
 using Helpers;
 using Model;
@@ -6,7 +6,6 @@ using Model.Definition;
 using Model.Definition.Data;
 using Model.Ops;
 using Model.Ops.Timetable;
-using Railloader;
 using RMROC451.TweaksAndThings.Patches;
 using Serilog;
 using System;
@@ -43,19 +42,19 @@ public static class Car_Extensions
     {
         if (engine == null) return null;
         Car? car;
-        if (engine is SteamLocomotive steamLocomotive && new Func<Car>(steamLocomotive.FuelCar) != null)
+        if (engine is SteamLocomotive steamLocomotive)
         {
             car = steamLocomotive.FuelCar();
         }
         else
         {
             car = engine is DieselLocomotive ? engine : null;
-            if (returnEngineIfNull && car == null) car = engine;
         }
+        if (returnEngineIfNull && car == null) car = engine;
         return car;
     }
 
-    public static bool MotivePower(this Car car) => car is BaseLocomotive || car.Archetype == Model.Definition.CarArchetype.Tender;
+    public static bool MotivePower(this Car car) => car is BaseLocomotive || car.CarType.IsTender;
 
     /// <summary>
     /// For every car in the consist, cost 1 minute of AI Engineer time.
@@ -64,7 +63,7 @@ public static class Car_Extensions
     public static int CalculateCostForAutoEngineerEndGearSetting(this IEnumerable<Car> consist) =>
         consist.Count() * 60;
 
-    public static bool IsCaboose(this Car car) => car.Archetype == Model.Definition.CarArchetype.Caboose;
+    public static bool IsCaboose(this Car car) => car.CarType.IsCaboose;
 
     public static Car? CarCaboose(this Car car) => car.IsCaboose() ? car : null;
 
@@ -84,16 +83,13 @@ public static class Car_Extensions
         .Where(c => !c.MotivePower())
         .All(c => c.MrocIsFreight());
 
-    public static bool MrocIsFreight(this Car c) =>
-        c.Archetype.IsFreight() || c.Archetype switch
+    public static bool MrocIsFreight(this Car c)
     {
-            CarArchetype.LocomotiveDiesel => false,
-            CarArchetype.LocomotiveSteam => false,
-            CarArchetype.Coach => false,
-            CarArchetype.Baggage => false,
-            _ => true
-        };
+        bool isFreight = c.CarType.IsFreight;
+        bool isLocoCoachBag = c.CarType.IsLocomotive || c.CarType.IsCoach || c.CarType.IsBaggage;
 
+        return isFreight || !isLocoCoachBag;
+    }
 
     public static bool SelectedEngineExpress(this TrainController input) =>
         input.SelectedLocomotive.TryGetTimetableTrain(out Timetable.Train t) && 
@@ -107,13 +103,15 @@ public static class Car_Extensions
 
     private static Car? FindMyCaboose(this Car car, float timeNeeded, bool decrement = false, bool requireLoad = true) =>
         (
-            car.CarCaboose() ?? car.CarsNearCurrentCar(timeNeeded, decrement).FindNearestCabooseFromNearbyCars()
+            (car.CarCaboose() is Car coupledCaboose && !NpcServiceCaboose.IsServiceCar(coupledCaboose) ? coupledCaboose : null) ??
+            car.CarsNearCurrentCar(timeNeeded, decrement).Where(p => !NpcServiceCaboose.IsServiceCar(p.car)).FindNearestCabooseFromNearbyCars()
         )?.CabooseWithSufficientCrewHours(timeNeeded: timeNeeded, requireLoad:requireLoad, decrement: decrement);
 
     public static Car? CabooseWithSufficientCrewHours(this Car car, float timeNeeded, bool requireLoad, bool decrement = false)
     {
         Car? output = null;
         if (car is null || !car.IsCaboose()) return null;
+        if (NpcServiceCaboose.IsServiceCar(car)) return null;
         if (!requireLoad) return car;
 
         List<LoadSlot> loadSlots = car.Definition.LoadSlots;
@@ -148,7 +146,7 @@ public static class Car_Extensions
             .Union(car.EnumerateCoupled())
             .Where(c => c.IsCaboose());
 
-        if (cabeese?.Any() ?? false) Log.Debug($"{nameof(CarsNearCurrentCar)}[{car.DisplayName}] => {cabeese.Count()}");
+        if (cabeese?.Any() ?? false) ModLog.Debug($"{nameof(CarsNearCurrentCar)}[{car.DisplayName}] => {cabeese.Count()}");
 
         List<(Car car, bool crewCar, float distance)> source =
             cabeese.Select(c => (car: c, crewCar: c.IsCrewCar(), distance: car.Distance(c))).ToList();

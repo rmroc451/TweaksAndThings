@@ -1,11 +1,15 @@
-﻿using Core;
+using Core;
 using Game.Messages;
+using Game.Notices;
 using Game.State;
 using HarmonyLib;
 using KeyValue.Runtime;
 using Model;
+using Model.Definition;
+using Model.Definition.Data;
+using Model.Ops;
 using Network;
-using Railloader;
+using Network.Messages;
 using RMROC451.TweaksAndThings.Enums;
 using RMROC451.TweaksAndThings.Extensions;
 using RollingStock;
@@ -17,7 +21,9 @@ using UI;
 using UI.Builder;
 using UI.CarInspector;
 using UI.ContextMenu;
+using ContextMenu = UI.ContextMenu.ContextMenu;
 using UI.Tags;
+using UnityEngine;
 using static Model.Car;
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -27,7 +33,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class CarInspector_PopulateCarPanel_Patch
 {
-    private static ILogger _log => Log.ForContext<CarInspector_PopulateCarPanel_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<CarInspector_PopulateCarPanel_Patch>();
     internal static IEnumerable<LogicalEnd> ends = Enum.GetValues(typeof(LogicalEnd)).Cast<LogicalEnd>();
 
     /// <summary>
@@ -39,11 +45,12 @@ internal class CarInspector_PopulateCarPanel_Patch
 	private static bool Prefix(CarInspector __instance, UIPanelBuilder builder)
     {
 
-        TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+        TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         if (!tweaksAndThings.IsEnabled()) return true;
         bool buttonsHaveCost = tweaksAndThings.EndGearHelpersRequirePayment();
 
-        var consist = __instance._car.EnumerateCoupled();
+        var consist = __instance._car.EnumerateCoupled().ToList();
+        if (__instance._car.IsCaboose()) SynchronizeCabooseTrainCrew(consist);
 
         builder.HStack(delegate (UIPanelBuilder hstack)
         {
@@ -53,7 +60,7 @@ internal class CarInspector_PopulateCarPanel_Patch
             {
                 MrocConsistHelper(__instance._car, MrocHelperType.Handbrake, buttonsHaveCost);
                 hstack.Rebuild();
-            }).Tooltip(buttonName, $"Iterates over cars in this consist and {(consist.Any(c => c.HandbrakeApplied()) ? "releases" : "sets")} {TextSprites.HandbrakeWheel}.");
+            }).Width(120f).Height(24f).Tooltip(buttonName, $"Iterates over cars in this consist and {(consist.Any(c => c.HandbrakeApplied()) ? "releases" : "sets")} {TextSprites.HandbrakeWheel}.");
 
             if (consist.Any(c => c.EndAirSystemIssue()))
             {
@@ -61,14 +68,38 @@ internal class CarInspector_PopulateCarPanel_Patch
                 {
                     MrocConsistHelper(__instance._car, MrocHelperType.GladhandAndAnglecock, buttonsHaveCost);
                     hstack.Rebuild();
-                }).Tooltip("Connect Consist Air", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
+                }).Width(120f).Height(24f).Tooltip("Connect Consist Air", "Iterates over each car in this consist and connects gladhands and opens anglecocks.");
             }
 
-            hstack.AddButtonCompact("Bleed Consist", delegate
+        });
+        builder.HStack(delegate (UIPanelBuilder hstack)
+        {
+            hstack = AddCarConsistRebuildObservers(hstack, consist);
+            hstack.AddButtonCompact("Bleed Air", delegate
             {
                 MrocConsistHelper(__instance._car, MrocHelperType.BleedAirSystem, buttonsHaveCost);
                 hstack.Rebuild();
-            }).Tooltip("Bleed Air Lines", "Iterates over each car in this consist and bleeds the air out of the lines.");
+            }).Width(120f).Height(24f).Tooltip("Bleed Air Lines", "Iterates over each car in this consist and bleeds the air out of the lines.");
+
+            if (consist.Any(SwitchListAccess.IsEligible))
+            {
+                hstack.AddButtonCompact("To Switch List", delegate
+                {
+                    var trainCrew = StateManager.Shared.PlayersManager.MyTrainCrew;
+                    if (trainCrew == null)
+                    {
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            "Join a Train Crew to add cars to your switch list.", AlertLevel.Error);
+                    }
+                    else if (SwitchListAccess.TryAddConsist(__instance._car, out int addedCount))
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            StateManager.IsHost ? $"Verified {addedCount.Pluralize("car")} added to the current switch list." : $"Requested {addedCount.Pluralize("car")} for the current switch list; waiting for host update.", AlertLevel.Info);
+                    else
+                        Multiplayer.SendError(StateManager.Shared.PlayersManager.LocalPlayer,
+                            "Could not confirm the switch-list update. Join a train crew and check the console diagnostics.", AlertLevel.Info);
+                    hstack.Rebuild();
+                }).Width(120f).Height(24f).Tooltip("Add Consist to Switch List", "Adds the cars in this consist, even when no locomotive is attached, to the current switch list.");
+            }
         });
 
         CabooseUiEnhancer(__instance, builder, consist, tweaksAndThings);
@@ -85,22 +116,55 @@ internal class CarInspector_PopulateCarPanel_Patch
                 hstack = AddCarConsistRebuildObservers(hstack, consist, all: false);
                 hstack.AddField("Consist Info", hstack.HStack(delegate (UIPanelBuilder field)
                 {
-                    int consistLength = consist.Count();
-                    int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(consist);
-                    int lengthInMeters = UnityEngine.Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(consist.ToList()) * 3.28084f);
-                    var newSubTitle = () => string.Format("{0}, {1:N0}T, {2:N0}ft, {3:N0} mph", consistLength.Pluralize("car"), tonnage, lengthInMeters, __instance._car.VelocityMphAbs);
-
-                    field.AddLabel(() => newSubTitle(), UIPanelBuilder.Frequency.Fast)
+                    field.AddLabel(() =>
+                    {
+                        var currentConsist = __instance._car.EnumerateCoupled().ToList();
+                        int tonnage = LocomotiveControlsHoverArea.CalculateTonnage(currentConsist);
+                        int feet = Mathf.CeilToInt(LocomotiveControlsHoverArea.CalculateLengthInMeters(currentConsist) * 3.28084f);
+                        return string.Format("{0}, {1:N0}T, {2:N0}ft, {3:N0} mph", currentConsist.Count.Pluralize("car"), tonnage, feet, __instance._car.VelocityMphAbs);
+                    }, UIPanelBuilder.Frequency.Fast)
                     .Tooltip("Consist Info", "Reflects info about consist.").FlexibleWidth();
                 }));
             });
         }
+
+        if (!plugin.CabooseAllowsConsistInfo() || !__instance._car.IsCaboose()) return;
+
+        var consistCars = consist.ToList();
+        builder.HStack(delegate (UIPanelBuilder hstack)
+        {
+            hstack = AddCarConsistRebuildObservers(hstack, consistCars, all: false);
+            hstack.AddButtonCompact("Waybill summary", () => WaybillSummaryWindow.Show(__instance._car))
+                .Width(130).Height(24)
+                .Tooltip("Waybill / switch list summary", "Open car counts, loaded/empty counts, tonnage and length grouped by destination and current location. Includes a tab for your crew's switch list.");
+        });
+    }
+
+    private static void SynchronizeCabooseTrainCrew(IEnumerable<Car> consist)
+    {
+        var caboose = consist.FirstOrDefault(car => car.IsCaboose());
+        if (caboose == null) return;
+
+        // A caboose normally trails the consist. Walk forward from it and use
+        // the foremost crew-assigned locomotive as the train's symbol source.
+        var forwardLocomotive = caboose.EnumerateCoupled(Car.End.F)
+            .OfType<BaseLocomotive>()
+            .LastOrDefault(locomotive => !string.IsNullOrWhiteSpace(locomotive.trainCrewId));
+        var reverseLocomotive = forwardLocomotive == null
+            ? caboose.EnumerateCoupled(Car.End.R)
+                .OfType<BaseLocomotive>()
+                .LastOrDefault(locomotive => !string.IsNullOrWhiteSpace(locomotive.trainCrewId))
+            : null;
+        var leadLocomotive = forwardLocomotive ?? reverseLocomotive;
+        if (leadLocomotive == null || caboose.trainCrewId == leadLocomotive.trainCrewId) return;
+
+        StateManager.ApplyLocal(new SetCarTrainCrew(caboose.id, leadLocomotive.trainCrewId));
     }
 
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist, bool all = true)
     {
         TagController tagController = UnityEngine.Object.FindFirstObjectByType<TagController>();
-        foreach (Model.Car car in consist.Where(c => c.Archetype != Model.Definition.CarArchetype.Tender))
+        foreach (Model.Car car in consist.Where(c => !c.CarType.IsTender))
         {
             builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), tagController);
             foreach (LogicalEnd logicalEnd in ends)
@@ -124,6 +188,8 @@ internal class CarInspector_PopulateCarPanel_Patch
                     try
                     {
                         builder.Rebuild();
+                        if (key.IndexOf(nameof(EndGearStateKey.IsCoupled), StringComparison.OrdinalIgnoreCase) >= 0)
+                            SynchronizeCabooseTrainCrew(car.EnumerateCoupled());
                         if (car.TagCallout != null) tagController.UpdateTags(CameraSelector.shared._currentCamera.GroundPosition, true);
                         if (ContextMenu.IsShown && ContextMenu.Shared.centerLabel.text == car.DisplayName) CarPickable.HandleShowContextMenu(car);
                     }
@@ -167,7 +233,7 @@ internal class CarInspector_PopulateCarPanel_Patch
                 }
                 else
                 {
-                    consist = consist.Where(c => c is not BaseLocomotive && c.Archetype != Model.Definition.CarArchetype.Tender);
+                    consist = consist.Where(c => c is not BaseLocomotive && !c.CarType.IsTender);
                     //when ApplyHandbrakesAsNeeded is called, and the consist contains an engine, it stops applying brakes.
                     tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
                 }

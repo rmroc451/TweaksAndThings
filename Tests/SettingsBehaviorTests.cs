@@ -1,0 +1,387 @@
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using RMROC451.TweaksAndThings;
+using RMROC451.TweaksAndThings.Patches;
+using UnityEngine;
+
+namespace RMROC451.TweaksAndThings.Tests;
+
+[TestFixture]
+public sealed class SettingsBehaviorTests
+{
+    [SetUp]
+    public void ResetSwitchList()
+    {
+        UI.SwitchList.SwitchListPanel.Shared = null;
+        Game.State.StateManager.IsHost = true;
+        Game.State.StateManager.AcceptSwitchListUpdates = true;
+    }
+
+    [Test]
+    public void SwitchListAccess_DoesNotClaimSuccessWhenHostUpdateFails()
+    {
+        Game.State.StateManager.AcceptSwitchListUpdates = false;
+        Assert.That(SwitchListAccess.TryAddCars(new[] { new Model.Car { id = "unconfirmed" } }, out var count), Is.False);
+        Assert.That(count, Is.Zero);
+    }
+
+    [Test]
+    public void SwitchListAccess_IncludesLocomotiveAndTenderWithRepairBills()
+    {
+        var loco = new Model.Car { id = "repair-loco", IsMotivePower = true, HasRepairBill = true };
+        var tender = new Model.Car { id = "repair-tender", CarType = Model.CarType.Tender, HasRepairBill = true };
+        loco.Consist = new[] { loco, tender };
+        Assert.That(SwitchListAccess.TryAddConsist(loco, out var count), Is.True);
+        Assert.That(count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void SanitizeEmptySettings_NullList_ReturnsOneEditableBlankRow()
+    {
+        var result = SettingsExtensions.SanitizeEmptySettings(null);
+
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0].WebhookUrl, Is.Empty);
+        Assert.That(result[0].RailroadMark, Is.Empty);
+        Assert.That(result[0].WebhookEnabled, Is.False);
+    }
+
+    [Test]
+    public void SanitizeEmptySettings_KeepsConfiguredRowsInOrderAndAppendsBlankRow()
+    {
+        var first = new WebhookSettings(true, "ABC", "https://example.test/one");
+        var second = new WebhookSettings(false, "XYZ", "https://example.test/two");
+        var result = SettingsExtensions.SanitizeEmptySettings(
+            new[] { first, new WebhookSettings(), second });
+
+        Assert.That(result, Has.Count.EqualTo(3));
+        Assert.That(result[0], Is.SameAs(first));
+        Assert.That(result[1], Is.SameAs(second));
+        Assert.That(result[2].WebhookUrl, Is.Empty);
+    }
+
+    [Test]
+    public void AddAnotherRow_AddsBlankOnlyWhenEveryExistingUrlIsFilled()
+    {
+        var settings = new Settings
+        {
+            WebhookSettingsList = new List<WebhookSettings>
+            {
+                new(true, "ABC", "https://example.test/one"),
+                new(false, "XYZ", "https://example.test/two")
+            }
+        };
+
+        settings.AddAnotherRow();
+
+        Assert.That(settings.WebhookSettingsList, Has.Count.EqualTo(3));
+        Assert.That(settings.WebhookSettingsList![2].WebhookUrl, Is.Empty);
+    }
+
+    [Test]
+    public void AddAnotherRow_DoesNotAddDuplicateBlankRow()
+    {
+        var settings = new Settings
+        {
+            WebhookSettingsList = new List<WebhookSettings>
+            {
+                new(true, "ABC", "https://example.test/one"),
+                new()
+            }
+        };
+
+        settings.AddAnotherRow();
+
+        Assert.That(settings.WebhookSettingsList, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void DefaultSettings_ContainOneBlankWebhookAndRosterFuelOptions()
+    {
+        var settings = new Settings();
+
+        Assert.That(settings.WebhookSettingsList, Has.Count.EqualTo(1));
+        Assert.That(settings.WebhookSettingsList!.Single().WebhookUrl, Is.Empty);
+        Assert.That(settings.EngineRosterFuelColumnSettings, Is.Not.Null);
+    }
+
+    [Test]
+    public void DefaultHotkeyBindings_PreserveOriginalAltControlAndShiftModifiers()
+    {
+        var settings = new Settings();
+
+        Assert.That(settings.ClickAltBinding.keyCode, Is.EqualTo(KeyCode.LeftAlt));
+        Assert.That(settings.ClickControlBinding.keyCode, Is.EqualTo(KeyCode.LeftControl));
+        Assert.That(settings.ClickShiftBinding.keyCode, Is.EqualTo(KeyCode.LeftShift));
+    }
+
+    [Test]
+    public void DefaultSettings_AllowRepairWithoutWorkOrderLikeStockRailroader()
+    {
+        var settings = new Settings();
+
+        Assert.That(settings.AllowRepairsWithoutWaybill, Is.True);
+    }
+
+    [Test]
+    public void DefaultSettings_ShowWaypointSetNotifications()
+    {
+        Assert.That(new Settings().ShowWaypointSetNotifications, Is.True);
+    }
+
+    [Test]
+    public void DefaultSettings_UseTheThroughTrafficSymbolConventionAndGracePeriod()
+    {
+        var settings = new Settings();
+
+        Assert.That(settings.ThroughTrafficEnabled, Is.True);
+        Assert.That(settings.ThroughTrafficTrainSymbolPrefix, Is.EqualTo("Z-"));
+        Assert.That(settings.ThroughTrafficOnTimeGraceMinutes, Is.EqualTo(5));
+        Assert.That(settings.ThroughTrafficDollarsPerPassenger, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void RepairPolicy_AllowsWorkOrderCarsRegardlessOfSetting()
+    {
+        var settings = new Settings { AllowRepairsWithoutWaybill = false };
+
+        Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: true, settings), Is.True);
+    }
+
+    [Test]
+    public void RepairPolicy_AllowsUnwaybilledCarsByDefault()
+    {
+        Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: false, new Settings()), Is.True);
+    }
+
+    [Test]
+    public void RepairPolicy_CanRequireWorkOrderForRepair()
+    {
+        var settings = new Settings { AllowRepairsWithoutWaybill = false };
+
+        Assert.That(FeaturePolicies.IsRepairEligible(hasRepairWorkOrder: false, settings), Is.False);
+    }
+
+    [Test]
+    public void WaypointSetNotificationPolicy_CanHideNotifications()
+    {
+        Assert.That(FeaturePolicies.ShouldShowWaypointSetNotification(new Settings()), Is.True);
+        Assert.That(FeaturePolicies.ShouldShowWaypointSetNotification(
+            new Settings { ShowWaypointSetNotifications = false }), Is.False);
+    }
+
+    [Test]
+    public void SwitchListAccess_SendsNativeCommandForCurrentCrew()
+    {
+        SwitchListTestController.Shared.AddedIds.Clear();
+        var cars = new[] { new Model.Car { id = "A" }, new Model.Car { id = "B" } };
+
+        var succeeded = SwitchListAccess.TryAddCars(cars, out var addedCount);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(addedCount, Is.EqualTo(2));
+        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+        Assert.That(Game.State.StateManager.LastMessage!.TrainCrewId, Is.EqualTo("crew"));
+        Assert.That(Game.State.StateManager.LastMessage.On, Is.True);
+    }
+
+    [Test]
+    public void SwitchListAccess_WithoutCrewDoesNotSendCommand()
+    {
+        var manager = Game.State.StateManager.Shared.PlayersManager;
+        var original = manager.MyTrainCrew;
+        manager.MyTrainCrew = null;
+        Game.State.StateManager.LastMessage = null;
+        try
+        {
+            Assert.That(SwitchListAccess.TryAddCars(new[] { new Model.Car { id = "A" } }, out int count), Is.False);
+            Assert.That(count, Is.Zero);
+            Assert.That(Game.State.StateManager.LastMessage, Is.Null);
+        }
+        finally { manager.MyTrainCrew = original; }
+    }
+
+    [Test]
+    public void SwitchListAccess_PreservesExistingListAndSkipsAlreadyListedCars()
+    {
+        var panel = new UI.SwitchList.SwitchListPanel();
+        panel.Ids.Add("A");
+        UI.SwitchList.SwitchListPanel.Shared = panel;
+        try
+        {
+            Assert.That(SwitchListAccess.TryAddCars(new[] { new Model.Car { id = "A" }, new Model.Car { id = "B" } }, out int count), Is.True);
+            Assert.That(count, Is.EqualTo(1));
+            Assert.That(Game.State.StateManager.LastMessage!.CarIds, Is.EqualTo(new[] { "B" }));
+            Assert.That(panel.Ids, Does.Contain("A"));
+        }
+        finally { UI.SwitchList.SwitchListPanel.Shared = null; }
+    }
+
+    [Test]
+    public void SwitchListAccess_AddsRollingStockAndSkipsLocomotivesAndTenders()
+    {
+        SwitchListTestController.Shared.AddedIds.Clear();
+        var locomotive = new Model.Car { id = "LOCO", IsMotivePower = true };
+        var tender = new Model.Car { id = "TENDER", CarType = Model.CarType.Tender };
+        var firstCar = new Model.Car { id = "A" };
+        var duplicate = new Model.Car { id = "A" };
+        locomotive.Consist = new[] { locomotive, tender, firstCar, duplicate };
+
+        var succeeded = SwitchListAccess.TryAddConsist(locomotive, out var addedCount);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(addedCount, Is.EqualTo(1));
+        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A" }));
+    }
+
+    [Test]
+    public void SwitchListAccess_AddsCarsWhenSelectedConsistHasNoLocomotive()
+    {
+        SwitchListTestController.Shared.AddedIds.Clear();
+        var firstCar = new Model.Car { id = "A" };
+        var secondCar = new Model.Car { id = "B" };
+        firstCar.Consist = new[] { firstCar, secondCar };
+
+        var succeeded = SwitchListAccess.TryAddConsist(firstCar, out var addedCount);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(addedCount, Is.EqualTo(2));
+        Assert.That(SwitchListTestController.Shared.AddedIds, Is.EqualTo(new[] { "A", "B" }));
+    }
+
+    [Test]
+    public void HotkeyBindings_KeepModifierCombinationsComposable()
+    {
+        Input.SetKey(KeyCode.LeftControl, true);
+        Input.SetKey(KeyCode.LeftAlt, true);
+        Input.SetKey(KeyCode.LeftShift, false);
+        try
+        {
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.LeftAlt }), Is.True);
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.LeftControl }), Is.True);
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.LeftShift }), Is.False);
+        }
+        finally
+        {
+            Input.SetKey(KeyCode.LeftControl, false);
+            Input.SetKey(KeyCode.LeftAlt, false);
+            Input.SetKey(KeyCode.LeftShift, false);
+            Input.SetKey(KeyCode.A, false);
+        }
+    }
+
+    [Test]
+    public void HotkeyBindings_SupportsRemappingAnActionToAnotherKey()
+    {
+        Input.SetKey(KeyCode.A, true);
+        try
+        {
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.A }), Is.True);
+        }
+        finally
+        {
+            Input.SetKey(KeyCode.A, false);
+        }
+    }
+
+    [Test]
+    public void HotkeyBindings_RequiresConfiguredModifiers()
+    {
+        var binding = new HotkeyBinding { keyCode = KeyCode.A, modifiers = 1 };
+        Input.SetKey(KeyCode.A, true);
+        Input.SetKey(KeyCode.LeftControl, false);
+        try
+        {
+            Assert.That(HotkeyBindings.IsHeld(binding), Is.False);
+            Input.SetKey(KeyCode.LeftControl, true);
+            Assert.That(HotkeyBindings.IsHeld(binding), Is.True);
+        }
+        finally
+        {
+            Input.SetKey(KeyCode.A, false);
+            Input.SetKey(KeyCode.LeftControl, false);
+        }
+    }
+}
+
+internal sealed class SwitchListTestController
+{
+    public static readonly SwitchListTestController Shared = new();
+    public readonly List<string> AddedIds = new();
+    public void AddCar(Model.Car car) => AddedIds.Add(car.id);
+    [Test]
+    public void WaypointDestinationCache_IsInvalidatedWhenSelectedLocomotiveChanges()
+    {
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive("loco-a", "loco-a"), Is.False);
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive("loco-a", "loco-b"), Is.True);
+        Assert.That(FeaturePolicies.IsWaypointCacheForDifferentLocomotive(null, "loco-a"), Is.True);
+    }
+    [TestCase(true, "destination", "Mill", true)]
+    [TestCase(false, "destination", "Mill", false)]
+    [TestCase(true, "", "Mill", false)]
+    [TestCase(true, "destination", " ", false)]
+    public void WaypointDestinationPolicy_OnlyExposesResolvedNamedDestinations(
+        bool locationResolved, string destinationId, string destinationName, bool expected)
+    {
+        Assert.That(FeaturePolicies.IsWaypointDestinationSelectable(locationResolved, destinationId, destinationName), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, false, true, true)]
+    [TestCase(true, true, true, false)]
+    [TestCase(false, false, true, false)]
+    [TestCase(true, false, false, false)]
+    public void WaypointPicker_OnlyAcceptsClickedNonCancelledNewLocation(
+        bool clicked, bool escaped, bool locationChanged, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldAcceptWaypointPickerHit(clicked, escaped, locationChanged), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, false, true)]
+    [TestCase(false, false, false)]
+    [TestCase(true, true, false)]
+    public void MapWaypointPolicy_RequiresRouteAndSafetyClearance(bool routeFound, bool safetyFirst, bool expected)
+    {
+        Assert.That(FeaturePolicies.CanSetWaypointFromMap(routeFound, safetyFirst), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, false, true, false, true)]
+    [TestCase(false, true, false, true, false, false)]
+    [TestCase(true, false, false, true, false, false)]
+    [TestCase(true, true, true, true, false, false)]
+    [TestCase(true, true, false, false, false, false)]
+    [TestCase(true, true, false, true, true, false)]
+    public void SafetyFirstPolicy_GovernsOnlyEnabledNonExpressAllFreightWithoutCaboose(
+        bool enabled, bool hasCars, bool express, bool freight, bool caboose, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldSafetyFirstGovern(enabled, hasCars, express, freight, caboose), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public void WaypointRefresh_RunsOnlyForWaypointModeWithALocomotive(bool waypointMode, bool hasLocomotive, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldRunWaypointRefresh(waypointMode, hasLocomotive), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true, true, true)]
+    [TestCase(false, true, true, true, false)]
+    [TestCase(true, false, true, true, false)]
+    [TestCase(true, true, false, true, false)]
+    [TestCase(true, true, true, false, false)]
+    public void RunaroundPolicy_RequiresStoppedLocoSingleBoundaryTailCouplerAndDestination(
+        bool stopped, bool oneBoundary, bool oneTailCoupler, bool destinationResolved, bool expected)
+    {
+        Assert.That(FeaturePolicies.CanBeginRunaround(stopped, oneBoundary, oneTailCoupler, destinationResolved), Is.EqualTo(expected));
+    }
+
+    [TestCase(true, true, true)]
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    public void RunaroundPolicy_ContinuesOnlyAfterSavedTailCarRecouples(bool pending, bool tailRecoupled, bool expected)
+    {
+        Assert.That(FeaturePolicies.ShouldCompleteRunaround(pending, tailRecoupled), Is.EqualTo(expected));
+    }
+
+}

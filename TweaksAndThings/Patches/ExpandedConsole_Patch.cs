@@ -1,10 +1,9 @@
-﻿using Game;
+using Game;
 using Game.State;
 using HarmonyLib;
 using Model;
 using Model.Ops.Timetable;
 using Newtonsoft.Json;
-using Railloader;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -22,12 +21,13 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class ExpandedConsole_Add_Patch
 {
-    private static Serilog.ILogger _log => Log.ForContext<ExpandedConsole_Add_Patch>();
+    private static Serilog.ILogger _log => ModLog.ForContext<ExpandedConsole_Add_Patch>();
     private static void Prefix(ref UI.Console.Console.Entry entry)
     {
+        bool internalDiagnostic = entry.Text.StartsWith("[TweaksAndThings] ");
         entry.Text = $"{entry.Timestamp} : {entry.Text}";
         entry.Timestamp = RealNow();
-        SendMs((UI.Console.Console.Entry?)entry);
+        if (!internalDiagnostic) SendMs((UI.Console.Console.Entry?)entry);
     }
 
 
@@ -50,7 +50,7 @@ internal class ExpandedConsole_Add_Patch
             if (entry is null && !String.IsNullOrEmpty(text)) entry = new() { Text = text };
             var msgText = entry?.Text ?? string.Empty;
             if (msgText.StartsWith("Usage:")) return;
-            TweaksAndThingsPlugin tweaksAndThings = SingletonPluginBase<TweaksAndThingsPlugin>.Shared;
+            TweaksAndThingsPlugin tweaksAndThings = TweaksAndThingsPlugin.Instance!;
             StateManager shared = StateManager.Shared;
             GameStorage gameStorage = shared.Storage;
             WebhookSettings settings = tweaksAndThings?.settings?.WebhookSettingsList?.FirstOrDefault(ws => ws.RailroadMark == gameStorage.RailroadMark);
@@ -127,7 +127,7 @@ internal class ExpandedConsole_Add_Patch
         }
         catch (Exception ex)
         {
-            Log.Error(ex, ex.Message);
+            ModLog.Error(ex, ex.Message);
         }
     }
 

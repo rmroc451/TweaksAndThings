@@ -1,11 +1,9 @@
-﻿using Serilog;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using RMROC451.TweaksAndThings.Enums;
-using UI.Builder;
 using Model;
 using RMROC451.TweaksAndThings.Extensions;
-using UnityEngine.InputSystem;
+using UnityEngine;
 
 namespace RMROC451.TweaksAndThings;
 
@@ -51,10 +49,12 @@ public class Settings
         DisableWaypointControls = disableWaypointControls;
     }
 
-    public readonly UIState<string> _selectedTabState = new UIState<string>(null);
     public List<WebhookSettings>? WebhookSettingsList;
-    public bool HandBrakeAndAirTagModifiers;
+    public bool HandBrakeAndAirTagModifiers = true;
     public RosterFuelColumnSettings? EngineRosterFuelColumnSettings;
+    public int EngineRosterNameWidth = 150;
+    public int EngineRosterCrewWidth = 100;
+    public int EngineRosterStatusWidth = 280;
     public bool EndGearHelpersRequirePayment;
     public bool RequireConsistCabooseForOilerAndHotboxSpotter;
     public bool CabooseAllowsConsistInfo;
@@ -65,7 +65,38 @@ public class Settings
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
+    public bool UseMenuContextStyle = true;
     public bool DisableWaypointControls;
+    public bool AllowRepairsWithoutWaybill = true;
+    public bool ShowWaypointSetNotifications = true;
+    public bool ThroughTrafficEnabled = true;
+    public string NpcReportingMark = string.Empty;
+    public bool RandomThroughFreightsEnabled;
+    public float RandomThroughFreightMultiplier = 1f;
+    public bool RandomThroughFreightFirstClass = true;
+    public bool RandomThroughFreightSecondClass = true;
+    public bool RandomThroughFreightThirdClass = true;
+    public int RandomThroughFreightMinCars = 5;
+    public int RandomThroughFreightMaxCars = 15;
+    public int PulpwoodOrderingFeePercent = 10;
+    public InterchangeServiceMode InterchangeService = InterchangeServiceMode.Automatic;
+    public NpcSpawnMode InterchangeSpawnMode = NpcSpawnMode.NearestMapEdge;
+    public int HeldDeliveryDeadlineHours = 4;
+    public int HeldDeliveryPremiumPercent = 100;
+    public string ThroughFreightReferenceCar = string.Empty;
+    public List<InterchangeApproachOverride> InterchangeApproaches = new List<InterchangeApproachOverride>();
+    public string ThroughTrafficTrainSymbolPrefix = ThroughTrafficPolicy.DefaultTrainSymbolPrefix;
+    public int ThroughTrafficOnTimeGraceMinutes = ThroughTrafficPolicy.DefaultOnTimeGraceMinutes;
+    public int ThroughTrafficDollarsPerPassenger = 3;
+    public HotkeyBinding ClickAltBinding = new HotkeyBinding { keyCode = KeyCode.LeftAlt };
+    public HotkeyBinding ClickControlBinding = new HotkeyBinding { keyCode = KeyCode.LeftControl };
+    public HotkeyBinding ClickShiftBinding = new HotkeyBinding { keyCode = KeyCode.LeftShift };
+    public bool AutoFollowTrainCtcMarker;
+    public bool ShowCtcHudOverlayButton;
+    public bool EnableExperimentalSecondMainlineProgressions;
+    public bool EnableExperimentalAeLocalMode;
+    public bool EnableNpcInterchangeTraffic;
+    public bool ShowTimetableStringGraph = true;
 
     internal void AddAnotherRow()
     {
@@ -73,9 +104,15 @@ public class Settings
         if (!string.IsNullOrEmpty(WebhookSettingsList.OrderByDescending(wsl => wsl.WebhookUrl).Last().WebhookUrl))
         {
             WebhookSettingsList.Add(new());
-            Log.Debug($"Adding another {nameof(WebhookSettings)} list entry, last one was filled in");
         }
     }
+
+}
+
+public class HotkeyBinding
+{
+    public KeyCode keyCode;
+    public byte modifiers;
 }
 
 public class WebhookSettings
@@ -150,5 +187,7 @@ public static class SettingsExtensions
         input?.settings?.TrainBrakeDisplayShowsColorsInCalloutMode ?? false;
     public static bool DisableWaypointControls(this TweaksAndThingsPlugin input) =>
         input?.settings?.DisableWaypointControls ?? false;
+    public static bool NpcInterchangeTrafficEnabled(this TweaksAndThingsPlugin? input) =>
+        input?.IsEnabled == true && input.settings?.EnableNpcInterchangeTraffic == true;
 
 }

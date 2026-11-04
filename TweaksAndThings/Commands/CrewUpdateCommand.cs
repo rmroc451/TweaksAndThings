@@ -13,9 +13,10 @@ using UnityEngine;
 
 namespace RMROC451.TweaksAndThings.Commands;
 
-[ConsoleCommand("/cu", "generate a formatted message about a locomotive's status.")]
-public class EchoCommand : IConsoleCommand
+[ConsoleCommandHandler("/cu", "generate a formatted message about a locomotive's status.")]
+public class EchoCommand
 {
+    [ConsoleDefaultCommand]
     public string Execute(string[] comps)
     {
         if (comps.Length < 4)
@@ -42,7 +43,7 @@ public class EchoCommand : IConsoleCommand
                 return "+ to include area or - to leave it out";
         }
 
-        var gamePoint = car.GetCenterPosition(Graph._graph);
+        var gamePoint = car.GetCenterPosition(Graph.Shared);
         EntityReference entityReference = new EntityReference(EntityType.Position, new Vector4( gamePoint.x, gamePoint.y, gamePoint.z, 0));
         EntityReference loco = new EntityReference(EntityType.Car, car.id);
         if (comps[2] == "+") message = new Hyperlink(entityReference.URI(), string.Format(message, OpsController.Shared.ClosestArea(car)?.name ?? "???"));
@@ -52,11 +53,11 @@ public class EchoCommand : IConsoleCommand
 
         if (StateManager.IsHost)
         {
-            car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared._playersManager.LocalPlayer}");
+            car.PostNotice(nameof(EchoCommand), $"{message} :{StateManager.Shared.PlayersManager.LocalPlayer}");
 
-            ExpandedConsole_Add_Patch.SendMs(null, $"{StateManager.Shared._playersManager.LocalPlayer} {hlt} {message}");
+            ExpandedConsole_Add_Patch.SendMs(null, $"{StateManager.Shared.PlayersManager.LocalPlayer} {hlt} {message}");
         }
-        if (!StateManager.IsHost) Multiplayer.Broadcast($"{StateManager.Shared._playersManager.LocalPlayer} {hlt}: \"{message}\"");
+        if (!StateManager.IsHost) Multiplayer.Broadcast($"{StateManager.Shared.PlayersManager.LocalPlayer} {hlt}: \"{message}\"");
 
         return string.Empty;
     }

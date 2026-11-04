@@ -2,10 +2,12 @@
   <Import Project="Paths.user" Condition="Exists('Paths.user')" />
   <Import Project="Assembly.version" Condition="Exists('Assembly.version')" />
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <GameManagedDir Condition="'$(GameManagedDir)' == ''">$([System.IO.Directory]::GetDirectories(`$(GameDir)`, `*_Data`)[0])\Managed</GameManagedDir>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <LangVersion>latest</LangVersion>
     <ImplicitUsings>false</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -16,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Definition.json" CopyToOutputDirectory="Always" />
+    <Content Include="Info.json" CopyToOutputDirectory="Always" />
     <PackageReference Include="BUTR.Harmony.Analyzer" Version="1.0.1.50">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
