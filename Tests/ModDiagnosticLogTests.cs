@@ -36,9 +36,9 @@ public sealed class ModDiagnosticLogTests
             ModDiagnosticLog.Initialize(directory, Assert.Fail);
             File.WriteAllText(path, new string('x', 5 * 1024 * 1024));
             ModDiagnosticLog.Write("TRAFFIC", "New event");
-            Assert.That(new FileInfo(path + ".previous").Length, Is.EqualTo(5 * 1024 * 1024));
+            Assert.That(new FileInfo(path + ".0").Length, Is.EqualTo(5 * 1024 * 1024));
             Assert.That(File.ReadAllText(path), Does.Contain("New event"));
         }
-        finally { File.Delete(path); File.Delete(path + ".previous"); Directory.Delete(directory); }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 }
