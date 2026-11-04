@@ -5,6 +5,24 @@ namespace RMROC451.TweaksAndThings.Tests;
 public class NpcPowerSelectionTests
 {
     [Test]
+    public void RosterMixCanSelectSteamAndDieselTogetherForATwoEngineTrain()
+    {
+        Assert.That(NpcPowerSelection.Select(new[] { new[] { 60d }, new[] { 60d } }, new[] { 100d },
+            2, new[] { false, true }, 1), Is.EquivalentTo(new[] { 0, 1 }));
+    }
+    [Test]
+    public void FleetPreferenceDoesNotAddEnginesWhenOneOfAnotherTypeIsEnough()
+    {
+        Assert.That(NpcPowerSelection.Select(new[] { new[] { 30d }, new[] { 110d } }, new[] { 100d },
+            1, new[] { false, true }, 0), Is.EqualTo(new[] { 1 }));
+    }
+    [Test]
+    public void PreferredDieselIsStillSizedToTheDemand()
+    {
+        Assert.That(NpcPowerSelection.Select(new[] { new[] { 101d }, new[] { 120d }, new[] { 250d } }, new[] { 100d },
+            1, new[] { false, true, true }, 1), Is.EqualTo(new[] { 1 }));
+    }
+    [Test]
     public void MixesEnginesToAvoidOversizing()
     {
         var selected = NpcPowerSelection.Select(new[] { new[] { 60d }, new[] { 40d } }, new[] { 100d });

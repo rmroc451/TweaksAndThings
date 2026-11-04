@@ -4,6 +4,7 @@ namespace RMROC451.TweaksAndThings;
 
 internal sealed class NpcServiceState
 {
+    public List<AeLocalJob> LocalJobs = new();
     public List<NpcServiceRecord> Services = new List<NpcServiceRecord>();
     public List<NpcPoolUnit> PoolPower = new List<NpcPoolUnit>();
     public Dictionary<string, double> ThroughDepartures = new Dictionary<string, double>();
@@ -15,6 +16,7 @@ internal sealed class NpcServiceState
     public Dictionary<string, NpcPickupPayment> PickupPayments = new Dictionary<string, NpcPickupPayment>();
     public List<NpcHeldDelivery> HeldDeliveries = new List<NpcHeldDelivery>();
     public Dictionary<string, string> ProtectedTimetables = new Dictionary<string, string>();
+    public Dictionary<string, int> CompletedTimetableDays = new();
     public Dictionary<string, string> AiCrews = new Dictionary<string, string>();
     public List<NpcRandomDeparture> RandomDepartures = new List<NpcRandomDeparture>();
     public int RandomScheduleDay = -1;
@@ -24,6 +26,17 @@ internal sealed class NpcServiceState
     public int NextNpcTrainNumber = 1;
     public int TimetablePlanVersion;
     public List<NpcPulpwoodOrder> PulpwoodOrders = new List<NpcPulpwoodOrder>();
+    public HashSet<string> LogImportIndustries = new HashSet<string>();
+    public List<NpcLogImportFee> LogImportFees = new List<NpcLogImportFee>();
+}
+
+internal sealed class NpcLogImportFee
+{
+    public string BillKey = string.Empty;
+    public int DeliveryDay;
+    public string Industry = string.Empty;
+    public int Amount;
+    public bool Settled;
 }
 
 internal sealed class NpcRandomDeparture
@@ -51,6 +64,7 @@ internal sealed class NpcTrafficPlan
 
 internal sealed class NpcPulpwoodOrder
 {
+    public bool DeferredLogFee;
     public string Tag = string.Empty;
     public string Destination = string.Empty;
     public string Interchange = string.Empty;
@@ -121,6 +135,9 @@ internal sealed class NpcServiceRecord
     public string LeadId = string.Empty;
     public string Spawn = string.Empty;
     public string Target = string.Empty;
+    public string ArrivalSpan = string.Empty;
+    public bool ArrivalHolding;
+    public List<string> ArrivalFootprint = new List<string>();
     public string Phase = "Approaching";
     public string WaitingReason = string.Empty;
     public double Scheduled;
@@ -134,6 +151,10 @@ internal sealed class NpcServiceRecord
     public bool Suspended;
     public bool PickupSnapshotTaken;
     public int PlannedInboundCars;
+    public int ReturnPlanVersion;
+    public bool YardTidied;
+    public HashSet<string> TouchedYardCars = new HashSet<string>();
+    public HashSet<string> TidiedYardCars = new HashSet<string>();
     public float ReservedDeliveryPounds;
     public bool InboundPlanKnown;
     public List<NpcPickupSnapshot> PickupSnapshot = new List<NpcPickupSnapshot>();

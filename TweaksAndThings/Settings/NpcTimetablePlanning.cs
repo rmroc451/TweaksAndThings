@@ -103,7 +103,7 @@ internal static class NpcTimetablePlanning
             (n, a, b) => nodes[n].SegmentCanReachSegment(segments[a], segments[b]),
             junctions: route.Where(s => s.Node != null && Graph.Shared.DecodeSwitchAt(s.Node, out _, out _, out _)).Select(s => s.Node.id).ToHashSet(),
             foulingClearance: (a, b) => Math.Max(20, NpcTrainOperations.FoulingDistance(nodes[a]) + NpcTrainOperations.FoulingDistance(nodes[b])),
-            found: (a, b, length) => { if (length >= 400 && Math.Min(Vector3.Distance(station.GetPosition(), nodes[a].transform.GamePosition()), Vector3.Distance(station.GetPosition(), nodes[b].transform.GamePosition())) < 800) found = true; });
+            found: (a, b, length) => { if (length >= 400 && Math.Min(Vector3.Distance(station.GetPosition(), nodes[a].Position), Vector3.Distance(station.GetPosition(), nodes[b].Position)) < 800) found = true; });
         if (passing.Count > 128) passing.Clear();
         passing[key] = (Time.realtimeSinceStartup + 60, found);
         return found;

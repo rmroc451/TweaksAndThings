@@ -101,7 +101,7 @@ internal class TagController_UpdateTag_Patch
             {
                 var info = car.GetLoadInfo(i);
                 if (!info.HasValue || info.Value.Quantity <= 0) continue;
-                var load = CarPrototypeLibrary.instance.LoadForId(info.Value.LoadId);
+                var load = CarLoadLibrary.GetLoad(info.Value.LoadId);
                 float capacity = slots[i].MaximumCapacity;
                 string amounts = load == null
                     ? $"{info.Value.Quantity:N1} / {capacity:N1} {info.Value.LoadId}"

@@ -22,11 +22,11 @@ internal static class NpcFuel_Water_Patch
     { if (!ThroughTrafficGuard.IsGenerated(__instance.GetComponent<SteamLocomotive>())) return true; __result = 0; return false; }
 }
 
-[HarmonyPatch(typeof(PrimeMover), "get_FuelConsumptionRate")]
+[HarmonyPatch(typeof(DieselPrimeMover), "get_FuelConsumptionRate")]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class NpcFuel_Diesel_Patch
 {
-    private static bool Prefix(PrimeMover __instance, ref float __result)
+    private static bool Prefix(DieselPrimeMover __instance, ref float __result)
     { if (!ThroughTrafficGuard.IsGenerated(__instance.GetComponent<DieselLocomotive>())) return true; __result = 0; return false; }
 }
 

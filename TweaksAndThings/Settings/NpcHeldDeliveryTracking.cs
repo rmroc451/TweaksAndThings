@@ -18,7 +18,7 @@ internal static class NpcHeldDeliveryTracking
         restoredState = NpcServiceStore.State;
         foreach (var interchange in OpsController.Shared.AllInterchanges) Restore(interchange);
     }
-    private static string Key(Order order) => order.Destination.Identifier + "|" + order.CarTypeFilter.queryString + "|" + order.Load?.id;
+    private static string Key(Order order) => order.Destination.Identifier + "|" + order.Criteria.CarTypeFilter.queryString + "|" + order.Criteria.Load?.id;
     private static string Key(NpcHeldDelivery held) => held.DestinationId + "|" + held.CarTypeFilter + "|" + (held.LoadId.Length == 0 ? null : held.LoadId);
 
     internal static void Restore(Interchange interchange)
@@ -26,18 +26,18 @@ internal static class NpcHeldDeliveryTracking
         if (!StateManager.IsHost || !NpcServiceStore.Load() || TrainController.Shared == null) return;
         ReconcileCars();
         foreach (var held in NpcServiceStore.State.HeldDeliveries.Where(h => h.InterchangeId == interchange.Identifier && h.CarId.Length == 0 && h.BardoCarId.Length > 0))
-            if (!interchange.Orders.OfType<ReturnFromBardoOrder>().Any(o => o.CarId == held.BardoCarId)) interchange.OrderReturnFromBardo(held.BardoCarId);
+            if (!interchange.Orders.OfType<ReturnFromBardoOrder>().Any(o => o.CarIds.Contains(held.BardoCarId))) interchange.OrderReturnFromBardo(new[] { held.BardoCarId });
         foreach (var group in NpcServiceStore.State.HeldDeliveries.Where(h => h.InterchangeId == interchange.Identifier && h.CarId.Length == 0 && h.BardoCarId.Length == 0).GroupBy(Key))
         {
             var held = group.First();
-            int current = interchange.Orders.OfType<Order>().Where(o => Key(o) == group.Key).Sum(o => o.CarCount);
+            int current = interchange.Orders.OfType<Order>().Where(o => Key(o) == group.Key).Sum(o => o.Quantity.Count);
             int missing = NpcHeldDeliveryPolicy.MissingReservations(group.Count(), current);
             if (missing == 0) continue;
             try
             {
-                var load = held.LoadId.Length == 0 ? null : CarPrototypeLibrary.instance.LoadForId(held.LoadId);
+                var load = held.LoadId.Length == 0 ? null : CarLoadLibrary.GetLoad(held.LoadId);
                 if (held.LoadId.Length > 0 && load == null) throw new InvalidOperationException("Held load no longer exists: " + held.LoadId);
-                interchange.AddOrder(new Order(new CarTypeFilter(held.CarTypeFilter), load,
+                interchange.AddOrder(NpcOrderFactory.Create(new CarTypeFilter(held.CarTypeFilter), load,
                     OpsController.Shared.ResolveOpsCarPosition(held.DestinationId), missing, held.Tag, held.NoPayment));
             }
             catch (Exception ex) { TweaksAndThingsPlugin.LogException("Restore held delivery " + held.Id, ex); }
@@ -51,20 +51,20 @@ internal static class NpcHeldDeliveryTracking
         // Promise the next daily service; a future extra service can advance this window.
         var next = interchange.GetNextServiceTime(missedService.AddingDays(1), out _, true);
         if (interchange.TryGetExtraScheduled(out var extra) && extra > missedService && extra < next) next = extra;
-        foreach (var group in interchange.Orders.OfType<Order>().Where(o => o.CarCount > 0).GroupBy(Key))
+        foreach (var group in interchange.Orders.OfType<Order>().Where(o => o.Quantity.Count > 0).GroupBy(Key))
         {
             var order = group.First();
             int reserved = NpcServiceStore.State.HeldDeliveries.Count(h => h.InterchangeId == interchange.Identifier && h.CarId.Length == 0 && h.BardoCarId.Length == 0 && Key(h) == group.Key);
-            int missing = NpcHeldDeliveryPolicy.MissingReservations(group.Sum(o => o.CarCount), reserved);
-            var detail = plan?.DescribeDeferred(order) ?? (order.CarTypeFilter.queryString, -1);
-            int payment = order.NoPayment ? 0 : detail.Item2 >= 0 ? detail.Item2 : OpsController.Shared.PaymentForMove(interchange, order.Destination,
-                order.Load == null ? 0 : (int)Math.Ceiling(order.Load.Pounds(order.Load.NominalQuantityPerCarLoad) / 2000));
+            int missing = NpcHeldDeliveryPolicy.MissingReservations(group.Sum(o => o.Quantity.Count), reserved);
+            var detail = plan?.DescribeDeferred(order) ?? (order.Criteria.CarTypeFilter.queryString, -1);
+            int weight = order.Criteria.Load == null ? 0 : (int)Math.Ceiling(order.Criteria.Load.Pounds(order.Criteria.Load.NominalQuantityPerCarLoad) / 2000);
+            int payment = order.NoPayment || !OpsController.Shared.TryPaymentForMove(interchange, order.Destination, weight, out int nativePayment) ? 0 : detail.Item2 >= 0 ? detail.Item2 : nativePayment;
             for (int i = 0; i < missing; i++) NpcServiceStore.State.HeldDeliveries.Add(new NpcHeldDelivery
             {
                 Id = Guid.NewGuid().ToString("N"), InterchangeId = interchange.Identifier,
-                DestinationId = order.Destination.Identifier, CarTypeFilter = order.CarTypeFilter.queryString,
-                LoadId = order.Load?.id ?? string.Empty, Tag = order.Tag ?? string.Empty, NoPayment = order.NoPayment,
-                Description = detail.Item1 + (order.Load == null ? " — empty" : " — " + order.Load.description),
+                DestinationId = order.Destination.Identifier, CarTypeFilter = order.Criteria.CarTypeFilter.queryString,
+                LoadId = order.Criteria.Load?.id ?? string.Empty, Tag = order.Tag ?? string.Empty, NoPayment = order.NoPayment,
+                Description = detail.Item1 + (order.Criteria.Load == null ? " — empty" : " — " + order.Criteria.Load.description),
                 MissedService = missedService.TotalSeconds, NextService = next.TotalSeconds,
                 BonusStarts = next.TotalSeconds, BasePayment = payment,
                 Deadline = NpcHeldDeliveryPolicy.Deadline(next.TotalSeconds, settings.HeldDeliveryDeadlineHours),
@@ -127,7 +127,7 @@ internal static class NpcHeldDeliveryTracking
         held.CarId = string.Empty;
         held.BardoCarId = car.id;
         NpcTrainOperations.Trusted(() => { NpcTrainOperations.Marker(car, false); TrainController.Shared.MoveToBardo(car.id, interchange.Identifier); });
-        interchange.OrderReturnFromBardo(car.id);
+        interchange.OrderReturnFromBardo(new[] { car.id });
         service.Inbound.Remove(car.id);
         ModDiagnosticLog.Write("HOLD", $"Arrival yard full: service={service.Id}, holding actual car={car.id}, destination={held.DestinationId}; native car, load and waybill retained in bardo.");
         NpcServiceStore.Save();

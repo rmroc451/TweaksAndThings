@@ -2,6 +2,7 @@ using HarmonyLib;
 using TMPro;
 using UI.Common;
 using UI.Timetable;
+using UI.Windows;
 using UnityEngine;
 using UnityEngine.UI;
 

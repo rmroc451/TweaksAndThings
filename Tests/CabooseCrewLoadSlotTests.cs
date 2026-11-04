@@ -1,3 +1,4 @@
+using Model;
 using Model.Definition;
 using Model.Definition.Data;
 using NUnit.Framework;
@@ -11,7 +12,7 @@ public sealed class CabooseCrewLoadSlotTests
     [Test]
     public void SetupAddsOneCrewSlotAndPreservesOtherLoads()
     {
-        var definition = new CarDefinition { Archetype = CarArchetype.Caboose };
+        var definition = new CarDefinition { CarType = CarType.Caboose };
         var other = new LoadSlot(LoadUnits.Pounds, 100, "custom");
         definition.LoadSlots.Add(other);
         CabooseCrewLoadSlot_Patch.EnsureCrewLoadSlot(definition);
@@ -25,7 +26,7 @@ public sealed class CabooseCrewLoadSlotTests
     [Test]
     public void ExistingCustomizedCrewCapacityIsRetained()
     {
-        var definition = new CarDefinition { Archetype = CarArchetype.Caboose };
+        var definition = new CarDefinition { CarType = CarType.Caboose };
         definition.LoadSlots.Add(new LoadSlot(LoadUnits.Quantity, 24, "crew-hours"));
         CabooseCrewLoadSlot_Patch.EnsureCrewLoadSlot(definition);
         Assert.That(definition.LoadSlots, Has.Count.EqualTo(1));
@@ -35,7 +36,7 @@ public sealed class CabooseCrewLoadSlotTests
     [Test]
     public void FreightDoesNotReceiveCrewLoad()
     {
-        var definition = new CarDefinition { Archetype = CarArchetype.Freight };
+        var definition = new CarDefinition { CarType = CarType.Freight };
         CabooseCrewLoadSlot_Patch.EnsureCrewLoadSlot(definition);
         Assert.That(definition.LoadSlots, Is.Empty);
     }

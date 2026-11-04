@@ -10,6 +10,18 @@ using UI.ContextMenu;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
+[HarmonyPatch(typeof(ContextMenu))]
+[HarmonyPatch(nameof(ContextMenu.Show), typeof(string))]
+[HarmonyPatchCategory("RMROC451TweaksAndThings")]
+internal class ContextMenu_ShowRadialStyle_Patch
+{
+    private static void Prefix()
+    {
+        ContextMenu.UseListStyle = TweaksAndThingsPlugin.Instance?.settings?.UseMenuContextStyle ?? true;
+    }
+}
+
+
 [HarmonyPatch(typeof(CarPickable))]
 [HarmonyPatch(nameof(CarPickable.HandleShowContextMenu), typeof(Car))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]

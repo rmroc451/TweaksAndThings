@@ -6,6 +6,7 @@ using Model.Ops;
 using UI;
 using UI.Builder;
 using UI.Timetable;
+using UnityEngine;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -22,17 +23,22 @@ internal static class TimetableDelinquentPickups_Patch
     private static readonly ConditionalWeakTable<TimetableWindow, Tabs> views = new();
     private static bool Prefix(TimetableWindow __instance, UIPanelBuilder builder)
     {
+        var plugin = TweaksAndThingsPlugin.Instance;
+        bool showTraffic = plugin.NpcInterchangeTrafficEnabled();
+        bool showGraph = plugin?.settings?.ShowTimetableStringGraph ?? true;
+        if (!showTraffic && !showGraph) return true;
         var view = views.GetValue(__instance, _ => new Tabs());
         if (__instance._firstBuild)
         {
             __instance._firstBuild = false;
-            __instance._window.SetContentWidth(1000);
+            __instance._window.SetContentSize(new Vector2(showGraph ? 1200 : 850, 760));
         }
+        if (!showGraph) view.Selected.Value = "traffic";
+        else if (!showTraffic) view.Selected.Value = "timetable";
         builder.AddTabbedPanels(view.Selected, tabs =>
         {
-            tabs.AddTab("Timetable", "timetable", panel => TimetableStringChart.Build(panel, view.Chart));
-            tabs.AddTab("Delinquent pickups", "delinquent", BuildDelinquents);
-            tabs.AddTab("AI traffic", "traffic", panel =>
+            if (showGraph) tabs.AddTab("Timetable", "timetable", panel => TimetableStringChart.Build(panel, view.Chart));
+            if (showTraffic) tabs.AddTab("AI traffic", "traffic", panel =>
             {
                 __instance._window.SetContentWidth(System.Math.Max(850, (int)__instance._window.GetContentSize().x));
                 NpcTrafficWindow.BuildContents(panel, view.TrafficSelected);

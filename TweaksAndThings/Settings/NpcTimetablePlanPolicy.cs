@@ -6,6 +6,17 @@ namespace RMROC451.TweaksAndThings;
 
 internal static class NpcTimetablePlanPolicy
 {
+    internal static List<(string Code, int Minute)> PassingEntries(IReadOnlyList<string> path, IReadOnlyList<int> travel, int departure, int arrival)
+    {
+        var result = new List<(string, int)>();
+        if (path.Count < 2 || travel.Count != path.Count - 1) return result;
+        int total = travel.Sum(t => Math.Max(1, t)), elapsed = 0;
+        for (int i = 1; i < path.Count - 1; i++) {
+            elapsed += Math.Max(1, travel[i - 1]);
+            result.Add((path[i], Interpolate(departure, arrival, elapsed, total)));
+        }
+        return result;
+    }
     internal static int Interpolate(int from, int to, int elapsed, int total) =>
         from + (int)Math.Ceiling((to - from) * Math.Max(0, Math.Min(1, elapsed / (double)Math.Max(1, total))));
     internal readonly struct Link

@@ -56,7 +56,7 @@ internal static class NpcTrafficRouting
             float braking = lead.AutoEngineerPlanner._engineer.CalculateLookaheadDistance() + 100;
             int offset = 0;
             while (offset < ahead.Count - 1 && ahead.Take(offset).Sum(s => s.Distance) < braking) offset++;
-            int end = Refuge(ahead.Skip(offset).ToList(), TrainController.ApproximateLength(own.Select(c => c.Descriptor())), out int entrance) + offset;
+            int end = Refuge(ahead.Skip(offset).ToList(), TrainController.ApproximateLength(own.Select(c => c.Descriptor()).ToList()), out int entrance) + offset;
             if (entrance < 0) continue; // Cannot shorten authority without a safe refuge.
             entrance += offset;
             var keep = ahead.Take(end + 1).Select(s => s.Location.segment.id).ToHashSet();
@@ -138,6 +138,15 @@ internal static class NpcTrafficRouting
         if (!StateManager.IsHost || TweaksAndThingsPlugin.Instance?.IsEnabled != true || Graph.Shared == null || engineer.Locomotive == null) return;
         if (graph != Graph.Shared) { Reset(); graph = Graph.Shared; }
         var lead = engineer.Locomotive;
+        // Corridor grants govern generated traffic. Player AE retains native
+        // routing, signals and occupancy checks, including ordinary yard moves.
+        // NPC routes still account for these trains through physical occupancy
+        // and OpposingApproach, without imposing NPC grants on player engines.
+        if (!ThroughTrafficGuard.IsGenerated(lead)) {
+            reservations.Remove(lead.id); grantedEnds.Remove(lead.id);
+            exitNodes.Remove(lead.id); sidingTracks.Remove(lead.id); yielding.Remove(lead.id);
+            return;
+        }
         var own = lead.EnumerateCoupled().ToHashSet();
         var ownSegments = own.SelectMany(c => new[] { c.LocationA.segment.id, c.LocationB.segment.id }).ToHashSet();
         // Discard abandoned future claims but preserve occupied sections for parked tails.
@@ -180,14 +189,14 @@ internal static class NpcTrafficRouting
                 if (!yielding.Contains(lead.id) && grantedIndex >= 0 &&
                     remaining > Math.Max(500, engineer.CalculateLookaheadDistance() + 100) && lookaheadDepth == 0) return;
                 float exitClearance = NpcTrainOperations.FoulingDistance(exit) + 5;
-                bool tailClear = own.All(c => Vector3.Distance(c.LocationA.GetPosition(), exit.transform.GamePosition()) > exitClearance &&
-                    Vector3.Distance(c.LocationB.GetPosition(), exit.transform.GamePosition()) > exitClearance);
+                bool tailClear = own.All(c => Vector3.Distance(c.LocationA.GetPosition(), exit.Position) > exitClearance &&
+                    Vector3.Distance(c.LocationB.GetPosition(), exit.Position) > exitClearance);
                 if (sidingTracks.TryGetValue(lead.id, out var siding))
                 {
                     float entranceClearance = NpcTrainOperations.FoulingDistance(siding.entrance) + 5;
                     tailClear &= ownSegments.IsSubsetOf(siding.segments) && own.All(c =>
-                        Vector3.Distance(c.LocationA.GetPosition(), siding.entrance.transform.GamePosition()) > entranceClearance &&
-                        Vector3.Distance(c.LocationB.GetPosition(), siding.entrance.transform.GamePosition()) > entranceClearance);
+                        Vector3.Distance(c.LocationA.GetPosition(), siding.entrance.Position) > entranceClearance &&
+                        Vector3.Distance(c.LocationB.GetPosition(), siding.entrance.Position) > entranceClearance);
                 }
                 int throatIndex = route.FindIndex(s => s.Node == exit);
                 bool opposing = OpposingApproach(lead, route.Take(throatIndex < 0 ? route.Count : throatIndex + 1).ToList(), exit);
@@ -205,10 +214,23 @@ internal static class NpcTrafficRouting
                 searchStart = throat < 0 ? 0 : throat;
             }
         }
-        int end = Refuge(route.Skip(searchStart).ToList(), TrainController.ApproximateLength(own.Select(c => c.Descriptor())), out int entrance) + searchStart;
+        int end = Refuge(route.Skip(searchStart).ToList(), TrainController.ApproximateLength(own.Select(c => c.Descriptor()).ToList()), out int entrance) + searchStart;
         if (entrance >= 0) entrance += searchStart;
         var corridor = route.Take(end + 1).Select(s => s.Location.segment).Distinct().ToList();
         var occupied = TrainController.Shared.CarsOnSegments(corridor).Where(c => c != null && !own.Contains(c)).ToList();
+        if (occupied.Count > 0 && NpcServiceStore.State.Services.Any(s => s.LeadId == lead.id && s.Phase == "Parking power"))
+        {
+            // Repair tracks may be shared. Cars beyond the parking destination
+            // on the same segment do not obstruct the approach to its pocket.
+            var onPath = new HashSet<Car>();
+            foreach (var step in route.Take(end + 1).Where(s => s.Location.IsValid))
+                for (float d = 0; d <= step.Distance; d += 2)
+                {
+                    var point = new Location(step.Location.segment, step.Location.distance - d, step.Location.end);
+                    TrainController.Shared.CheckForCarsAtPoint(point.GetPosition(), 2, onPath, point);
+                }
+            occupied = occupied.Where(onPath.Contains).ToList();
+        }
         var blocked = occupied.SelectMany(c => new[] { c.LocationA.segment.id, c.LocationB.segment.id }).ToHashSet();
         // Intent matters: two empty approaches must not both be cleared toward
         // the same throat before either train actually occupies that switch.
@@ -259,7 +281,7 @@ internal static class NpcTrafficRouting
         string owners = string.Join(",", reservations.Owners.Where(id => id != lead.id && corridor.Any(s => reservations.Covers(id, new[] { s.id }))).Select(id => TrainController.Shared.TryGetCarForId(id, out var c) ? c.DisplayName : id));
         Notice(lead, reason + (clear ? "" : "; claims=" + owners),
             "; corridor=" + corridor.Count + "; refuge=" + (entrance >= 0 ? route[end].Node?.id : "route endpoint (no usable protected siding)") +
-            "; trainLength=" + TrainController.ApproximateLength(own.Select(c => c.Descriptor())).ToString("N0") + " m; occupiedBy=" + string.Join(",", occupied.Select(c => c.DisplayName).Distinct().Take(4)));
+            "; trainLength=" + TrainController.ApproximateLength(own.Select(c => c.Descriptor()).ToList()).ToString("N0") + " m; occupiedBy=" + string.Join(",", occupied.Select(c => c.DisplayName).Distinct().Take(4)));
     }
 
     private static void AddStop(AutoEngineer.Targets targets, float distance, string reason)
@@ -312,7 +334,7 @@ internal static class NpcTrafficRouting
                 }
             }
             else {
-                ahead = ahead.Take(Refuge(ahead, TrainController.ApproximateLength(other.EnumerateCoupled().Select(c => c.Descriptor()))) + 1).ToList();
+                ahead = ahead.Take(Refuge(ahead, TrainController.ApproximateLength(other.EnumerateCoupled().Select(c => c.Descriptor()).ToList())) + 1).ToList();
                 var shared = ahead.Where(s => directions.ContainsKey(s.Location.segment.id)).Select(s => s.Location.segment.id).Distinct().ToList();
                 // A newcomer's ungranted intention cannot revoke an existing
                 // grant. Physical occupancy is still checked independently.
@@ -336,8 +358,7 @@ internal static class NpcTrafficRouting
             route = route.Skip(first).ToList();
             var step = route[0];
             float remaining = Math.Max(0, step.Location.distance - start.WithEnd(step.Location.end).distance);
-            route[0] = step.Node == null ? new RouteSearch.Step(step.Location, step.Direction, remaining, Graph.Shared, step.Flags) :
-                new RouteSearch.Step(step.Location, step.Node, step.Direction, remaining, Graph.Shared, step.Flags);
+            route[0] = step.WithLocation(step.Location, remaining);
             return route;
         }
         // ROAD follows the currently lined track; it must not reserve an imagined waypoint route.
@@ -347,8 +368,17 @@ internal static class NpcTrafficRouting
         while (cursor.IsValid && seen.Add(cursor.segment.id)) {
             float remaining = cursor.segment.GetLength() - cursor.distance;
             var finish = new Location(cursor.segment, cursor.segment.GetLength(), cursor.end);
-            result.Add(new RouteSearch.Step(finish, cursor.EndIsA ? cursor.segment.a : cursor.segment.b, StepDirection.Out, remaining, Graph.Shared));
-            var next = Graph.Shared.LocationByMoving(cursor, remaining + 0.05f, checkSwitchAgainstMovement: true, stopAtEndOfTrack: true);
+            result.Add(new RouteSearch.Step(finish, StepDirection.Out, default, remaining, Graph.Shared));
+            Location next;
+            try {
+                next = Graph.Shared.LocationByMoving(cursor, remaining + 0.05f, checkSwitchAgainstMovement: true, stopAtEndOfTrack: true);
+            }
+            catch (SwitchAgainstMovement) {
+                // A distant unlined ROAD switch ends known intent. Native AE
+                // handles the switch on approach; this must not abort another
+                // train's dispatch or infer a route beyond the switch.
+                break;
+            }
             if (next.segment == cursor.segment) break;
             cursor = next;
         }

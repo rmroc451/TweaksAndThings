@@ -22,7 +22,7 @@ internal static class ThroughTrafficSpawner
 
     internal static void Tick(Settings settings, float deltaTime)
     {
-        if (!StateManager.IsHost || TrainController.Shared == null || TimetableController.Shared == null || !NpcServiceStore.Load()) return;
+        if (!settings.EnableNpcInterchangeTraffic || !StateManager.IsHost || TrainController.Shared == null || TimetableController.Shared == null || !NpcServiceStore.Load()) return;
         tickRemainder += deltaTime;
         if (tickRemainder < 0.5f) return;
         tickRemainder = 0;
@@ -75,7 +75,7 @@ internal static class ThroughTrafficSpawner
         foreach (int index in operating)
         {
             var entry = train.Entries[index];
-            if (!TimetableController.Shared.TryGetStation(entry.Station, out var station) || !station.IsEnabled ||
+            if (!TimetableController.Shared.TryGetStation(entry.Station, out var station) ||
                 !TryGetStationLocation(station, out var location)) return false;
             stations.Add(station);
             locations.Add(location);
@@ -99,7 +99,7 @@ internal static class ThroughTrafficSpawner
         }
         else if (randomFreight)
         {
-            var catalog = TrainController.Shared.PrefabStore.AllCarDefinitionInfos.Where(i => i.Definition.VisibleInPlacer && i.Definition.Archetype.IsFreight()).ToList();
+            var catalog = TrainController.Shared.ContentLibrary.AllCarDefinitionInfos.Where(i => i.Definition.VisibleInPlacer && i.Definition.CarType.IsFreight).ToList();
             if (catalog.Count == 0) return false;
             int minimum = Math.Max(1, Math.Min(50, settings.RandomThroughFreightMinCars));
             int maximum = Math.Max(minimum, Math.Min(50, settings.RandomThroughFreightMaxCars));
@@ -119,10 +119,10 @@ internal static class ThroughTrafficSpawner
         else
         {
             var reference = string.IsNullOrWhiteSpace(settings.ThroughFreightReferenceCar)
-                ? TrainController.Shared.Cars.FirstOrDefault(c => c.Archetype.IsFreight() && !ThroughTrafficGuard.IsGenerated(c))
+                ? TrainController.Shared.Cars.FirstOrDefault(c => c.CarType.IsFreight && !ThroughTrafficGuard.IsGenerated(c))
                 : TrainController.Shared.CarForString(settings.ThroughFreightReferenceCar);
             if (reference == null) return false;
-            var cars = reference.EnumerateCoupled().Where(c => c.Archetype.IsFreight() && !ThroughTrafficGuard.IsGenerated(c)).ToList();
+            var cars = reference.EnumerateCoupled().Where(c => c.CarType.IsFreight && !ThroughTrafficGuard.IsGenerated(c)).ToList();
             if (cars.Count == 0) return false;
             weight = cars.Sum(c => c.Weight);
             freightWeights.AddRange(cars.Select(c => c.Weight));
@@ -181,11 +181,12 @@ internal static class ThroughTrafficSpawner
         var service = new NpcServiceRecord
         {
             Id = Guid.NewGuid().ToString("N"), TrainSymbol = train.Name, LeadId = ids[0], PowerIds = ids,
-            Scheduled = scheduled, Spawn = Graph.Shared.LocationToString(spawn), Target = Graph.Shared.LocationToString(locations[1]), RandomFreight = randomFreight, CrewId = crewId, StopIndex = firstStop
+            Scheduled = scheduled, Spawn = Graph.LocationToString(spawn), Target = Graph.LocationToString(locations[1]), RandomFreight = randomFreight, CrewId = crewId, StopIndex = firstStop
         };
         NpcServiceStore.State.Services.Add(service);
         NpcTimetableRegistry.Register(service, train);
         NpcTrainOperations.Order(loco, locations[1]);
+        NpcTrainOperations.ArmRollingSpawn(loco);
         NpcTrafficMessages.Send(service, "depart-1", $"On the move from {stations[0].name} toward {stations[1].name}.");
         return true;
     }
@@ -263,7 +264,8 @@ internal static class ThroughTrafficSpawner
                 {
                     foreach (var coach in passengers)
                         if ((coach.GetPassengerMarker()?.CountPassengersForStop(station.passengerStop.identifier) ?? 0) > 0)
-                            unloaded |= station.passengerStop.UnloadCar(coach);
+                            station.passengerStop.LoadUnloadCar(coach, int.MaxValue);
+                            unloaded = true;
                 });
                 if (!unloaded) break;
             }
@@ -278,7 +280,7 @@ internal static class ThroughTrafficSpawner
         if (service.StopIndex >= train.Entries.Count) { Finish(service); return; }
         if (TimetableController.Shared.TryGetStation(train.Entries[service.StopIndex].Station, out var next) && TryGetStationLocation(next, out var nextLocation))
         {
-            service.Target = Graph.Shared.LocationToString(nextLocation);
+            service.Target = Graph.LocationToString(nextLocation);
             if (!NpcDeparturePlacement.FaceDeparture(service, nextLocation))
             { service.Suspended = true; service.WaitingReason = "Clear track to turn NPC power toward its next destination"; return; }
             NpcTrainOperations.Order(lead, nextLocation);
@@ -329,7 +331,7 @@ internal static class ThroughTrafficSpawner
         return new[] { station.code, station.name, station.mapFeature?.name, station.mapFeature?.DisplayName }.Select(Normalize).Any(n => n.Length > 0 && names.Contains(n));
     }
 
-    internal static bool IsInterchange(TimetableStation station) => OpsController.Shared?.EnabledInterchanges.Any(i => MatchesInterchange(station, i)) == true;
+    internal static bool IsInterchange(TimetableStation station) => OpsController.Shared?.AllInterchanges.Any(i => MatchesInterchange(station, i)) == true;
 
     internal static bool TrySpawnRandom(NpcRandomDeparture departure, Settings settings)
     {
@@ -351,15 +353,38 @@ internal static class ThroughTrafficSpawner
     internal static bool TryGetStationLocation(TimetableStation station, out Location location)
     {
         location = Location.Invalid;
+        if (station == null || Graph.Shared == null || !Graph.Shared.HasPopulatedCollections) return false;
         var span = station.passengerStop?.TrackSpans?.FirstOrDefault();
-        if (span != null && Graph.Shared.TryGetLocationFromPoint(span.GetSegments().FirstOrDefault(), span.GetCenterPoint(), 200f, out location)) return true;
-        var interchange = OpsController.Shared?.EnabledInterchanges.FirstOrDefault(i => MatchesInterchange(station, i));
+        if (TryGetSpanLocation(span, out location)) return true;
+        var interchange = OpsController.Shared?.AllInterchanges.FirstOrDefault(i => MatchesInterchange(station, i));
         span = interchange?.TrackSpans.FirstOrDefault();
-        if (span != null && Graph.Shared.TryGetLocationFromPoint(span.GetSegments().FirstOrDefault(), span.GetCenterPoint(), 200f, out location)) return true;
+        if (TryGetSpanLocation(span, out location)) return true;
         var feature = station.mapFeature;
         if (feature == null) return false;
         if (feature.GetType().GetProperty("CenterPoint")?.GetValue(feature, null) is UnityEngine.Vector3 point)
-            return Graph.Shared.TryGetLocationFromGamePoint(point, 200f, out location);
-        return false;
+            if (Graph.Shared.TryGetLocationFromGamePoint(point, 200f, out location)) return true;
+        return Graph.Shared.TryGetLocationFromGamePoint(Helpers.WorldTransformer.WorldToGame(feature.transform.position), 200f, out location);
+    }
+
+    private static bool TryGetSpanLocation(TrackSpan? span, out Location location)
+    {
+        location = Location.Invalid;
+        if (span == null || Graph.Shared == null) return false;
+        // Locked spans can have an empty native segment cache. Never pass its
+        // FirstOrDefault (null) to TryGetLocationFromPoint.
+        var segment = span.GetSegments()?.FirstOrDefault(s => s != null);
+        if (segment != null && Graph.Shared.TryGetLocationFromPoint(segment, span.GetCenterPoint(), 200f, out location)) return true;
+        var lower = span._lower;
+        if (!string.IsNullOrEmpty(lower.segmentId) && (segment = Graph.Shared.Segments.FirstOrDefault(s => s.id == lower.segmentId)) != null) {
+            location = new Location(segment, lower.distance, lower.end);
+            var upper = span._upper;
+            if (upper.segmentId == lower.segmentId) {
+                var end = new Location(segment, upper.distance, upper.end).WithEnd(lower.end);
+                location = new Location(segment, (lower.distance + end.distance) / 2, lower.end);
+            }
+            if (location.IsValid) return true;
+        }
+        // The authoring transform is a final fallback for an unresolved span.
+        return Graph.Shared.TryGetLocationFromGamePoint(Helpers.WorldTransformer.WorldToGame(span.transform.position), 200f, out location);
     }
 }

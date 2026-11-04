@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using Model;
 using Model.Definition;
 using Model.Physics;
@@ -34,7 +34,7 @@ internal class BaseLocomotive_FindSourceLocomotive_Patch
         Car car;
         while (!stop && (car = __instance.set.NextCarConnected(ref carIndex, fromEnd, IntegrationSet.EnumerationCondition.AirAndCoupled, out stop)) != null)
         {
-            if (!(car == __instance) && car is BaseLocomotive baseLocomotive &&  car.Archetype != CarArchetype.Tender && !baseLocomotive.locomotiveControl.air.IsCutOut)
+            if (!(car == __instance) && car is BaseLocomotive baseLocomotive &&  !car.CarType.IsTender && !baseLocomotive.locomotiveControl.air.IsCutOut)
             {
                 return baseLocomotive;
             }
@@ -104,7 +104,7 @@ internal class BaseLocomotive_FindSourceLocomotive_Patch
 //        {
 //            return false;
 //        }
-//        if (__instance.car.Archetype != CarArchetype.Tender)
+//        if (__instance.!car.CarType.IsTender)
 //        {
 //            return false;
 //        }

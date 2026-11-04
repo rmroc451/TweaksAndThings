@@ -8,40 +8,6 @@ namespace Serilog
     }
 }
 
-namespace UnityModManagerNet
-{
-    public sealed class KeyBinding
-    {
-        public static bool ControlHeld;
-        public static bool ShiftHeld;
-        public static bool AltHeld;
-        public static bool KeyHeld;
-        public UnityEngine.KeyCode keyCode;
-        public byte modifiers;
-        public bool Pressed() => KeyHeld;
-        public void Change(UnityEngine.KeyCode key, byte modifier = 0)
-        {
-            keyCode = key;
-            modifiers = modifier;
-        }
-        public static bool Ctrl() => ControlHeld;
-        public static bool Shift() => ShiftHeld;
-        public static bool Alt() => AltHeld;
-    }
-
-    public static class UnityModManager
-    {
-        public sealed class ModEntry { }
-
-        public abstract class ModSettings
-        {
-            public static T? Load<T>(ModEntry entry) where T : ModSettings => default;
-            public static void Save<T>(T settings, ModEntry entry) where T : ModSettings { }
-            public virtual void Save(ModEntry entry) { }
-        }
-    }
-}
-
 namespace UnityEngine
 {
     public enum KeyCode
@@ -53,13 +19,40 @@ namespace UnityEngine
         RightControl,
         LeftShift,
         RightShift,
-        A
+        A,
+        F10
+    }
+
+    public static class Input
+    {
+        private static readonly System.Collections.Generic.HashSet<UnityEngine.KeyCode> held = new();
+        public static bool GetKey(UnityEngine.KeyCode key) => held.Contains(key);
+        public static void SetKey(UnityEngine.KeyCode key, bool value)
+        {
+            if (value) held.Add(key);
+            else held.Remove(key);
+        }
     }
 }
 
-namespace Model.Definition
+namespace Model
 {
-    public enum CarArchetype { Tender, Freight, Caboose }
+    public sealed class CarType
+    {
+        public static readonly CarType Tender = new CarType("Tender", true, false, false);
+        public static readonly CarType Freight = new CarType("Freight", false, true, false);
+        public static readonly CarType Caboose = new CarType("Caboose", false, false, true);
+        private readonly string _name;
+        private CarType(string name, bool isTender, bool isFreight, bool isCaboose)
+        { _name = name; IsTender = isTender; IsFreight = isFreight; IsCaboose = isCaboose; }
+        public bool IsTender { get; }
+        public bool IsFreight { get; }
+        public bool IsCaboose { get; }
+        public bool IsLocomotive => false;
+        public bool IsCoach => false;
+        public bool IsBaggage => false;
+        public override string ToString() => _name;
+    }
 }
 
 namespace HarmonyLib
@@ -71,7 +64,7 @@ namespace HarmonyLib
 }
 namespace Model.Definition.Data
 {
-    public enum LoadUnits { Quantity, Pounds }
+    public enum LoadUnits { Quantity, Pounds, Gallons }
     public sealed class LoadSlot
     {
         public string RequiredLoadIdentifier;
@@ -82,8 +75,8 @@ namespace Model.Definition.Data
     }
     public sealed class CarDefinition
     {
-        public Model.Definition.CarArchetype Archetype;
-        public System.Collections.Generic.List<LoadSlot> LoadSlots = new System.Collections.Generic.List<LoadSlot>();
+        public Model.CarType CarType { get; set; } = Model.CarType.Freight;
+        public System.Collections.Generic.List<LoadSlot> LoadSlots { get; set; } = new System.Collections.Generic.List<LoadSlot>();
     }
 }
 
@@ -129,6 +122,17 @@ namespace UI.SwitchList
         public readonly System.Collections.Generic.HashSet<string> Ids = new System.Collections.Generic.HashSet<string>();
         public bool SwitchListContains(string id) => Ids.Contains(id);
     }
+
+    public static class Input
+    {
+        private static readonly System.Collections.Generic.HashSet<UnityEngine.KeyCode> held = new();
+        public static bool GetKey(UnityEngine.KeyCode key) => held.Contains(key);
+        public static void SetKey(UnityEngine.KeyCode key, bool value)
+        {
+            if (value) held.Add(key);
+            else held.Remove(key);
+        }
+    }
 }
 
 namespace Model.Ops
@@ -148,20 +152,31 @@ namespace Model.Ops
     {
         public void SendSwitchListUpdate(string crew) { }
     }
+
+    public static class Input
+    {
+        private static readonly System.Collections.Generic.HashSet<UnityEngine.KeyCode> held = new();
+        public static bool GetKey(UnityEngine.KeyCode key) => held.Contains(key);
+        public static void SetKey(UnityEngine.KeyCode key, bool value)
+        {
+            if (value) held.Add(key);
+            else held.Remove(key);
+        }
+    }
 }
 
 namespace Model
 {
     public sealed class CarDescriptor
     {
-        public sealed class Info { public Model.Definition.Data.CarDefinition Definition = new Model.Definition.Data.CarDefinition(); }
-        public Info DefinitionInfo = new Info();
+        public sealed class Info { public Model.Definition.Data.CarDefinition Definition { get; set; } = new Model.Definition.Data.CarDefinition(); }
+        public Info DefinitionInfo { get; set; } = new Info();
     }
     public sealed class Car
     {
         public void Setup(CarDescriptor descriptor) { }
         public string id = string.Empty;
-        public Model.Definition.CarArchetype Archetype = Model.Definition.CarArchetype.Freight;
+        public Model.CarType CarType { get; set; } = Model.CarType.Freight;
         public bool IsMotivePower;
         public bool HasRepairBill;
         public System.Collections.Generic.IEnumerable<Car>? Consist;

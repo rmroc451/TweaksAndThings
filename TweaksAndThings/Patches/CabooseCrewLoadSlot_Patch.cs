@@ -1,6 +1,5 @@
 using HarmonyLib;
 using Model;
-using Model.Definition;
 using Model.Definition.Data;
 using System.Linq;
 
@@ -16,7 +15,7 @@ internal static class CabooseCrewLoadSlot_Patch
 
     internal static void EnsureCrewLoadSlot(CarDefinition definition)
     {
-        if (definition == null || definition.Archetype != CarArchetype.Caboose) return;
+        if (definition == null || !definition.CarType.IsCaboose) return;
         if (definition.LoadSlots == null) definition.LoadSlots = new System.Collections.Generic.List<LoadSlot>();
         if (definition.LoadSlots.Any(slot => slot.RequiredLoadIdentifier == "crew-hours")) return;
         definition.LoadSlots.Add(new LoadSlot(LoadUnits.Quantity, 8, "crew-hours"));

@@ -15,6 +15,7 @@ using UI.Tooltips;
 using UnityEngine;
 using Game.State;
 using Game;
+using Model.Ops.Definition;
 
 
 namespace RMROC451.TweaksAndThings.Patches;
@@ -28,6 +29,9 @@ internal class EngineRosterRow_Refresh_Patch
 
     public static void Postfix(EngineRosterRow __instance)
     {
+        try
+        {
+        EngineRosterColumns.Apply(__instance);
         TweaksAndThingsPlugin? tweaksAndThings = TweaksAndThingsPlugin.Instance!;
         RosterFuelColumnSettings? rosterFuelColumnSettings = tweaksAndThings?.settings?.EngineRosterFuelColumnSettings;
 
@@ -35,6 +39,26 @@ internal class EngineRosterRow_Refresh_Patch
         string fuelInfoTooltip = string.Empty;
 
         TweakyTweakTweakers(__instance);
+        var local = tweaksAndThings?.IsEnabled == true ? AeLocalService.Job(__instance._engine) : null;
+        if (local != null)
+        {
+            __instance.infoLabel.text = AeLocalService.Summary(local);
+            __instance.infoTooltip.TooltipInfo = new TooltipInfo("AE Local", local.Status + "\nPlan: " + local.PlanDetail +
+                "\nEngineer: " + local.NativeStatus + "\nDeferred cars: " + local.YardRemainder.Count);
+            return;
+        }
+
+        if (tweaksAndThings.NpcInterchangeTrafficEnabled() && NpcServiceStore.Load())
+        {
+            var service = NpcServiceStore.State.Services.FirstOrDefault(s => s.PowerIds.Contains(__instance._engine.id));
+            if (service != null)
+            {
+                __instance.infoLabel.text = NpcServiceHud.TransferStatus(service);
+                __instance.infoTooltip.TooltipInfo = new TooltipInfo(service.TrainSymbol + " · " + service.InterchangeId,
+                    NpcServiceHud.TransferStatus(service) + (service.WaitingReason.Length > 0 ? "\n" + service.WaitingReason : ""));
+                return;
+            }
+        }
 
         if (tweaksAndThings == null ||
             rosterFuelColumnSettings == null || 
@@ -55,7 +79,7 @@ internal class EngineRosterRow_Refresh_Patch
             bool cabooseRequirementFulfilled = 
                 !tweaksAndThings.RequireConsistCabooseForOilerAndHotboxSpotter() 
                 || consist.ConsistNoFreight() 
-                || (bool)engineOrTender.FindMyCabooseSansLoadRequirement();
+                || HasNearbyCaboose(engineOrTender);
             float offendingPercentage = 100f;
 
             foreach (Car loco in locos)
@@ -68,7 +92,17 @@ internal class EngineRosterRow_Refresh_Patch
                     loadSlots = investigate != null ? investigate.Definition.LoadSlots : Enumerable.Empty<LoadSlot>().ToList();
                 }
 
-                var offender = loadSlots.OrderBy(ls => (investigate.GetLoadInfo(ls.RequiredLoadIdentifier, out int slotIndex)?.Quantity ?? 0) / loadSlots[slotIndex].MaximumCapacity).FirstOrDefault().RequiredLoadIdentifier;
+                if (investigate == null || loadSlots.Count == 0)
+                {
+                    continue;
+                }
+
+                var offender = loadSlots
+                    .Select((slot, index) => (slot, loadInfo: investigate.GetLoadInfo(index)))
+                    .Where(item => item.loadInfo.HasValue)
+                    .OrderBy(item => CalcPercentLoad(item.loadInfo!.Value.Quantity, item.slot.MaximumCapacity))
+                    .Select(item => item.slot.RequiredLoadIdentifier)
+                    .FirstOrDefault();
 
 
                 for (int i = 0; i < loadSlots.Count; i++)
@@ -86,7 +120,7 @@ internal class EngineRosterRow_Refresh_Patch
                             fuelInfoText = loadSlots[i].RequiredLoadIdentifier == offender ? $"{fuelLevel} " : string.Empty;
                         }
 
-                        fuelInfoTooltip += $"{TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity)} {valueOrDefault.LoadString(CarPrototypeLibrary.instance.LoadForId(valueOrDefault.LoadId))} {(!loco.id.Equals(__instance._engine.id) ? $"{loco.DisplayName}" : "")}\n";
+                        fuelInfoTooltip += $"{TextSprites.PiePercent(valueOrDefault.Quantity, loadSlots[i].MaximumCapacity)} {valueOrDefault.LoadString(CarLoadLibrary.GetLoad(valueOrDefault.LoadId))} {(!loco.id.Equals(__instance._engine.id) ? $"{loco.DisplayName}" : "")}\n";
                     }
                 }
             }
@@ -142,6 +176,13 @@ internal class EngineRosterRow_Refresh_Patch
             rosterFuelColumnSettings.EngineRosterFuelStatusColumn = EngineRosterFuelDisplayColumn.None;
             ModLog.Error(ex, "Error Detecting fuel status for engine roster");
         }
+        }
+        catch (Exception ex)
+        {
+            ModLog.Error(ex, "Customizing engine roster row failed; native row refresh completed");
+            ModDiagnosticLog.Write("ENGINE ROSTER", "Row customization failed for " +
+                (__instance != null && __instance._engine != null ? __instance._engine.id : "<unknown>") + ".\n" + ex);
+        }
     }
 
     private static void TweakyTweakTweakers(EngineRosterRow __instance)
@@ -164,14 +205,25 @@ internal class EngineRosterRow_Refresh_Patch
         }
     }
 
+    private static bool HasNearbyCaboose(Car engine)
+    {
+        bool found = engine.FindMyCabooseSansLoadRequirement() != null;
+        return found;
+    }
+
     internal static (string nameLabel, string nameTooltip, int selectedCount)? EngineTextHelper(Car loco, bool mapIcon = false)
     {
         (string nameLabel, string nameTooltip, int selectedCount)? output = null;
         int selectedCount = 0;
-        var players = PerformancePolicies.SummarizePlayers(
-            StateManager.Shared.PlayersManager.AllPlayers.Select(player =>
-                (Name: player.Name,
-                 Selected: new PlayerProperties(PlayerPropertiesManager.Shared._object[player.PlayerId.ToString()]).SelectedCarId == loco.id)));
+        var state = StateManager.Shared;
+        var allPlayers = state.PlayersManager.AllPlayers.ToList();
+        List<(string Name, bool Selected)> playerSummaries = new();
+        foreach (var player in allPlayers)
+        {
+            bool selected = new PlayerProperties(PlayerPropertiesManager.Shared._object[player.PlayerId.ToString()]).SelectedCarId == loco.id;
+            playerSummaries.Add((player.Name, selected));
+        }
+        var players = PerformancePolicies.SummarizePlayers(playerSummaries);
         selectedCount = players.SelectedNames.Count;
 
         if (selectedCount > 0 && players.PlayerCount > 1)

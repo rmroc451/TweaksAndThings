@@ -4,11 +4,10 @@ using RMROC451.TweaksAndThings.Enums;
 using Model;
 using RMROC451.TweaksAndThings.Extensions;
 using UnityEngine;
-using UnityModManagerNet;
 
 namespace RMROC451.TweaksAndThings;
 
-public class Settings : UnityModManager.ModSettings
+public class Settings
 {
 
     public Settings()
@@ -53,6 +52,9 @@ public class Settings : UnityModManager.ModSettings
     public List<WebhookSettings>? WebhookSettingsList;
     public bool HandBrakeAndAirTagModifiers = true;
     public RosterFuelColumnSettings? EngineRosterFuelColumnSettings;
+    public int EngineRosterNameWidth = 150;
+    public int EngineRosterCrewWidth = 100;
+    public int EngineRosterStatusWidth = 280;
     public bool EndGearHelpersRequirePayment;
     public bool RequireConsistCabooseForOilerAndHotboxSpotter;
     public bool CabooseAllowsConsistInfo;
@@ -63,10 +65,12 @@ public class Settings : UnityModManager.ModSettings
     public CrewHourLoadMethod LoadCrewHoursMethod;
     public float CabeeseSearchRadiusFtInMeters;
     public bool TrainBrakeDisplayShowsColorsInCalloutMode;
+    public bool UseMenuContextStyle = true;
     public bool DisableWaypointControls;
     public bool AllowRepairsWithoutWaybill = true;
     public bool ShowWaypointSetNotifications = true;
     public bool ThroughTrafficEnabled = true;
+    public string NpcReportingMark = string.Empty;
     public bool RandomThroughFreightsEnabled;
     public float RandomThroughFreightMultiplier = 1f;
     public bool RandomThroughFreightFirstClass = true;
@@ -84,12 +88,15 @@ public class Settings : UnityModManager.ModSettings
     public string ThroughTrafficTrainSymbolPrefix = ThroughTrafficPolicy.DefaultTrainSymbolPrefix;
     public int ThroughTrafficOnTimeGraceMinutes = ThroughTrafficPolicy.DefaultOnTimeGraceMinutes;
     public int ThroughTrafficDollarsPerPassenger = 3;
-    public KeyBinding ClickAltBinding = new KeyBinding { keyCode = KeyCode.LeftAlt };
-    public KeyBinding ClickControlBinding = new KeyBinding { keyCode = KeyCode.LeftControl };
-    public KeyBinding ClickShiftBinding = new KeyBinding { keyCode = KeyCode.LeftShift };
+    public HotkeyBinding ClickAltBinding = new HotkeyBinding { keyCode = KeyCode.LeftAlt };
+    public HotkeyBinding ClickControlBinding = new HotkeyBinding { keyCode = KeyCode.LeftControl };
+    public HotkeyBinding ClickShiftBinding = new HotkeyBinding { keyCode = KeyCode.LeftShift };
     public bool AutoFollowTrainCtcMarker;
     public bool ShowCtcHudOverlayButton;
     public bool EnableExperimentalSecondMainlineProgressions;
+    public bool EnableExperimentalAeLocalMode;
+    public bool EnableNpcInterchangeTraffic;
+    public bool ShowTimetableStringGraph = true;
 
     internal void AddAnotherRow()
     {
@@ -100,7 +107,12 @@ public class Settings : UnityModManager.ModSettings
         }
     }
 
-    public override void Save(UnityModManager.ModEntry modEntry) => Save(this, modEntry);
+}
+
+public class HotkeyBinding
+{
+    public KeyCode keyCode;
+    public byte modifiers;
 }
 
 public class WebhookSettings
@@ -175,5 +187,7 @@ public static class SettingsExtensions
         input?.settings?.TrainBrakeDisplayShowsColorsInCalloutMode ?? false;
     public static bool DisableWaypointControls(this TweaksAndThingsPlugin input) =>
         input?.settings?.DisableWaypointControls ?? false;
+    public static bool NpcInterchangeTrafficEnabled(this TweaksAndThingsPlugin? input) =>
+        input?.IsEnabled == true && input.settings?.EnableNpcInterchangeTraffic == true;
 
 }

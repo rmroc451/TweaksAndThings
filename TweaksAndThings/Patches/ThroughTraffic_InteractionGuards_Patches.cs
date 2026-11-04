@@ -32,6 +32,8 @@ internal static class ThroughTraffic_TrainController_Couple_Patch
         __state = false;
         if (ThroughTrafficGuard.IsTrustedMutation) return true;
         var cars = __args.OfType<Car>().ToList();
+        if (cars.Count == 2 && cars.All(AeLocalService.Owns) && cars[0].KeyValueObject[AeLocalService.Marker].StringValue == cars[1].KeyValueObject[AeLocalService.Marker].StringValue)
+        { ThroughTrafficGuard.BeginTrustedMutation(); __state = true; return true; }
         if (cars.Count == 2 && cars.Any(NpcPoolPower.IsPooled) && cars.All(c => !ThroughTrafficGuard.IsGenerated(c) || NpcPoolPower.IsPooled(c)))
         {
             ThroughTrafficGuard.BeginTrustedMutation();
@@ -112,12 +114,29 @@ internal static class ThroughTraffic_TrainController_ManualMove_Patch
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class ThroughTraffic_TrainController_Rerail_Patch
 {
-    private static bool Prefix(string[] carIds)
+    private static bool Prefix(string[] carIds, out bool __state)
     {
+        __state = false;
         foreach (string carId in carIds)
-            if (ThroughTrafficGuard.BlockCarIdInteraction(carId)) return false;
+        {
+            if (ThroughTrafficGuard.IsGeneratedCarId(carId))
+            {
+                if (!__state) ThroughTrafficGuard.BeginNpcRerail();
+                __state = true;
+                continue;
+            }
+            if (ThroughTrafficGuard.BlockCarIdInteraction(carId))
+            {
+                if (__state) ThroughTrafficGuard.EndNpcRerail();
+                __state = false;
+                return false;
+            }
+        }
         return true;
     }
+
+    private static System.Exception? Finalizer(bool __state, System.Exception? __exception)
+    { if (__state) ThroughTrafficGuard.EndNpcRerail(); return __exception; }
 }
 
 [HarmonyPatch(typeof(TrainController))]

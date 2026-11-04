@@ -3,13 +3,11 @@
   <Import Project="Assembly.version" Condition="Exists('Assembly.version')" />
   <PropertyGroup>
     <GameManagedDir Condition="'$(GameManagedDir)' == ''">$([System.IO.Directory]::GetDirectories(`$(GameDir)`, `*_Data`)[0])\Managed</GameManagedDir>
-    <UnityModManagerDir Condition="'$(UnityModManagerDir)' == ''">$(GameManagedDir)\UnityModManager</UnityModManagerDir>
   </PropertyGroup>
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <LangVersion>latest</LangVersion>
     <ImplicitUsings>false</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

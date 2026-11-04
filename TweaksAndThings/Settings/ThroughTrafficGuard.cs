@@ -20,12 +20,21 @@ internal static class ThroughTrafficGuard
     private static readonly HashSet<string> notifiedCarIds = new HashSet<string>(StringComparer.Ordinal);
     private static readonly HashSet<string> interactiveControlKeys = BuildInteractiveControlKeys();
     [ThreadStatic] private static int trustedMutationDepth;
+    [ThreadStatic] private static int npcRerailDepth;
 
     internal static bool IsSandbox => StateManager.IsSandbox;
     internal static bool IsTrustedMutation => trustedMutationDepth > 0;
 
     internal static void BeginTrustedMutation() => trustedMutationDepth++;
     internal static void EndTrustedMutation() => trustedMutationDepth = Math.Max(0, trustedMutationDepth - 1);
+    internal static void BeginNpcRerail() => npcRerailDepth++;
+    internal static void EndNpcRerail() => npcRerailDepth = Math.Max(0, npcRerailDepth - 1);
+    internal static void WithNpcRerail(Action action)
+    {
+        BeginNpcRerail();
+        try { action(); }
+        finally { EndNpcRerail(); }
+    }
 
     internal static bool IsGenerated(Car? car)
     {
@@ -47,7 +56,7 @@ internal static class ThroughTrafficGuard
         return BlockInteraction(car);
     }
 
-    internal static bool IsRestricted(Car? car) => IsGenerated(car);
+    internal static bool IsRestricted(Car? car) => IsGenerated(car) || AeLocalService.Owns(car);
 
     internal static bool BlockInteraction(Car? car)
     {
@@ -58,7 +67,13 @@ internal static class ThroughTrafficGuard
 
     internal static bool ShouldBlockPropertyChange(string objectId, string key)
     {
-        if (IsTrustedMutation || !IsGeneratedCarId(objectId)) return false;
+        if (TrainController.Shared == null || !TrainController.Shared.TryGetCarForId(objectId, out var restricted)) return false;
+        if (IsGenerated(restricted) && IsDerailmentKey(key) && npcRerailDepth == 0)
+        {
+            Notify(restricted);
+            return true;
+        }
+        if (IsTrustedMutation || !IsRestricted(restricted)) return false;
         if (TrainController.Shared.TryGetCarForId(objectId, out var pooled) && NpcPoolPower.IsPooled(pooled) && IsCouplerKey(key))
         {
             bool locked = NpcPoolPower.ConnectionBlocked(pooled, key);
@@ -76,7 +91,7 @@ internal static class ThroughTrafficGuard
     internal static bool ShouldBlockConsistMutation(IEnumerable<object> arguments)
     {
         if (IsTrustedMutation) return false;
-        var car = arguments.OfType<Car>().FirstOrDefault(IsGenerated);
+        var car = arguments.OfType<Car>().FirstOrDefault(IsRestricted);
         if (car == null) return false;
         Notify(car);
         return true;
@@ -87,9 +102,10 @@ internal static class ThroughTrafficGuard
         if (!notifiedCarIds.Add(car.id)) return;
         try
         {
+            string message = AeLocalService.Owns(car) ? "AE Local owns this equipment. Pause or cancel its local job before taking control." : Notice;
             var localPlayer = StateManager.Shared?.PlayersManager?.LocalPlayer;
-            if (localPlayer != null) Multiplayer.SendError(localPlayer, Notice, AlertLevel.Info);
-            else car.PostNotice("through-traffic-npc", Notice);
+            if (localPlayer != null) Multiplayer.SendError(localPlayer, message, AlertLevel.Info);
+            else car.PostNotice("through-traffic-npc", message);
         }
         catch { car.PostNotice("through-traffic-npc", Notice); }
     }
@@ -120,6 +136,10 @@ internal static class ThroughTrafficGuard
         Contains(key, "Waybill") || Contains(key, "Owned") || Contains(key, "Destination");
 
     private static bool IsPassengerMarkerKey(string key) => Contains(key, "PassengerMarker");
+
+    private static bool IsDerailmentKey(string key) =>
+        key.Equals(PropertyChange.KeyForControl(PropertyChange.Control.Derailment), StringComparison.OrdinalIgnoreCase) ||
+        Contains(key, "Derailment");
 
     private static bool Contains(string value, string part) => value.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0;
 }

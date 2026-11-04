@@ -1,3 +1,4 @@
+using Game.History;
 using System.Linq;
 using Game;
 using Game.State;
@@ -15,6 +16,7 @@ internal static class NpcHeldDelivery_Restore_Patch
 {
     private static void Postfix(Interchange __instance)
     {
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) return;
         if (!SimulatedInterchangeService.Owns(__instance) || SimulatedInterchangeService.Loading != null)
             NpcHeldDeliveryTracking.Restore(__instance);
         NpcPulpwoodOrdering.Restore(__instance);
@@ -25,7 +27,7 @@ internal static class NpcHeldDelivery_Restore_Patch
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class NpcHeldDelivery_PulpwoodFulfilled_Patch
 {
-    private static void Postfix(Interchange __instance) => NpcPulpwoodOrdering.Restore(__instance);
+    private static void Postfix(Interchange __instance) { if (TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) NpcPulpwoodOrdering.Restore(__instance); }
 }
 
 [HarmonyPatch(typeof(LocationsPanelBuilder.IndustryDetailBuilder), nameof(LocationsPanelBuilder.IndustryDetailBuilder.AddOrdersSection))]
@@ -34,9 +36,11 @@ internal static class NpcHeldDelivery_IndustryPanel_Patch
 {
     private static void Postfix(LocationsPanelBuilder.IndustryDetailBuilder __instance, UIPanelBuilder builder)
     {
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) return;
         builder.RebuildOnInterval(5);
         NpcHeldDeliveryTracking.BuildList(builder, __instance._industry.identifier);
         NpcPulpwoodOrdering.Build(__instance._industry, builder);
+        NpcLogOrdering.Build(__instance._industry, builder);
     }
 }
 
@@ -46,7 +50,7 @@ internal static class NpcHeldDelivery_Premium_Patch
 {
     private static void Postfix(IndustryContext __instance, IOpsCar car, Waybill waybill)
     {
-        if (!StateManager.IsHost || !NpcServiceStore.Load()) return;
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled() || !StateManager.IsHost || !NpcServiceStore.Load()) return;
         var held = NpcServiceStore.State.HeldDeliveries.FirstOrDefault(h => h.CarId == car.Id &&
             h.WaybillCreated == waybill.Created.TotalSeconds && h.DestinationId == waybill.Destination.Identifier);
         if (held == null) return;
@@ -69,7 +73,7 @@ internal static class NpcHeldDelivery_CarPanel_Patch
 {
     private static void Prefix(CarInspector __instance, UIPanelBuilder builder)
     {
-        if (!NpcServiceStore.Load()) return;
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled() || !NpcServiceStore.Load()) return;
         var held = NpcServiceStore.State.HeldDeliveries.FirstOrDefault(h => h.CarId == __instance._car.id);
         if (held != null) builder.AddField("Held delivery", () => NpcHeldDeliveryTracking.CarBonusSummary(__instance._car.id), UIPanelBuilder.Frequency.Periodic)
             .Tooltip("Delivery premium", "The extra bonus decreases with elapsed game time after the next interchange service. Deliver to the waybill destination before the deadline.");

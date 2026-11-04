@@ -9,6 +9,7 @@ internal static class NpcStatusNotice_Patch
 {
     private static bool Prefix(NoticeManager __instance, EntityReference entity, string contextualKey, string content)
     {
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) return true;
         if (contextualKey != NpcServiceHud.NoticeKey || string.IsNullOrEmpty(content)) return true;
         string key = $"{(int)entity.Type}//{entity.Id}//{contextualKey}";
         if (!__instance._notices.TryGetValue(key, out var notice) || notice.Row == null) return true;

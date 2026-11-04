@@ -4,6 +4,21 @@ namespace RMROC451.TweaksAndThings.Tests;
 
 public class SimulationSpeedPolicyTests
 {
+    [Test]
+    public void FastClockRequiresEveryControllingEngineToBeAutomatic()
+    {
+        Assert.That(SimulationSpeedPolicy.AllAutomatic(new[] { true, true }), Is.True);
+        Assert.That(SimulationSpeedPolicy.AllAutomatic(new[] { true, false }), Is.False);
+        Assert.That(SimulationSpeedPolicy.AllAutomatic(new[] { false, true }), Is.False);
+        Assert.That(SimulationSpeedPolicy.AllAutomatic(System.Array.Empty<bool>()), Is.True);
+    }
+    [TestCase(true, false, false, false, false)]
+    [TestCase(false, true, false, false, false)]
+    [TestCase(false, false, true, false, false)]
+    [TestCase(false, false, false, true, false)]
+    [TestCase(false, false, false, false, true)]
+    public void NpcAndPooledPowerNeverBlockFastClock(bool npc, bool pooled, bool mu, bool hidden, bool expected) =>
+        Assert.That(SimulationSpeedPolicy.RequiresAutomatic(npc, pooled, mu, hidden), Is.EqualTo(expected));
     [TestCase(2, 2)] [TestCase(4, 4)] [TestCase(8, 8)] [TestCase(1000, 1)] [TestCase(0, 1)]
     public void OnlySupportedPhysicsRatesAreAccepted(int input, int expected)
         => Assert.That(SimulationSpeedPolicy.Rate(input), Is.EqualTo(expected));

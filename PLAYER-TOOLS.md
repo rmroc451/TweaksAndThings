@@ -6,7 +6,7 @@ Related guides: [freight and industry work](FREIGHT-AND-INDUSTRIES.md), [timetab
 
 ## Expanded car tags
 
-Enable **UI → Enable tag updates for air, handbrake, oil, and hotbox status** in UMM, and enable the game's own car-tag display. Fresh mod settings enable the update option by default; existing settings retain their saved choice.
+Enable **UI → Enable tag updates for air, handbrake, oil, and hotbox status** in the mod's F10 settings window, and enable the game's own car-tag display. Fresh mod settings enable the update option by default; existing settings retain their saved choice.
 
 The mod adds air-system/coupler status, a handbrake indicator, oil/hotbox information where applicable, and a caboose refill marker. Locomotive oil information can summarize the worst applicable car in the connected consist, subject to the existing caboose requirement setting.
 
@@ -55,11 +55,11 @@ Canceling or entering an invalid count leaves the existing preview unchanged. If
 
 ## Caboose crew hours and legacy JSON customization
 
-The UMM version adds crew-hour slots in code during car setup. It checks the native **Caboose** archetype, including compatible custom caboose definitions. If the definition already contains a crew-hours slot, that slot is retained. Otherwise, an eight-hour quantity slot is added.
+The mod adds crew-hour slots in code during car setup. It checks the native **Caboose** archetype, including compatible custom caboose definitions. If the definition already contains a crew-hours slot, that slot is retained. Otherwise, an eight-hour quantity slot is added.
 
 The canonical load identifier is **crew-hours**, with a hyphen. **crew_hours** is a different identifier and is not supported. Adding a slot also requires that the running game can resolve the actual load definition; a misspelled identifier in custom content is not fixed by the slot patch.
 
-The old Railloader cabeese.json file is not a UMM configuration source. This mod does not read additional mixin entries from that file. Custom cabooses using the correct native archetype participate automatically. Custom entries that changed capacity, targeted non-caboose archetypes, or modified unrelated definition fields are not automatically translated into UMM settings. Preserve that file as a reference and migrate those changes through your custom-content provider's supported definition mechanism. There is no new drop-in cabeese.json override reader in this branch.
+The old Railloader `cabeese.json` file is not a configuration source. This mod does not read additional mixin entries from that file. Custom cabooses using the correct native archetype participate automatically. Custom entries that changed capacity, targeted non-caboose archetypes, or modified unrelated definition fields are not automatically translated into mod settings. Preserve that file as a reference and migrate those changes through your custom-content provider's supported definition mechanism. There is no drop-in `cabeese.json` override reader in this branch.
 
 The existing caboose helper costs, crew refilling and player Safety First settings remain available. NPC locomotives are exempt from the player caboose speed cap. Nearby-caboose assistance for interchange transfer time is a separate free benefit and does not debit crew hours.
 

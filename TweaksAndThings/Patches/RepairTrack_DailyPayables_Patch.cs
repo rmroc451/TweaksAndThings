@@ -1,3 +1,4 @@
+using Game.History;
 using Game;
 using Game.State;
 using HarmonyLib;
@@ -100,7 +101,7 @@ internal class RepairTrack_BuildCars_Patch
     public static IEnumerable<Car> EnumerateCarsActualOrig(RepairTrack __instance, IIndustryContext ctx)
     {
         TrainController trainController = TrainController.Shared;
-        return from car in __instance.EnumerateCars(ctx)
+        return from car in __instance.EnumerateCars(ctx, IndustryComponent.CarFilter.CarTypeMatches)
                select trainController.CarForId(car.Id);
     }
 
@@ -163,6 +164,6 @@ internal class RepairTrack_BuildCars_Patch
                     });
                 }
             }
-        }).Padding(new RectOffset(20, 0, 0, 0));
+        });
     }
 }

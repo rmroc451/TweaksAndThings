@@ -4,7 +4,7 @@ using Model.Ops;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
-[HarmonyPatch(typeof(PassengerStop), nameof(PassengerStop.LoadCar))]
+[HarmonyPatch(typeof(PassengerStop), nameof(PassengerStop.ShouldLoadUnloadCar))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class PassengerStop_LoadCar_ThroughTraffic_Patch
 {

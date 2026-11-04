@@ -1,3 +1,4 @@
+using Game.History;
 using Game.State;
 using Game;
 using HarmonyLib;
@@ -12,7 +13,7 @@ namespace RMROC451.TweaksAndThings.Patches;
 
 /// <summary>Settles the scheduled reward or late penalty only for passengers actually delivered.</summary>
 [HarmonyPatch(typeof(PassengerStop))]
-[HarmonyPatch(nameof(PassengerStop.UnloadCar))]
+[HarmonyPatch(nameof(PassengerStop.LoadUnloadCar))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class PassengerStop_UnloadCar_ThroughTraffic_Patch
 {
@@ -22,7 +23,7 @@ internal static class PassengerStop_UnloadCar_ThroughTraffic_Patch
         internal bool TrustedMutation;
     }
 
-    private static void Prefix(PassengerStop __instance, Car car, ref UnloadState __state)
+    private static void Prefix(PassengerStop __instance, Car car, int __1, ref UnloadState __state)
     {
         __state = default;
         if (!StateManager.IsHost || car == null || !ThroughTrafficGuard.IsGenerated(car) || !car.TryGetTimetableTrain(out Timetable.Train train) ||
@@ -35,7 +36,7 @@ internal static class PassengerStop_UnloadCar_ThroughTraffic_Patch
         __state.PassengerCount = marker?.CountPassengersForStop(__instance.identifier) ?? 0;
     }
 
-    private static void Postfix(PassengerStop __instance, Car car, UnloadState __state)
+    private static void Postfix(PassengerStop __instance, Car car, int __1, UnloadState __state)
     {
         if (__state.PassengerCount <= 0 || !StateManager.IsHost || TweaksAndThingsPlugin.Instance?.settings == null ||
             !car.TryGetTimetableTrain(out Timetable.Train train)) return;

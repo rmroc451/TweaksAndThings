@@ -9,96 +9,53 @@ using TMPro;
 using UI;
 using UI.Builder;
 using UI.Common;
-using UI.Tooltips;
+using UI.Windows;
 using UnityEngine;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace RMROC451.TweaksAndThings;
 
-internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
+internal sealed class NpcTrafficWindow
 {
-    private static NpcTrafficWindow? instance;
-    private static Button? toolbarButton;
-    private static float nextToolbarCheck;
-    private Window window = null!;
-    private UIPanel? panel;
+    private static readonly NpcTrafficWindow instance = new();
+    private static CustomWindow? customWindow;
+    private static bool registered;
     private readonly UIState<string> selected = new("active");
-    public string WindowIdentifier => "TweaksAndThings.AITraffic";
-    public Vector2Int DefaultSize => new(850, 550);
-    public Window.Position DefaultPosition => Window.Position.Center;
-    public Window.Sizing Sizing => Window.Sizing.Resizable(new Vector2Int(600, 350));
-    public UIBuilderAssets BuilderAssets { get; set; } = null!;
-
-    private void Awake()
-    {
-        window = GetComponent<Window>();
-        instance = this;
-        // Publicizer exposes the backing field under the event's name as well.
-        typeof(Window).GetEvent("OnShownWillChange")!.AddEventHandler(window, (Action<bool>)(shown =>
-        {
-            if (!shown && !window.IsShown) { panel?.Dispose(); panel = null; }
-        }));
-    }
-    private void OnDisable() { panel?.Dispose(); panel = null; }
-
-    internal static void UpdateToolbar()
-    {
-        if (Time.realtimeSinceStartup < nextToolbarCheck) return;
-        nextToolbarCheck = Time.realtimeSinceStartup + 1;
-        if (toolbarButton != null) return;
-        var area = Object.FindFirstObjectByType<TopRightArea>();
-        if (area == null || area.timetableButton == null) return;
-        // Use the game's button for sizing, hover behavior and toolbar layout.
-        toolbarButton = Object.Instantiate(area.timetableButton, area.timetableButton.transform.parent, false);
-        toolbarButton.name = "TweaksAndThings AI Traffic";
-        toolbarButton.onClick = new Button.ButtonClickedEvent();
-        toolbarButton.onClick.AddListener(() => Toggle());
-        toolbarButton.interactable = true;
-        var layout = toolbarButton.transform.parent.GetComponent<HorizontalLayoutGroup>();
-        if (layout != null && layout.reverseArrangement) toolbarButton.transform.SetAsLastSibling();
-        else toolbarButton.transform.SetAsFirstSibling();
-        // Preserve the native icon and its raycast surface; disabling it makes the button unclickable.
-        if (toolbarButton.targetGraphic != null) toolbarButton.targetGraphic.raycastTarget = true;
-        foreach (var tooltip in toolbarButton.GetComponentsInChildren<UITooltipProvider>(true))
-            tooltip.TooltipInfo = new TooltipInfo("AI traffic / interchanges", "Active NPC trains, interchange schedules, delinquent pickups and traffic settings.");
-        if (toolbarButton.GetComponent<UITooltipProvider>() == null)
-            toolbarButton.gameObject.AddComponent<UITooltipProvider>().TooltipInfo = new TooltipInfo("AI traffic / interchanges", "Open traffic management.");
-        toolbarButton.gameObject.SetActive(true);
-    }
 
     internal static void Show(string tab = "active")
     {
-        if (instance == null)
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) return;
+        var manager = WindowManager.Shared;
+        if (manager == null) { Toast.Present("Load a railroad to open AI traffic."); return; }
+        if (!registered && !manager.HasDefinition("TweaksAndThings.AITraffic"))
         {
-            var creator = Object.FindFirstObjectByType<ProgrammaticWindowCreator>();
-            if (creator == null) { Toast.Present("Load a railroad to open AI traffic."); return; }
-            creator.CreateWindow<NpcTrafficWindow>();
+            manager.RegisterCustomWindow(new CustomWindowDefinition
+            {
+                Identifier = "TweaksAndThings.AITraffic",
+                Title = "AI traffic / interchanges",
+                Config = new WindowConfig(new Vector2Int(850, 550), default, default),
+                BuilderAction = instance.Build
+            });
+            registered = true;
         }
-        instance!.selected.Value = tab;
-        instance.window.Title = "AI traffic / interchanges";
-        instance.panel?.Dispose();
-        instance.panel = UIPanel.Create(instance.window.contentRectTransform, instance.BuilderAssets, instance.Build);
-        instance.window.ShowWindow();
-    }
-
-    private static void Toggle()
-    {
-        if (instance != null && instance.window.IsShown) instance.window.CloseWindow();
-        else Show();
+        instance.selected.Value = tab;
+        customWindow = manager.ShowCustomWindow("TweaksAndThings.AITraffic");
+        customWindow.SetNeedsRebuild();
     }
 
     internal static void Hide()
     {
-        if (toolbarButton != null) Object.Destroy(toolbarButton.gameObject);
-        toolbarButton = null;
-        if (instance != null) instance.window.CloseWindow();
+        customWindow ??= WindowManager.Shared?.GetCustomWindow("TweaksAndThings.AITraffic");
+        customWindow?.Window.CloseWindow();
     }
 
     private void Build(UIPanelBuilder builder) => BuildContents(builder, selected);
 
     internal static void BuildContents(UIPanelBuilder builder, UIState<string> selected)
     {
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) return;
+        ResponsiveModText.Install(builder._container);
         builder.AddTabbedPanels(selected, tabs =>
         {
             tabs.AddTab("Active traffic", "active", BuildActive);
@@ -154,7 +111,7 @@ internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
                     var due = interchange.GetNextServiceTime(Game.TimeWeather.Now, out _);
                     var active = NpcServiceStore.Load() ? NpcServiceStore.State.Services.FirstOrDefault(s => s.InterchangeId == interchange.Identifier) : null;
                     section.AddField("Next service", NpcRandomTrafficPolicy.Clock(active?.Scheduled ?? due.TotalSeconds));
-                    section.AddField("Cars awaiting delivery", interchange.Orders.Sum(o => o.CarCount).ToString());
+                    section.AddField("Cars awaiting delivery", interchange.Orders.Sum(o => o.Quantity.Count).ToString());
                     if (NpcServiceStore.Load()) {
                         foreach (var pool in NpcServiceStore.State.PoolPower.Where(p => p.InterchangeId == interchange.Identifier)) {
                             var pooledLead = pool.PowerIds.Select(id => TrainController.Shared.CarForId(id)).OfType<BaseLocomotive>().FirstOrDefault();
@@ -200,6 +157,10 @@ internal sealed class NpcTrafficWindow : MonoBehaviour, IProgrammaticWindow
         builder.HVScrollView(list =>
         {
             list.AddFieldToggle("Timetable AI traffic", () => settings.ThroughTrafficEnabled, value => { settings.ThroughTrafficEnabled = value; SaveSettings(); });
+            list.AddField("NPC reporting mark", list.AddInputField(settings.NpcReportingMark ?? "", value =>
+            { settings.NpcReportingMark = value.Trim().ToUpperInvariant(); SaveSettings(); }, "Blank = default NPC mark", Game.State.GameStorage.ReportingMarkMaxLength));
+            list.AddLabel("New NPC locomotives use 18xx numbers, then 19xx, 20xx and onward as ranges fill. Reporting-mark changes affect newly generated NPC equipment.");
+            list.AddField("NPC diesel proportion", () => NpcTrainOperations.OwnedDieselShare().ToString("P0") + " of owned locomotive roster", UIPanelBuilder.Frequency.Periodic);
             list.AddFieldToggle("Random through freights", () => settings.RandomThroughFreightsEnabled, value => { settings.RandomThroughFreightsEnabled = value; SaveSettings(); });
             list.AddField("Random traffic multiplier", list.AddInputField(settings.RandomThroughFreightMultiplier.ToString(), value =>
             { if (float.TryParse(value, out float multiplier) && !float.IsNaN(multiplier)) { settings.RandomThroughFreightMultiplier = Math.Max(0, Math.Min(10, multiplier)); SaveSettings(); } }));

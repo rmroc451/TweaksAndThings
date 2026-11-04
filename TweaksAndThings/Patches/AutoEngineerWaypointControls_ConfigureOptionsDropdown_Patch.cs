@@ -45,15 +45,20 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
         {
             var waypointControls = __instance.aiWaypointControls as AutoEngineerWaypointControls;
             var controlledLocomotive = waypointControls?.Locomotive;
-            if (ThroughTrafficGuard.IsGenerated(controlledLocomotive))
+            if (ThroughTrafficGuard.IsRestricted(controlledLocomotive))
             {
                 if (watchyWatchy != null && watchyOwner != null) watchyOwner.StopCoroutine(watchyWatchy);
                 watchyWatchy = null;
                 watchyOwner = null;
                 lastLocoSeenCarId = null;
-                NpcRecoveryControls.Configure(__instance);
+                if (ThroughTrafficGuard.IsGenerated(controlledLocomotive))
+                    NpcRecoveryControls.Configure(__instance);
+                else
+                    AeLocalWindow.Configure(__instance);
                 return;
             }
+            __instance.modeDropdown.gameObject.SetActive(true);
+            AeLocal_ModeOptions_Patch.EnsureOption(__instance);
             string? currentLocomotiveId = controlledLocomotive?.id;
             bool shouldRun = FeaturePolicies.ShouldRunWaypointRefresh(
                 TryGetWaypointMode(__instance),
@@ -112,6 +117,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             if (ThroughTrafficGuard.IsGenerated(selectedLoco))
             { NpcRecoveryControls.Configure(__instance); yield return wait; continue; }
             HashSet<OpsCarPosition?> destinations = [];
+            if (AeLocalWindow.Configure(__instance)) { yield return wait; continue; }
             if (!tweaksAndThings.IsEnabled() || tweaksAndThings.DisableWaypointControls() || !ShouldRecalc(__instance, selectedLoco, out destinations))
             {
                 yield return wait;
@@ -257,7 +263,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                     HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
                     List<RouteSearch.Step> list = new List<RouteSearch.Step>();
 
-                    var totLen = StateManager.IsHost ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength() : CalculateTotalLength(selectedLoco);
+                    var totLen = StateManager.IsHost ? AutoEngineerPlanner.CalculateTotalLength(selectedLoco.EnumerateCoupled().ToList()) : CalculateTotalLength(selectedLoco);
                     if (!Graph.Shared.FindRoute(start, end, autoEngineer, list, out var metrics, checkForCars: false, totLen, trainMomentum))
                     {
                         RouteSearch.Metrics metrics2;
@@ -275,7 +281,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
                             return;
                         }
 
-                        var mw = (location: end, carId: string.Empty);
+                        var mw = new OrderWaypoint(Graph.LocationToString(end), string.Empty);
                         // Supplying the mode initializes native waypoint defaults
                         // (including speed) and sends the first destination atomically.
                         aeoh.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: mw);
@@ -294,7 +300,7 @@ internal class LocomotiveControlsUIAdapter_UpdateCarText_Postfix()
             ? selectedLoco.AutoEngineerPlanner.RouteStartLocation(out trainMomentum)
             : RouteStartLocation(__instance, selectedLoco);
         float totalLength = StateManager.IsHost
-            ? selectedLoco.AutoEngineerPlanner.CalculateTotalLength()
+            ? AutoEngineerPlanner.CalculateTotalLength(selectedLoco.EnumerateCoupled().ToList())
             : CalculateTotalLength(selectedLoco);
         HeuristicCosts autoEngineer = HeuristicCosts.AutoEngineer;
         foreach (OpsCarPosition ocp in locoConsistDestinations)

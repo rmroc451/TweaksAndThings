@@ -10,14 +10,14 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class NpcControls_Cog_Patch
 {
-    private static bool Prefix(LocomotiveControlsUIAdapter __instance) => !NpcRecoveryControls.Configure(__instance);
+    private static bool Prefix(LocomotiveControlsUIAdapter __instance) => !NpcRecoveryControls.Configure(__instance) && !AeLocalWindow.Configure(__instance);
 }
 
 [HarmonyPatch(typeof(LocomotiveControlsUIAdapter), nameof(LocomotiveControlsUIAdapter.DropdownDidChange))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class NpcControls_Mode_Patch
 {
-    private static bool Prefix() => !ThroughTrafficGuard.IsGenerated(TrainController.Shared?.SelectedLocomotive);
+    private static bool Prefix() => !ThroughTrafficGuard.IsRestricted(TrainController.Shared?.SelectedLocomotive);
 }
 
 [HarmonyPatch(typeof(CarInspector), "PopulatePanel")]
@@ -26,8 +26,11 @@ internal static class NpcControls_Inspector_Patch
 {
     private static bool Prefix(CarInspector __instance, UIPanelBuilder builder)
     {
-        if (!ThroughTrafficGuard.IsGenerated(__instance._car)) return true;
-        NpcRecoveryControls.Inspector(__instance._car, builder);
+        if (!ThroughTrafficGuard.IsRestricted(__instance._car)) return true;
+        if (ThroughTrafficGuard.IsGenerated(__instance._car))
+            NpcRecoveryControls.Inspector(__instance._car, builder);
+        else
+            AeLocalWindow.Inspector(__instance._car, builder);
         return false;
     }
 }

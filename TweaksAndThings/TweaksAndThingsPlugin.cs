@@ -6,25 +6,39 @@ using Game.State;
 using Model.Ops;
 using RMROC451.TweaksAndThings.Commands;
 using RMROC451.TweaksAndThings.Enums;
+using RMROC451.TweaksAndThings.Patches;
+using Railroader.Modding;
 using System;
+using System.IO;
 using System.Net.Http;
+using Newtonsoft.Json;
 using UnityEngine;
-using UnityModManagerNet;
 
 namespace RMROC451.TweaksAndThings;
 
-public sealed class TweaksAndThingsPlugin
+public sealed class TweaksAndThingsPlugin : IModEntryPoint, IWorldLifecycle
 {
+    private const string HarmonyId = "RMROC451.TweaksAndThings";
     private static Harmony? harmony;
-    private static UnityModManager.ModEntry? modEntry;
+    private static IModContext? modContext;
+    private static string modDirectory = string.Empty;
+    private static string settingsPath = string.Empty;
     private static HttpClient? client;
+    private static bool initializedAfterMods;
+    private static bool patchesApplied;
+    private static bool loadedCrewSlotsEnsured;
+    private static bool settingsWindowVisible;
+    private static Vector2 settingsScroll;
+    private static Rect settingsWindowRect = new Rect(80, 60, 760, 680);
+    private static HotkeyBinding? bindingCapture;
 
     public static TweaksAndThingsPlugin? Instance { get; private set; }
 
     internal HttpClient Client => client ??= new HttpClient();
     internal Settings? settings { get; private set; }
     internal bool IsEnabled { get; private set; }
-    public string ModDirectory => modEntry?.Path ?? string.Empty;
+    public string ModDirectory => modDirectory;
+    internal static string ModVersion => typeof(TweaksAndThingsPlugin).Assembly.GetName().Version?.ToString() ?? string.Empty;
 
     internal static void LogException(string message, Exception exception)
     {
@@ -36,44 +50,110 @@ public sealed class TweaksAndThingsPlugin
         ModDiagnosticLog.Write("INFO", message);
     }
 
-    private TweaksAndThingsPlugin() { }
+    public TweaksAndThingsPlugin() { }
 
-    public static bool Load(UnityModManager.ModEntry entry)
+    public void OnModLoad(IModContext context)
     {
         try
         {
-            modEntry = entry;
-            ModDiagnosticLog.Initialize(entry.Path);
+            modContext = context;
+            modDirectory = context.ModDirectory;
+            Directory.CreateDirectory(modDirectory);
+            settingsPath = Path.Combine(modDirectory, "Settings.json");
+            ModDiagnosticLog.Initialize(modDirectory);
             ModLog.Initialize();
-            ModDiagnosticLog.Write("SESSION", $"Mod {entry.Info.Version}; directory={entry.Path}; Unity={Application.unityVersion}");
+            ModDiagnosticLog.Write("SESSION", $"Mod {ModVersion}; directory={modDirectory}; Unity={Application.unityVersion}");
             Instance = new TweaksAndThingsPlugin
             {
-                settings = UnityModManager.ModSettings.Load<Settings>(entry) ?? new Settings()
+                settings = LoadSettings()
             };
             Instance.NormalizeSettings();
             ThroughTrafficSpawner.Reset();
             NpcServiceStore.Reset();
 
-            harmony = new Harmony(entry.Info.Id);
-            entry.OnToggle = OnToggle;
-            entry.OnGUI = OnGUI;
-            entry.OnSaveGUI = OnSaveGUI;
-            entry.OnUpdate = OnUpdate;
-
-            if (entry.Enabled)
-            {
-                harmony.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
-                Instance.IsEnabled = true;
-            }
-
-            ModDiagnosticLog.Write("SESSION", "Tweaks and Things loaded for UnityModManager.");
-            return true;
+            harmony = new Harmony(HarmonyId);
+            Instance.IsEnabled = true;
+            initializedAfterMods = false;
+            patchesApplied = false;
+            loadedCrewSlotsEnsured = false;
+            WorldPatchReadiness.WorldLoaded = false;
+            var host = new GameObject("RMROC451.TweaksAndThings");
+            UnityEngine.Object.DontDestroyOnLoad(host);
+            host.AddComponent<TweaksAndThingsUpdateHost>();
+            context.Log.Info($"Tweaks and Things loaded from {modDirectory}.");
         }
         catch (Exception exception)
         {
             ModDiagnosticLog.Write("ERROR", "Failed to load Tweaks and Things\n" + exception);
-            return false;
+            context.Log.Error(exception, "Failed to load Tweaks and Things");
+            throw;
         }
+    }
+
+    public void OnModUnload()
+    {
+        try
+        {
+            try { SaveSettings(); }
+            catch (Exception exception) { modContext?.Log.Error(exception, "Could not save Tweaks and Things settings during unload"); }
+            settingsWindowVisible = false;
+            NpcServiceHud.Hide();
+            NpcTrafficWindow.Hide();
+            NpcSimulationSpeed.Reset();
+            NpcTrafficRouting.Reset();
+            BrysonCtcMirrors.Remove();
+            DoubleMainlineCtc.UpdateTrainMarker(false);
+            DoubleMainlineHudOverlay.Update(false);
+            harmony?.UnpatchAll(HarmonyId);
+            harmony = null;
+            WorldPatchReadiness.WorldLoaded = false;
+            initializedAfterMods = false;
+            patchesApplied = false;
+            ModJoinCompatibility.Reset();
+            if (client != null) { client.Dispose(); client = null; }
+            var host = GameObject.Find("RMROC451.TweaksAndThings");
+            if (host != null) UnityEngine.Object.Destroy(host);
+            Instance = null;
+        }
+        catch (Exception exception) { modContext?.Log.Error(exception, "Failed to clean up Tweaks and Things"); }
+    }
+
+    public void OnWorldLoad()
+    {
+        WorldPatchReadiness.WorldLoaded = true;
+        WorldPatchReadiness.Changed();
+        initializedAfterMods = false;
+        loadedCrewSlotsEnsured = false;
+    }
+
+    public void OnWorldUnload()
+    {
+        WorldPatchReadiness.WorldLoaded = false;
+        initializedAfterMods = false;
+        loadedCrewSlotsEnsured = false;
+        NpcServiceHud.Hide();
+        NpcTrafficWindow.Hide();
+        NpcSimulationSpeed.Reset();
+        NpcTrafficRouting.Reset();
+    }
+
+    private static Settings LoadSettings()
+    {
+        if (!File.Exists(settingsPath)) return new Settings();
+        try { return JsonConvert.DeserializeObject<Settings>(File.ReadAllText(settingsPath)) ?? new Settings(); }
+        catch (Exception exception)
+        {
+            ModDiagnosticLog.Write("ERROR", "Could not read Settings.json; using defaults.\n" + exception);
+            return new Settings();
+        }
+    }
+
+    private static void SaveSettings()
+    {
+        var plugin = Instance;
+        if (plugin?.settings == null || string.IsNullOrEmpty(settingsPath)) return;
+        plugin.NormalizeSettings();
+        File.WriteAllText(settingsPath, JsonConvert.SerializeObject(plugin.settings, Formatting.Indented));
     }
 
     private void NormalizeSettings()
@@ -92,53 +172,30 @@ public sealed class TweaksAndThingsPlugin
         settings.HeldDeliveryPremiumPercent = Math.Max(0, Math.Min(100, settings.HeldDeliveryPremiumPercent));
     }
 
-    private static bool OnToggle(UnityModManager.ModEntry entry, bool value)
-    {
-        try
-        {
-            var plugin = Instance;
-            if (plugin == null || harmony == null) return false;
-            if (plugin.IsEnabled == value) return true;
-            if (value)
-            {
-                harmony.PatchCategory(entry.Info.Id.Replace(".", string.Empty));
-            }
-            else
-            {
-                NpcServiceHud.Hide();
-                NpcSimulationSpeed.Reset();
-                NpcTrafficRouting.Reset();
-                NpcTrafficWindow.Hide();
-                BrysonCtcMirrors.Remove();
-                DoubleMainlineCtc.UpdateTrainMarker(false);
-                DoubleMainlineHudOverlay.Update(false);
-                harmony.UnpatchAll(entry.Info.Id);
-            }
-            plugin.IsEnabled = value;
-            return true;
-        }
-        catch (Exception exception)
-        {
-            ModDiagnosticLog.Write("ERROR", (value ? "Failed to enable Tweaks and Things" : "Failed to disable Tweaks and Things") + "\n" + exception);
-            return false;
-        }
-    }
-
-    private static void OnSaveGUI(UnityModManager.ModEntry entry)
-    {
-        var plugin = Instance;
-        if (plugin?.settings == null) return;
-        plugin.NormalizeSettings();
-        plugin.settings.Save(entry);
-    }
-
     internal static void SaveTrafficSettings()
     {
-        if (modEntry != null) OnSaveGUI(modEntry);
+        SaveSettings();
     }
 
     private static readonly float[] nextSlowUpdateNotice = new float[3];
-    private static void ReportUpdateDuration(UnityModManager.ModEntry entry, int component, string name, long start)
+    internal static void NativeLateUpdate()
+    {
+        if (Instance?.IsEnabled != true || initializedAfterMods || !WorldPatchReadiness.Ready) return;
+        try
+        {
+            if (!patchesApplied)
+            {
+                harmony!.PatchCategory("RMROC451TweaksAndThings");
+                patchesApplied = true;
+            }
+            loadedCrewSlotsEnsured = EnsureLoadedCabooseSlots();
+            initializedAfterMods = true;
+            WorldPatchReadiness.Changed();
+            modContext?.Log.Info("Gameplay patches initialized after the world graph settled.");
+        }
+        catch (Exception ex) { LogException("Deferred mod initialization failed", ex); Instance.IsEnabled = false; }
+    }
+    private static void ReportUpdateDuration(int component, string name, long start)
     {
         double milliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - start) * 1000d / System.Diagnostics.Stopwatch.Frequency;
         if (milliseconds < 50 || UnityEngine.Time.realtimeSinceStartup < nextSlowUpdateNotice[component]) return;
@@ -146,31 +203,68 @@ public sealed class TweaksAndThingsPlugin
         ModDiagnosticLog.Write("PERFORMANCE", $"{name} took {milliseconds:F1} ms.");
     }
 
-    private static void OnUpdate(UnityModManager.ModEntry entry, float deltaTime)
+    private static bool EnsureLoadedCabooseSlots()
     {
+        var controller = TrainController.Shared;
+        if (controller == null) return false;
+        foreach (var car in controller.Cars)
+            if (car != null) CabooseCrewLoadSlot_Patch.EnsureCrewLoadSlot(car.Definition);
+        return true;
+    }
+
+    internal static void NativeUpdate(float deltaTime)
+    {
+        if (bindingCapture != null)
+        {
+            foreach (KeyCode keyCode in Enum.GetValues(typeof(KeyCode)))
+            {
+                if (keyCode == KeyCode.None || !Input.GetKeyDown(keyCode)) continue;
+                bindingCapture.keyCode = keyCode;
+                bindingCapture.modifiers = 0;
+                bindingCapture = null;
+                SaveSettings();
+                break;
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.F10)) settingsWindowVisible = !settingsWindowVisible;
         var plugin = Instance;
-        if (plugin?.IsEnabled != true || plugin.settings == null) return;
+        if (plugin?.IsEnabled != true || !initializedAfterMods || plugin.settings == null) return;
+        if (!loadedCrewSlotsEnsured) loadedCrewSlotsEnsured = EnsureLoadedCabooseSlots();
         try
         {
+            ModJoinCompatibility.Update();
+            if (NewGameStartPicker.Choosing) return;
+            Patches.AutoEngineerRunaround.Tick();
+            if (plugin.settings.EnableNpcInterchangeTraffic) NpcLoadRecovery.Update();
+            AeLocalService.Tick();
+            AeLocalNotices.Update();
+            NewGameStartOptions.InspectLoadedMap();
+            NpcLogOrdering.Tick();
             long start = System.Diagnostics.Stopwatch.GetTimestamp();
             DoubleMainlineRuntime.Update();
             DoubleMainlineCtc.UpdateTrainMarker(plugin.settings.AutoFollowTrainCtcMarker);
             DoubleMainlineHudOverlay.Update(plugin.settings.ShowCtcHudOverlayButton);
-            NpcSimulationSpeed.Update();
-            if (StateManager.IsHost) NpcDailyTrafficPlans.Tick(plugin.settings, Game.TimeWeather.Now.TotalSeconds);
-            ThroughTrafficSpawner.Tick(plugin.settings, deltaTime);
-            ReportUpdateDuration(entry, 0, "timetable traffic", start);
+            if (plugin.settings.EnableNpcInterchangeTraffic) NpcSimulationSpeed.Update();
+            if (plugin.settings.EnableNpcInterchangeTraffic)
+            {
+                if (StateManager.IsHost) NpcDailyTrafficPlans.Tick(plugin.settings, Game.TimeWeather.Now.TotalSeconds);
+                ThroughTrafficSpawner.Tick(plugin.settings, deltaTime);
+            }
+            ReportUpdateDuration(0, "timetable traffic", start);
             start = System.Diagnostics.Stopwatch.GetTimestamp();
-            if (StateManager.IsHost) NpcTrainOperations.AdvancePlanning();
-            SimulatedInterchangeService.Tick(plugin.settings, deltaTime);
-            ReportUpdateDuration(entry, 1, "interchange service", start);
+            if (plugin.settings.EnableNpcInterchangeTraffic)
+            {
+                if (StateManager.IsHost) NpcTrainOperations.AdvancePlanning();
+                SimulatedInterchangeService.Tick(plugin.settings, deltaTime);
+            }
+            ReportUpdateDuration(1, "interchange service", start);
             start = System.Diagnostics.Stopwatch.GetTimestamp();
-            NpcTrafficWindow.UpdateToolbar();
             BrysonCtcMirrors.Update();
-            NpcServiceHud.Update();
+            if (plugin.settings.EnableNpcInterchangeTraffic) NpcServiceHud.Update();
+            if (plugin.settings.EnableNpcInterchangeTraffic) NpcMaintenance.Update();
             TimetableHistory.Update();
-            NpcTrafficDiagnostics.UpdateFileSnapshot();
-            ReportUpdateDuration(entry, 2, "NPC HUD", start);
+            if (plugin.settings.EnableNpcInterchangeTraffic) NpcTrafficDiagnostics.UpdateFileSnapshot();
+            ReportUpdateDuration(2, "NPC HUD", start);
         }
         catch (Exception exception)
         {
@@ -179,13 +273,55 @@ public sealed class TweaksAndThingsPlugin
     }
 
     private static int selectedTab;
-    private static readonly string[] Tabs = { "Caboose Mods", "UI", "Webhooks", "Crew Update", "Keybindings", "AI Traffic", "Experimental" };
+    private static readonly string[] Tabs = { 
+        "Caboose Mods", 
+        "UI", 
+        "Webhooks", 
+        "Crew Update", 
+        "Keybindings",
+        //"NPC Traffic",
+        //"Experimental",
+    };
     private static readonly string[] CrewLoadMethods = { "Tracks", "Daily" };
     private static readonly string[] FuelColumns = { "None", "Engine", "Crew", "Status" };
     private static string crewUpdateMessage = string.Empty;
     private static bool includeCrewUpdateArea = true;
 
-    private static void OnGUI(UnityModManager.ModEntry entry)
+    internal static void NativeOnGUI()
+    {
+        if (!settingsWindowVisible || Instance?.settings == null) return;
+        Color previousColor = GUI.color;
+        Color previousBackgroundColor = GUI.backgroundColor;
+        Color previousContentColor = GUI.contentColor;
+        try
+        {
+            GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b, 1f);
+            GUI.backgroundColor = new Color(previousBackgroundColor.r, previousBackgroundColor.g, previousBackgroundColor.b, 1f);
+            GUI.contentColor = new Color(previousContentColor.r, previousContentColor.g, previousContentColor.b, 1f);
+            settingsWindowRect = GUI.Window(45102, settingsWindowRect, DrawSettingsWindow, "RMROC451's Tweaks and Things");
+        }
+        finally
+        {
+            GUI.color = previousColor;
+            GUI.backgroundColor = previousBackgroundColor;
+            GUI.contentColor = previousContentColor;
+        }
+    }
+
+    private static void DrawSettingsWindow(int windowId)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("F10 toggles this window. Settings are saved in Settings.json beside the mod.");
+        if (GUILayout.Button("Save", GUILayout.Width(80))) SaveSettings();
+        if (GUILayout.Button("Close", GUILayout.Width(80))) settingsWindowVisible = false;
+        GUILayout.EndHorizontal();
+        settingsScroll = GUILayout.BeginScrollView(settingsScroll);
+        DrawSettingsContents();
+        GUILayout.EndScrollView();
+        GUI.DragWindow(new Rect(0, 0, 10000, 24));
+    }
+
+    private static void DrawSettingsContents()
     {
         if (GUILayout.Button("Report a bug / feature")) Application.OpenURL("https://github.com/rmroc451/TweaksAndThings/issues");
         var settings = Instance?.settings;
@@ -207,11 +343,38 @@ public sealed class TweaksAndThingsPlugin
             case 3: DrawCrewUpdate(); break;
             case 4: DrawKeybindings(settings); break;
             case 5:
-                GUILayout.Label("AI traffic and interchange controls are in their own game window, opened with the leftmost AI button in the top-right toolbar.");
-                if (GUILayout.Button("Open AI traffic / interchanges")) NpcTrafficWindow.Show();
-                GUILayout.Label("Diagnostic log: " + ModDiagnosticLog.FilePath);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label("Experimental NPC traffic is disabled by default. When disabled, Railroader uses its native simulated interchange traffic.");
+                bool npcTrafficEnabled = GUILayout.Toggle(settings.EnableNpcInterchangeTraffic, "Enable NPC interchange traffic, timetable traffic, and NPC clock controls");
+                if (npcTrafficEnabled != settings.EnableNpcInterchangeTraffic)
+                {
+                    settings.EnableNpcInterchangeTraffic = npcTrafficEnabled;
+                    SaveSettings();
+                    if (!npcTrafficEnabled)
+                    {
+                        NpcTrafficWindow.Hide(); NpcServiceHud.Hide(); NpcSimulationSpeed.Reset();
+                        InterchangeTimewarp_Patch.CancelForDisable();
+                    }
+                }
+                if (settings.EnableNpcInterchangeTraffic && GUILayout.Button("Open AI traffic and interchanges")) NpcTrafficWindow.Show("settings");
+                GUILayout.EndVertical();
                 break;
             case 6:
+                GUILayout.Space(8f);
+
+                GUILayout.Label("Experimental Auto Engineer mode");
+                GUILayout.Label("AE Local is an experimental switching mode. It is disabled by default.");
+                bool aeLocalEnabled = GUILayout.Toggle(
+                    settings.EnableExperimentalAeLocalMode,
+                    "Enable AE Local mode in locomotive controls");
+                if (aeLocalEnabled != settings.EnableExperimentalAeLocalMode)
+                {
+                    settings.EnableExperimentalAeLocalMode = aeLocalEnabled;
+                    SaveSettings();
+                }
+                GUILayout.Label("This setting controls whether AE Local appears as a mode option. Reopen locomotive controls after changing it.");
+
+                GUILayout.Space(8f);
                 GUILayout.Label("EXTREMELY WIP — experimental second-mainline progressions");
                 GUILayout.Label("This feature can create broken, colliding, or invisible track and unfinished CTC signaling. It is disabled by default.");
                 settings.EnableExperimentalSecondMainlineProgressions = GUILayout.Toggle(
@@ -291,19 +454,19 @@ public sealed class TweaksAndThingsPlugin
     private static void DrawKeybindings(Settings settings)
     {
         GUILayout.Label("These bindings replace the hard-coded click modifiers. Hold the binding while clicking a car or map location.");
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Alt action modifier", GUILayout.Width(160f));
-        UnityModManager.UI.DrawKeybinding(ref settings.ClickAltBinding);
-        GUILayout.EndHorizontal();
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Control action modifier", GUILayout.Width(160f));
-        UnityModManager.UI.DrawKeybinding(ref settings.ClickControlBinding);
-        GUILayout.EndHorizontal();
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Shift action modifier", GUILayout.Width(160f));
-        UnityModManager.UI.DrawKeybinding(ref settings.ClickShiftBinding);
-        GUILayout.EndHorizontal();
+        DrawBinding("Alt action modifier", settings.ClickAltBinding);
+        DrawBinding("Control action modifier", settings.ClickControlBinding);
+        DrawBinding("Shift action modifier", settings.ClickShiftBinding);
         GUILayout.Label("Defaults are Left Alt, Left Control, and Left Shift. The existing click combinations still work by holding multiple action modifiers together.");
+    }
+
+    private static void DrawBinding(string label, HotkeyBinding binding)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(label, GUILayout.Width(180f));
+        string button = ReferenceEquals(bindingCapture, binding) ? "Press a key..." : binding.keyCode.ToString();
+        if (GUILayout.Button(button, GUILayout.Width(180f))) bindingCapture = binding;
+        GUILayout.EndHorizontal();
     }
 
     private static void DrawCabooseSettings(Settings settings)
@@ -331,6 +494,8 @@ public sealed class TweaksAndThingsPlugin
 
     private static void DrawUiSettings(Settings settings)
     {
+        settings.ShowTimetableStringGraph = GUILayout.Toggle(settings.ShowTimetableStringGraph, "Show timetable string graph in the timetable window");
+        settings.UseMenuContextStyle = GUILayout.Toggle(settings.UseMenuContextStyle, "Use menu-style car context menu (uncheck for cog style)");
         settings.HandBrakeAndAirTagModifiers = GUILayout.Toggle(settings.HandBrakeAndAirTagModifiers, "Enable tag updates for air, handbrake, oil, and hotbox status");
         bool enabled = GUI.enabled;
         if (ModSettingsAuthority.HostControlsLocked) GUILayout.Label("Host only — repair service settings are read-only.");
@@ -339,7 +504,7 @@ public sealed class TweaksAndThingsPlugin
         settings.ServicingFundPenalty = GUILayout.Toggle(settings.ServicingFundPenalty, "Allow repair and interchange servicing with insufficient funds (20% overdraft fee)");
         GUI.enabled = enabled;
         settings.ShowWaypointSetNotifications = GUILayout.Toggle(settings.ShowWaypointSetNotifications, "Show WP SET notifications");
-        settings.TrainBrakeDisplayShowsColorsInCalloutMode = GUILayout.Toggle(settings.TrainBrakeDisplayShowsColorsInCalloutMode, "Show train brake colors in callout mode");
+        settings.TrainBrakeDisplayShowsColorsInCalloutMode = GUILayout.Toggle(settings.TrainBrakeDisplayShowsColorsInCalloutMode, "Show destination colors in train brake display while tags are visible");
         settings.DisableWaypointControls = GUILayout.Toggle(settings.DisableWaypointControls, "Disable waypoint controls");
         settings.AutoFollowTrainCtcMarker = GUILayout.Toggle(
             settings.AutoFollowTrainCtcMarker,
@@ -350,6 +515,15 @@ public sealed class TweaksAndThingsPlugin
 
         GUILayout.Space(6f);
         GUILayout.Label("Fuel display in engine roster");
+        GUILayout.Label("Engine roster column widths (pixels; narrower panels shrink columns to fit)");
+        GUILayout.Label("Locomotive: " + settings.EngineRosterNameWidth);
+        settings.EngineRosterNameWidth = Mathf.RoundToInt(GUILayout.HorizontalSlider(settings.EngineRosterNameWidth, 60, 600));
+        GUILayout.Label("Crew / mode: " + settings.EngineRosterCrewWidth);
+        settings.EngineRosterCrewWidth = Mathf.RoundToInt(GUILayout.HorizontalSlider(settings.EngineRosterCrewWidth, 60, 600));
+        GUILayout.Label("Status: " + settings.EngineRosterStatusWidth);
+        settings.EngineRosterStatusWidth = Mathf.RoundToInt(GUILayout.HorizontalSlider(settings.EngineRosterStatusWidth, 60, 600));
+        if (GUILayout.Button("Reset roster column widths"))
+        { settings.EngineRosterNameWidth = 150; settings.EngineRosterCrewWidth = 100; settings.EngineRosterStatusWidth = 280; }
         var current = (int)(settings.EngineRosterFuelColumnSettings?.EngineRosterFuelStatusColumn ?? EngineRosterFuelDisplayColumn.None);
         var selected = GUILayout.SelectionGrid(current, FuelColumns, FuelColumns.Length);
         if (Enum.IsDefined(typeof(EngineRosterFuelDisplayColumn), selected))
@@ -380,4 +554,15 @@ public sealed class TweaksAndThingsPlugin
         }
         settings.WebhookSettingsList = SettingsExtensions.SanitizeEmptySettings(rows);
     }
+}
+
+internal sealed class TweaksAndThingsUpdateHost : MonoBehaviour
+{
+    private void Update() => TweaksAndThingsPlugin.NativeUpdate(Time.deltaTime);
+    private void LateUpdate()
+    {
+        TweaksAndThingsPlugin.NativeLateUpdate();
+        TrainBrakeDisplayRefresh.Tick();
+    }
+    private void OnGUI() => TweaksAndThingsPlugin.NativeOnGUI();
 }

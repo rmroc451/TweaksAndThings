@@ -1,3 +1,4 @@
+#if RAILROADER_LEGACY_API
 using System;
 using System.Collections.Generic;
 using System.Collections;
@@ -9,6 +10,7 @@ using HarmonyLib;
 using Model.Ops;
 using Track;
 using UnityEngine;
+using Section = Game.Progression.Milestone;
 using ILogger = Serilog.ILogger;
 
 namespace RMROC451.TweaksAndThings;
@@ -269,19 +271,12 @@ internal static class DoubleMainlineRuntime
         return candidates;
     }
 
-    private static Section.DeliveryPhase[] CloneDeliveryPhases(Section.DeliveryPhase[] phases) =>
-        (phases ?? Array.Empty<Section.DeliveryPhase>()).Select(phase => new Section.DeliveryPhase
-        {
-            cost = phase.cost,
-            industryComponent = phase.industryComponent,
-            deliveries = (phase.deliveries ?? Array.Empty<Section.Delivery>()).Select(delivery => new Section.Delivery
-            {
-                carTypeFilter = delivery.carTypeFilter,
-                count = delivery.count,
-                load = delivery.load,
-                direction = delivery.direction
-            }).ToArray()
-        }).ToArray();
+    private static TPhase[] CloneDeliveryPhases<TPhase>(TPhase[] phases) where TPhase : class
+    {
+        if (phases == null || phases.Length == 0) return Array.Empty<TPhase>();
+        var cloneMethod = typeof(object).GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return phases.Select(phase => (TPhase)cloneMethod.Invoke(phase, null)!).ToArray();
+    }
 
     private static void ApplyCtcCostMultipliers(Progression progression)
     {
@@ -2430,3 +2425,24 @@ internal static class DoubleMainlineGraph_RebuildCollections_Patch
 {
     private static void Postfix() => DoubleMainlineRuntime.InvalidateTrackScanCache();
 }
+#else
+namespace RMROC451.TweaksAndThings;
+
+/// <summary>
+/// The legacy generator requires Unity-backed progression sections and TrackSegment components.
+/// The current Railroader API stores milestones and track geometry as model data, so generation is
+/// intentionally unavailable until that subsystem is ported to the new model.
+/// </summary>
+internal static class DoubleMainlineRuntime
+{
+    private const string Unsupported = "Second Mainline generation is unavailable with the current Railroader track/progression API.";
+
+    internal static void Update() { }
+    internal static string SetRendererVisibilityOverride(bool force) => Unsupported;
+    internal static string PauseGeneration() => Unsupported;
+    internal static string BeginSegmentStepping(string groupId) => Unsupported;
+    internal static string StepNextGeneratedSegment() => Unsupported;
+    internal static string SegmentSteppingStatus() => Unsupported;
+    internal static string ResumeGeneration() => Unsupported;
+}
+#endif

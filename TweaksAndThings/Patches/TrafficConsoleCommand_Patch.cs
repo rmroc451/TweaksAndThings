@@ -5,7 +5,7 @@ using UI.Console;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
-// UMM does not perform Railloader's attribute-based command registration.
+// The game DLL loader does not perform Relay's attribute-based command registration.
 [HarmonyPatch(typeof(CommandProcessor), nameof(CommandProcessor.ProcessCommand))]
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal static class TrafficConsoleCommand_Patch
@@ -14,6 +14,7 @@ internal static class TrafficConsoleCommand_Patch
     {
         if (parts.Length > 0 && string.Equals(parts[0], "/npcPickups", System.StringComparison.OrdinalIgnoreCase))
         {
+            if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) { output = "NPC interchange traffic is disabled in the F10 settings."; __result = true; return false; }
             NpcTrafficWindow.Show("delinquent");
             output = "Opened delinquent pickup list.";
             __result = true;
@@ -56,6 +57,7 @@ internal static class TrafficConsoleCommand_Patch
             return false;
         }
         if (parts.Length == 0 || !string.Equals(parts[0], "/npcTraffic", System.StringComparison.OrdinalIgnoreCase)) return true;
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) { output = "NPC interchange traffic is disabled in the F10 settings."; __result = true; return false; }
         output = NpcTrafficDiagnostics.Snapshot();
         TweaksAndThingsPlugin.LogDiagnostic(output);
         __result = true;

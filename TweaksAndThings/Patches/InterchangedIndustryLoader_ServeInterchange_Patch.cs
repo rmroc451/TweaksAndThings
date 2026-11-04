@@ -44,10 +44,10 @@ internal static class InterchangedIndustryLoader_ServeInterchange_Patch
 
         foreach (var order in orders)
         {
-            order.Car.Load(__instance.load, order.Capacity);
+            order.Car.Load(__instance.load, order.Capacity, interchange.Identifier);
             order.Car.SetWaybill(null, __instance, "Full");
             ctx.MoveToBardo(order.Car);
-            __instance.ScheduleReturnFromBardo(order.Car, returnTime);
+            interchange.OrderReturnFromBardo(new[] { order.Car.Id });
         }
 
         if (totalCost > 0)

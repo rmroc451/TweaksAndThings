@@ -10,48 +10,43 @@ using UI.Common;
 using RMROC451.TweaksAndThings.Extensions;
 using UI.SwitchList;
 using UnityEngine;
+using UI.Windows;
 
 namespace RMROC451.TweaksAndThings;
 
-internal sealed class WaybillSummaryWindow : MonoBehaviour, IProgrammaticWindow
+internal sealed class WaybillSummaryWindow
 {
-    private static WaybillSummaryWindow? instance;
-    private Window window = null!;
-    private UIPanel? panel;
+    private static readonly WaybillSummaryWindow instance = new();
+    private static CustomWindow? customWindow;
+    private static bool registered;
     private string? carId;
     private readonly UIState<string> tab = new("consist");
-    public string WindowIdentifier => "TweaksAndThings.WaybillSummary";
-    public Vector2Int DefaultSize => new(760, 520);
-    public Window.Position DefaultPosition => Window.Position.Center;
-    public Window.Sizing Sizing => Window.Sizing.Resizable(new Vector2Int(550, 300));
-    public UIBuilderAssets BuilderAssets { get; set; } = null!;
-
-    private void Awake()
-    {
-        window = GetComponent<Window>(); instance = this;
-        typeof(Window).GetEvent("OnShownWillChange")!.AddEventHandler(window, (System.Action<bool>)(shown =>
-        { if (!shown && !window.IsShown) { panel?.Dispose(); panel = null; } }));
-    }
-    private void OnDisable() { panel?.Dispose(); panel = null; }
 
     internal static void Show(Car? caboose = null)
     {
-        if (instance == null)
+        var manager = WindowManager.Shared;
+        if (manager == null) { Toast.Present("Load a railroad to see the waybill summary."); return; }
+        if (!registered && !manager.HasDefinition("TweaksAndThings.WaybillSummary"))
         {
-            var creator = Object.FindFirstObjectByType<ProgrammaticWindowCreator>();
-            if (creator == null) { Toast.Present("Load a railroad to see the waybill summary."); return; }
-            creator.CreateWindow<WaybillSummaryWindow>();
+            manager.RegisterCustomWindow(new CustomWindowDefinition
+            {
+                Identifier = "TweaksAndThings.WaybillSummary",
+                Title = "Waybill / switch list summary",
+                Config = new WindowConfig(new Vector2Int(1000, 700), default, default),
+                BuilderAction = instance.Build
+            });
+            registered = true;
         }
-        instance!.carId = caboose?.id;
+        instance.carId = caboose?.id;
         instance.tab.Value = caboose == null ? "switch" : "consist";
-        instance.window.Title = "Waybill / switch list summary";
-        instance.panel?.Dispose();
-        instance.panel = UIPanel.Create(instance.window.contentRectTransform, instance.BuilderAssets, instance.Build);
-        instance.window.ShowWindow();
+        customWindow = manager.ShowCustomWindow("TweaksAndThings.WaybillSummary");
+        customWindow.Window.SetResizable(new Vector2(850, 550), new Vector2(int.MaxValue, int.MaxValue));
+        customWindow.SetNeedsRebuild();
     }
 
     private void Build(UIPanelBuilder builder)
     {
+        ResponsiveModText.Install(builder._container);
         builder.AddTabbedPanels(tab, tabs =>
         {
             tabs.AddTab("Caboose consist", "consist", b => BuildSummary(b, false));
@@ -81,7 +76,7 @@ internal sealed class WaybillSummaryWindow : MonoBehaviour, IProgrammaticWindow
                 if (carId == null || !TrainController.Shared.TryGetCarForId(carId, out var caboose))
                 { content.AddLabel("Open this summary from a caboose to select a consist."); return; }
                 content.AddLabel(caboose.DisplayName + " · " + caboose.VelocityMphAbs.ToString("N0") + " mph");
-                entries.Rebuild(caboose.EnumerateCoupled().Where(c => !c.MotivePower() && c.Archetype != Model.Definition.CarArchetype.Tender).Select(c => c.id));
+                entries.Rebuild(caboose.EnumerateCoupled().Where(c => !c.MotivePower() && !c.CarType.IsTender).Select(c => c.id));
             }
             var cars = Resolve(entries.Entries);
             content.AddLabel("Total: " + Metrics(cars) + $" · {entries.Entries.Count(e => e.Completed)} completed");

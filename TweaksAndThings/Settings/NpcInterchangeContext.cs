@@ -15,6 +15,7 @@ internal sealed class NpcInterchangeContext : IIndustryContext
     public GameDateTime Now => inner.Now;
     public float DeltaTime => inner.DeltaTime;
     public float PortionOfDayUntilNextRegularService => inner.PortionOfDayUntilNextRegularService;
+    public Core.Random.IRandom Random => inner.Random;
     // Loading takes place at the remote service-train spawn, not in the destination yard.
     // Existing yard cars must not consume the backend's incoming-train capacity.
     // The native fitter still checks real yard occupancy when we set cars out on arrival.
@@ -31,22 +32,24 @@ internal sealed class NpcInterchangeContext : IIndustryContext
     public void MoveToBardo(IOpsCar car) => inner.MoveToBardo(car);
     public void OrderAwayEmpty(IOpsCar car, string orderTag, bool noPayment) => inner.OrderAwayEmpty(car, orderTag, noPayment);
     public void OrderAwayLoaded(IOpsCar car, string orderTag, bool noPayment) => inner.OrderAwayLoaded(car, orderTag, noPayment);
-    public bool OrderLoad(CarTypeFilter carTypeFilter, Load load, string orderTag, bool noPayment, out float quantity) => inner.OrderLoad(carTypeFilter, load, orderTag, noPayment, out quantity);
-    public void OrderEmpty(CarTypeFilter carTypeFilter, string orderTag, bool noPayment) => inner.OrderEmpty(carTypeFilter, orderTag, noPayment);
+    public bool OrderLoad(CarTypeFilter carTypeFilter, Load load, OrderQuantity quantity, string orderTag, bool noPayment) => inner.OrderLoad(carTypeFilter, load, quantity, orderTag, noPayment);
+    public bool OrderEmpty(CarTypeFilter carTypeFilter, Load load, OrderQuantity quantity, string orderTag, bool noPayment) => inner.OrderEmpty(carTypeFilter, load, quantity, orderTag, noPayment);
     public float QuantityOnOrder(Load load) => inner.QuantityOnOrder(load);
-    public int NumberOfCarsOnOrder(Load load) => inner.NumberOfCarsOnOrder(load);
     public int NumberOfCarsOnOrderForTag(string tag) => inner.NumberOfCarsOnOrderForTag(tag);
-    public int NumberOfCarsOnOrderEntireIndustry() => inner.NumberOfCarsOnOrderEntireIndustry();
-    public int NumberOfCarsOnOrderEmpties(CarTypeFilter carTypes) => inner.NumberOfCarsOnOrderEmpties(carTypes);
-    public float AvailableCapacityInCars(CarTypeFilter carTypeFilter, Load load) => inner.AvailableCapacityInCars(carTypeFilter, load);
+    public float AvailableCapacityInCars(Load load) => inner.AvailableCapacityInCars(load);
+    public float AvailableToDraw(Load load) => inner.AvailableToDraw(load);
+    public void FulfillOrders(List<IOrder> orders, int maxToOrder, out OrderFulfillmentReport report) => inner.FulfillOrders(orders, maxToOrder, out report);
     public void AddToStorage(Load load, float quantity, float maxQuantity) => inner.AddToStorage(load, quantity, maxQuantity);
     public void RemoveFromStorage(Load load, float quantity) => inner.RemoveFromStorage(load, quantity);
     public float QuantityInStorage(Load load) => inner.QuantityInStorage(load);
     public void PayWaybill(IOpsCar car, Waybill waybill) => inner.PayWaybill(car, waybill);
-    public void PayLoad(Load load, float quantity) => inner.PayLoad(load, quantity);
+    public void PayAccruedFreight(Load load, float quantity, float basis, float contractMultiplier) => inner.PayAccruedFreight(load, quantity, basis, contractMultiplier);
+    public FreightLane? BillableDeliveryBasis(string originId) => inner.BillableDeliveryBasis(originId);
     public void RequestIndustriesOrderCars() => inner.RequestIndustriesOrderCars();
     public GameDateTime GetDateTime(string key, GameDateTime defaultValue) => inner.GetDateTime(key, defaultValue);
     public void SetDateTime(string key, GameDateTime dateTime) => inner.SetDateTime(key, dateTime);
     public float CounterIncrement(string key, float value) => inner.CounterIncrement(key, value);
     public float CounterClear(string key) => inner.CounterClear(key);
+    public float GetFloat(string key, float defaultValue) => inner.GetFloat(key, defaultValue);
+    public void SetFloat(string key, float value) => inner.SetFloat(key, value);
 }

@@ -1,3 +1,4 @@
+using Game.History;
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -17,12 +18,12 @@ internal static class NpcPulpwoodOrdering
     internal static void Build(Industry industry, UIPanelBuilder builder)
     {
         foreach (var destination in industry.Components.OfType<IndustryUnloader>().Where(c =>
-            !c.ProgressionDisabled && c.load != null && c.load.id.IndexOf("pulpwood", StringComparison.OrdinalIgnoreCase) >= 0))
+            c.IsProgressionEnabled && c.load != null && c.load.id.IndexOf("pulpwood", StringComparison.OrdinalIgnoreCase) >= 0))
         {
             var count = quantities.GetValue(destination, _ => new UIState<int>(1));
             var load = destination.load;
             int percent = TweaksAndThingsPlugin.Instance.settings.PulpwoodOrderingFeePercent;
-            double unitValue = Math.Max(load.costPerUnit, load.payPerQuantity);
+            double unitValue = load.costPerUnit;
             builder.AddSection("Order pulpwood from interchange", section =>
             {
                 section.AddField("Cars", section.AddInputField(count.Value.ToString(), value =>
@@ -44,17 +45,17 @@ internal static class NpcPulpwoodOrdering
         double unmet = destination.maxStorage * destination.Industry.GetContractMultiplier() - ctx.QuantityInStorage(load) - ctx.QuantityOnOrder(load);
         int count = Math.Min(requested, Math.Max(0, (int)Math.Ceiling(unmet / load.NominalQuantityPerCarLoad)));
         if (count == 0) { Toast.Present("Pulpwood demand is already covered by storage and pending deliveries."); return; }
-        double unitValue = Math.Max(load.costPerUnit, load.payPerQuantity);
+        double unitValue = load.costPerUnit;
         int percent = TweaksAndThingsPlugin.Instance.settings.PulpwoodOrderingFeePercent;
         if (unitValue <= 0 && percent > 0) { Toast.Present("This pulpwood load has no defined purchase or delivery value for calculating its ordering fee."); return; }
-        var interchange = OpsController.Shared.InterchangeForPosition(destination, null);
-        if (interchange == null || interchange.Disabled || interchange.ProgressionDisabled)
+        var interchange = OpsController.Shared.TryGetInterchangeForPosition(destination, null, out var servedBy) ? servedBy : null;
+        if (interchange == null || interchange.Disabled)
         { Toast.Present("No enabled interchange can serve this industry."); return; }
         int feePerCar = NpcRandomTrafficPolicy.OrderingFee(load.NominalQuantityPerCarLoad, unitValue, percent);
         var record = new NpcPulpwoodOrder { Tag = "TAT-PULP-" + Guid.NewGuid().ToString("N"), Destination = destination.Identifier,
             Interchange = interchange.Identifier, Remaining = count, FeePercent = percent, UnitValue = unitValue, EstimatedFeePerCar = feePerCar };
         // Explicit imports bypass the load's automatic-import eligibility without changing its global definition.
-        interchange.AddOrder(new Order(destination.carTypeFilter, load, destination, count, record.Tag, false));
+        interchange.AddOrder(NpcOrderFactory.Create(destination.carTypeFilter, load, destination, count, record.Tag, false));
         int fee = feePerCar * count;
         destination.Industry.ApplyToBalance(-fee, Ledger.Category.Freight, "Pulpwood interchange ordering fee", count, quiet: true);
         NpcServiceStore.State.PulpwoodOrders.Add(record);
@@ -71,8 +72,9 @@ internal static class NpcPulpwoodOrdering
             foreach (var car in TrainController.Shared.Cars.Where(c => c.Waybill?.Tag == record.Tag))
                 if (record.Fulfilled.Add(car.id))
                 {
+                    car.KeyValueObject[Patches.CaptiveLoadSource.Key] = KeyValue.Runtime.Value.String(record.Interchange);
                     record.Remaining = Math.Max(0, record.Remaining - 1);
-                    int actualFee = NpcRandomTrafficPolicy.OrderingFee(car.GetLoadInfo(0)?.Quantity ?? 0, record.UnitValue, record.FeePercent);
+                    int actualFee = record.DeferredLogFee ? 0 : NpcRandomTrafficPolicy.OrderingFee(car.GetLoadInfo(0)?.Quantity ?? 0, record.UnitValue, record.FeePercent);
                     int adjustment = record.EstimatedFeePerCar - actualFee;
                     if (adjustment != 0)
                     {
@@ -84,11 +86,11 @@ internal static class NpcPulpwoodOrdering
             if (record.Remaining == 0) { NpcServiceStore.State.PulpwoodOrders.Remove(record); continue; }
             var unloader = OpsController.Shared.Areas.SelectMany(a => a.Industries).SelectMany(i => i.Components)
                 .OfType<IndustryUnloader>().FirstOrDefault(c => c.Identifier == record.Destination);
-            if (unloader == null || unloader.ProgressionDisabled) continue;
-            int pending = interchange.Orders.OfType<Order>().Where(o => o.Tag == record.Tag).Sum(o => o.CarCount);
+            if (unloader == null || !unloader.IsProgressionEnabled) continue;
+            int pending = interchange.Orders.OfType<Order>().Where(o => o.Tag == record.Tag).Sum(o => o.Quantity.Count);
             pending = Math.Max(pending, NpcServiceStore.State.HeldDeliveries.Count(h => h.Tag == record.Tag && h.CarId.Length == 0));
             if (pending < record.Remaining)
-                interchange.AddOrder(new Order(unloader.carTypeFilter, unloader.load, unloader, record.Remaining - pending, record.Tag, false));
+                interchange.AddOrder(NpcOrderFactory.Create(unloader.carTypeFilter, unloader.load, unloader, record.Remaining - pending, record.Tag, false));
         }
         NpcServiceStore.Save();
     }

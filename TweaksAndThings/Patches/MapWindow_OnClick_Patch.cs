@@ -9,9 +9,11 @@ using Model.AI;
 using Network;
 using Network.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Track;
 using Track.Search;
 using UI;
@@ -20,9 +22,11 @@ using UI.Map;
 using UnityEngine;
 using UnityEngine.Pool;
 using UnityEngine.UI;
-using static UI.AutoEngineerDestinationPicker;
+using static UI.Waypoints.AutoEngineerDestinationPicker;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
+using Object = UnityEngine.Object;
+using UI.Waypoints;
 
 namespace RMROC451.TweaksAndThings.Patches;
 
@@ -31,6 +35,19 @@ namespace RMROC451.TweaksAndThings.Patches;
 [HarmonyPatchCategory("RMROC451TweaksAndThings")]
 internal class MapWindow_OnClick_Patch
 {
+    private static readonly MethodInfo? loadImage = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")?
+        .GetMethod("LoadImage", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Texture2D), typeof(byte[]) }, null);
+    private readonly struct Hit
+    {
+        internal readonly Location Location;
+        internal readonly (Car car, Car.End end)? CarInfo;
+
+        internal Hit(Location location, (Car car, Car.End end)? carInfo)
+        {
+            Location = location;
+            CarInfo = carInfo;
+        }
+    }
     private static Serilog.ILogger _log => ModLog.ForContext<MapWindow_OnClick_Patch>();
     private static GameObject _prefabHolder;
     private static MapIcon _waypointPrefab;
@@ -42,7 +59,7 @@ internal class MapWindow_OnClick_Patch
         Texture2D texture2D = new Texture2D(128, 128, TextureFormat.DXT5, mipChain: false);
         texture2D.name = name;
         texture2D.wrapMode = TextureWrapMode.Clamp;
-        if (!ImageConversion.LoadImage(texture2D, File.ReadAllBytes(path)))
+        if (!(loadImage?.Invoke(null, new object[] { texture2D, File.ReadAllBytes(path) }) is bool loaded) || !loaded)
         {
             _log.Debug($"Unable to load {name} icon!");
             return null;
@@ -105,7 +122,7 @@ internal class MapWindow_OnClick_Patch
             if (ThroughTrafficGuard.BlockInteraction(selectedLoco)) return false;
 
             Ray ray = RayForViewportNormalizedPoint(__instance, viewportNormalizedPoint);
-            Vector3 gamePoint = MapManager.Instance.FindTerrainPointForXZ(WorldTransformer.WorldToGame(ray.origin));
+            if (!MapManager.Instance.TryFindTerrainPointForXZ(WorldTransformer.WorldToGame(ray.origin), out Vector3 gamePoint)) return true;
             Camera _camera = null;
             if (MainCameraHelper.TryGetIfNeeded(ref _camera) &&
                 Graph.Shared.TryGetLocationFromGamePoint(gamePoint, 200f, out Location location))
@@ -119,7 +136,7 @@ internal class MapWindow_OnClick_Patch
                 }
 
                 var start = selectedLoco.AutoEngineerPlanner.RouteStartLocation(out float momentum);
-                var length = selectedLoco.AutoEngineerPlanner.CalculateTotalLength();
+                var length = AutoEngineerPlanner.CalculateTotalLength(selectedLoco.EnumerateCoupled().ToList());
                 bool routeFound = Graph.Shared.FindRoute(start, location, HeuristicCosts.AutoEngineer,
                     null, out _, checkForCars: false, length, momentum);
                 bool safetyFirst = AutoEngineerPlanner_HandleCommand_Patch.SafetyFirstGoverningApplies(selectedLoco);
@@ -137,8 +154,8 @@ internal class MapWindow_OnClick_Patch
                 }
 
                 var aeoh = new AutoEngineerOrdersHelper(persistence: new AutoEngineerPersistence(selectedLoco.KeyValueObject), locomotive: selectedLoco);
-                var mw = (location: location, carId: valueOrDefault?.CarInfo?.car?.id ?? string.Empty);
-                aeoh.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: mw);
+                var waypoint = new OrderWaypoint(Graph.LocationToString(location), valueOrDefault?.CarInfo?.car?.id ?? string.Empty);
+                aeoh.SetOrdersValue(mode: AutoEngineerMode.Waypoint, maybeWaypoint: waypoint);
                 AutoEngineerDestinationPicker.Shared.Cancel();
                 return false;
             }
@@ -151,7 +168,7 @@ internal class MapWindow_OnClick_Patch
 
     private static Hit? HitLocation(Location? location, BaseLocomotive selectedLoco)
     {
-        var _graph = TrainController.Shared.graph;
+        var _graph = TrainController.Shared.Graph;
         if (location.HasValue)
         {
             Location valueOrDefault = location.GetValueOrDefault();

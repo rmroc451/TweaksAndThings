@@ -1,10 +1,10 @@
-﻿<Project>
+<Project>
   <PropertyGroup>
     <!-- Try to find the directory on our own -->
 
-    <!-- Copy the mod to the game directory -->
-    <GameModDir Condition="'$(GameModDir)' == ''">$(GameDir)/Mods/$(AssemblyName)</GameModDir>
-    <OutDir Condition="'$(Configuration)' == 'Debug' AND '$(OutDir)' == ''">$(GameModDir)/</OutDir>
+    <!-- Deploy local development builds to Railroader\ModDev. -->
+    <RailroaderUserDir Condition="'$(RailroaderUserDir)' == ''">$([System.Environment]::GetFolderPath(SpecialFolder.MyDocuments))/Railroader</RailroaderUserDir>
+    <GameModDir Condition="'$(GameModDir)' == ''">$(RailroaderUserDir)/ModDev/$(AssemblyName)</GameModDir>
   </PropertyGroup>
 
   <!-- Replace the default version if something was set for it -->
@@ -26,23 +26,22 @@
     </Reference>
   </ItemGroup>
 
-  <!-- Keep the packaged UMM manifest version in sync with Assembly.version. -->
+  <!-- Keep the native mod pack version in sync with Assembly.version. -->
   <Target Name="SetModInfoVersion" AfterTargets="CopyFilesToOutputDirectory">
     <Exec Command="powershell -NoProfile -Command &quot;$infoPath = '$(TargetDir)Info.json'; $infoJson = [System.IO.File]::ReadAllText($infoPath); $infoJson = $infoJson.Replace('__ASSEMBLY_VERSION__', '$(AssemblyVersion)'); [System.IO.File]::WriteAllText($infoPath, $infoJson)&quot;" />
   </Target>
 
-  <!-- Package both Debug and Release builds beside the actual build output. -->
+  <!-- Package both Debug and Release builds beside the actual build output and deploy them to ModDev. -->
   <Target Name="PrepareForPublishing" AfterTargets="Build" DependsOnTargets="SetModInfoVersion"
           Condition="'$(DesignTimeBuild)' != 'true' AND '$(IsTestProject)' != 'true'">
     <PropertyGroup>
       <ZipName>$(TargetDir)$(AssemblyName)_$(AssemblyVersion).zip</ZipName>
     </PropertyGroup>
     <ItemGroup>
-      <ModPackageFiles Include="$(TargetDir)Info.json;$(TargetPath);$(TargetDir)Newtonsoft.Json.dll" />
+      <ModPackageFiles Include="$(TargetDir)Info.json;$(TargetPath);$(TargetDir)0Harmony.dll;$(TargetDir)Newtonsoft.Json.dll" />
     </ItemGroup>
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)build\Package-Mod.ps1&quot; -OutputDirectory &quot;$(TargetDir).&quot; -AssemblyName &quot;$(AssemblyName)&quot; -Version &quot;$(AssemblyVersion)&quot;" />
-    <Message Importance="high" Text="Unity Mod Manager package: $(ZipName)" />
-    <!-- Preserve Release deployment, copying only the installable mod files. -->
-    <Copy SourceFiles="@(ModPackageFiles)" DestinationFolder="$(GameModDir)" Condition="'$(Configuration)' == 'Release'" />
+    <Message Importance="high" Text="Railroader DLL mod package: $(ZipName)" />
+    <Copy SourceFiles="@(ModPackageFiles)" DestinationFolder="$(GameModDir)" />
   </Target>
 </Project>

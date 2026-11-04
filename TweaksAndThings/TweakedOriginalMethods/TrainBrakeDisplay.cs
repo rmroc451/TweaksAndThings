@@ -5,6 +5,8 @@ using RMROC451.TweaksAndThings.Patches;
 using UI;
 using UI.CarInspector;
 using UI.Common;
+using UI.Tags;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -15,40 +17,37 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
 {
     internal static class TrainBrakeDisplay
     {
+        private static readonly List<Car> currentConsist = new();
+        private static int lastLoggedCarCount = -1;
+        private static string lastLoggedSelectedCarId = string.Empty;
+        private static int lastLoggedStatusSignature;
+        private static bool? lastLoggedColorsEnabled;
+        private static bool? lastLoggedTagsVisible;
+        private static float nextColorDiagnosticTime;
+
         internal static void ColorForCar(UI.TrainBrakeDisplay __instance, Car car, ref Color __result)
         {
             __result = Color.gray;
-
             if (car.IsDerailed)
             {
                 __result = __instance.derailedColor;
                 return;
             }
+
             CarAirSystem air = car.air;
-            OpsController opsController = OpsController.Shared;
             if (air.handbrakeApplied)
             {
                 __result = __instance.handbrakeAppliedColor;
                 return;
             }
-            else if (
-                (Object)(object)opsController != (Object)null &&
-                opsController.TryGetDestinationInfo(car, out var destinationName, out var isAtDestination, out var destinationPosition, out var destination)
-            )
-            {
-                Area area = opsController.AreaForCarPosition(destination);
-                if ((Object)(object)area != (Object)null)
-                {
-                    __result = area.tagColor;
-                }
-                if (!isAtDestination)
-                {
-                    float num = 1f / __result.maxColorComponent;
-                    __result *= num;
-                }
-            }
 
-            if (Mathf.InverseLerp(0f, 72f, air.BrakeCylinder.Pressure) >= 10f) __result = (__result + __instance.ColorForPsi(air.BrakeCylinder.Pressure)) / 2f;
+            // Use the same destination tint as car tags, while retaining the
+            // tweaked display's higher-priority condition colors.
+            __result = CarTagColor.For(car, OpsController.Shared);
+            // Pressure is in PSI; comparing InverseLerp's 0..1 result to 10
+            // prevented this warning blend from ever appearing.
+            if (air.BrakeCylinder.Pressure >= 10f)
+                __result = (__result + __instance.ColorForPsi(air.BrakeCylinder.Pressure)) / 2f;
         }
 
         internal static Image GetCarImage(UI.TrainBrakeDisplay __instance, int index, float xCyl, float yCyl, Car car)
@@ -91,9 +90,12 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
         internal static void Update(UI.TrainBrakeDisplay __instance)
         {
             Car selectedCar = __instance._trainController.SelectedCar;
-            if (selectedCar == null || selectedCar.set == null) return;
+            if (selectedCar == null) return;
 
-            int numberOfCars = selectedCar.set.NumberOfCars;
+            BuildCurrentConsist(selectedCar);
+            List<Car> cars = currentConsist;
+
+            int numberOfCars = cars.Count;
             if (numberOfCars != __instance._lastNumCars)
             {
                 __instance.RemoveAllImages();
@@ -115,19 +117,71 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
             }
 
             int num4 = 0;
+            bool colorsEnabled = TweaksAndThingsPlugin.Instance?.TrainBrakeDisplayShowsColorsInCalloutMode() == true;
+            bool tagsVisible = TagController.Shared?.TagsVisible == true;
+            int statusSignature = 17;
+            foreach (Car car in cars)
+            {
+                int flags = (car.air.handbrakeApplied ? 1 : 0) |
+                    (car.IsDerailed ? 2 : 0) |
+                    (car.EndGearA.IsAirConnected ? 4 : 0) |
+                    (car.EndGearB.IsAirConnected ? 8 : 0) |
+                    (car.EndGearA.IsCoupled ? 16 : 0) |
+                    (car.EndGearB.IsCoupled ? 32 : 0) |
+                    (car.EndGearA.AnglecockSetting > 0.9f ? 64 : 0) |
+                    (car.EndGearB.AnglecockSetting > 0.9f ? 128 : 0);
+                statusSignature = unchecked(statusSignature * 31 + car.id.GetHashCode());
+                statusSignature = unchecked(statusSignature * 31 + flags);
+            }
+            bool logColors = selectedCar.id != lastLoggedSelectedCarId || numberOfCars != lastLoggedCarCount ||
+                statusSignature != lastLoggedStatusSignature ||
+                colorsEnabled != lastLoggedColorsEnabled || tagsVisible != lastLoggedTagsVisible ||
+                Time.realtimeSinceStartup >= nextColorDiagnosticTime;
+            string colorSample = string.Empty;
+            bool sampledDestination = false;
+            bool sampledVisibleTag = false;
+            int derailedCars = 0;
+            int handbrakeCars = 0;
+            int destinationCandidates = 0;
+            int pressureBlendCars = 0;
             float num5 = __instance._imageWidth / 2f;
             float num6 = 0f;
             float y = 12f - 2f * __instance._spacing;
-            Car.LogicalEnd logicalEnd = ((selectedCar.set.IndexOfCar(selectedCar).GetValueOrDefault(0) >= numberOfCars / 2) ? Car.LogicalEnd.B : Car.LogicalEnd.A);
+            Car.LogicalEnd logicalEnd = Car.LogicalEnd.A;
             Car.LogicalEnd end = ((logicalEnd == Car.LogicalEnd.A) ? Car.LogicalEnd.B : Car.LogicalEnd.A);
-            bool stop = false;
-            int carIndex = selectedCar.set.StartIndexForConnected(selectedCar, logicalEnd, IntegrationSet.EnumerationCondition.Coupled);
-            Car car;
-            while (!stop && (car = selectedCar.set.NextCarConnected(ref carIndex, logicalEnd, IntegrationSet.EnumerationCondition.Coupled, out stop)) != null && !(num5 > __instance._rectTransform.rect.width))
+            foreach (Car car in cars)
             {
+                if (num5 > __instance._rectTransform.rect.width) break;
+
                 Image carImage = TweakedOriginalMethods.TrainBrakeDisplay.GetCarImage(__instance, num4, num5, 0f, car);
                 num5 += __instance._imageWidth + __instance._spacing;
-                carImage.color = __instance.ColorForCar(car);
+                if (!TrainBrakeDisplay_ColorForCar_Patch.TryGetDestinationColor(__instance, car, out var carColor))
+                    carColor = __instance.ColorForCar(car);
+                carImage.color = carColor;
+                if (logColors)
+                {
+                    if (car.IsDerailed) derailedCars++;
+                    else if (car.air.handbrakeApplied) handbrakeCars++;
+                    else
+                    {
+                        Color tagColor = CarTagColor.For(car, OpsController.Shared);
+                        bool hasDestinationColor = tagColor != CarTagColor.NoDestination;
+                        TagCallout? callout = car.TagCallout;
+                        bool visibleTag = callout != null && callout.gameObject.activeInHierarchy;
+                        if (hasDestinationColor) destinationCandidates++;
+                        if (car.air.BrakeCylinder.Pressure >= 10f) pressureBlendCars++;
+                        if (colorSample.Length == 0 || (visibleTag && !sampledVisibleTag) ||
+                            (hasDestinationColor && !sampledDestination && !sampledVisibleTag))
+                        {
+                            string tagImageColor = callout != null && visibleTag && callout.colorImages != null && callout.colorImages.Length > 0 && callout.colorImages[0] != null
+                                ? callout.colorImages[0].color.ToString()
+                                : "none";
+                            colorSample = $"{car.id}: computedTag={tagColor} visibleTag={visibleTag} tagImage={tagImageColor} pressure={car.air.BrakeCylinder.Pressure:F1} applied={carImage.color}";
+                            sampledDestination = hasDestinationColor;
+                            sampledVisibleTag = visibleTag;
+                        }
+                    }
+                }
                 Image airImage = __instance.GetAirImage(num4, num6, y);
                 num6 += __instance._imageWidth + __instance._spacing;
                 Color color;
@@ -162,6 +216,18 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
                 __instance._airImages[j].gameObject.SetActive(value: false);
             }
 
+            if (logColors)
+            {
+                ModDiagnosticLog.Write("TRAIN BRAKE COLORS",
+                    $"selected={selectedCar.id}; coupled={numberOfCars}; drawn={num4}; setting={colorsEnabled}; tagsVisible={tagsVisible}; colorsActive={colorsEnabled && tagsVisible}; opsReady={OpsController.Shared != null}; status={statusSignature}; destinationCandidates={destinationCandidates}; pressureBlends={pressureBlendCars}; handbrakes={handbrakeCars}; derailed={derailedCars}; sample={colorSample}");
+                lastLoggedCarCount = numberOfCars;
+                lastLoggedSelectedCarId = selectedCar.id;
+                lastLoggedStatusSignature = statusSignature;
+                lastLoggedColorsEnabled = colorsEnabled;
+                lastLoggedTagsVisible = tagsVisible;
+                nextColorDiagnosticTime = Time.realtimeSinceStartup + 30f;
+            }
+
             static Color ColorForOuterAnglecock(float value)
             {
                 if (!((double)value < 0.01))
@@ -170,6 +236,34 @@ namespace RMROC451.TweaksAndThings.TweakedOriginalMethods
                 }
 
                 return Color.clear;
+            }
+        }
+
+        private static void BuildCurrentConsist(Car selectedCar)
+        {
+            currentConsist.Clear();
+            currentConsist.Add(selectedCar);
+            if (selectedCar.set == null) return;
+
+            // Walk each side of the selected car through current coupler connections.
+            // EnumerateCoupled uses cached set boundaries, which can omit an end car
+            // immediately after a mid-consist cut.
+            AddConnectedSide(selectedCar.CoupledTo(Car.LogicalEnd.A), selectedCar);
+            currentConsist.Reverse();
+            AddConnectedSide(selectedCar.CoupledTo(Car.LogicalEnd.B), selectedCar);
+        }
+
+        private static void AddConnectedSide(Car current, Car previous)
+        {
+            while (current != null && !currentConsist.Contains(current))
+            {
+                currentConsist.Add(current);
+                if (current.set == null) break;
+                Car next = current.CoupledTo(Car.LogicalEnd.A);
+                if (next == null || next == previous)
+                    next = current.CoupledTo(Car.LogicalEnd.B);
+                previous = current;
+                current = next;
             }
         }
     }

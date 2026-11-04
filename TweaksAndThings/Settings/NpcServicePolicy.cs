@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace RMROC451.TweaksAndThings;
 
@@ -14,6 +16,17 @@ public sealed class InterchangeApproachOverride
 
 internal static class NpcServicePolicy
 {
+    internal static List<T> ConsistOrder<T>(IEnumerable<T> cars, IReadOnlyList<string> powerIds,
+        Func<T, string> id, Func<T, bool> caboose)
+    {
+        var all = cars.ToList();
+        return powerIds.SelectMany(powerId => all.Where(car => id(car) == powerId && !caboose(car)))
+            .Concat(all.Where(car => !powerIds.Contains(id(car)) && !caboose(car)))
+            .Concat(all.Where(caboose)).ToList();
+    }
+    internal static bool HasPendingTransfers(int setouts, int pickups) => Math.Max(0, setouts) + Math.Max(0, pickups) > 0;
+    internal static bool ShouldPoolPower(int remainingSetouts, int remainingPickups, int successfulPickups) =>
+        !HasPendingTransfers(remainingSetouts, remainingPickups) && successfulPickups == 0;
     internal const int BatchSize = 2;
     internal const double SecondsPerCar = 120;
     internal static bool CanCollectOwnedCar(bool owned, string? tag, bool offMapLoader) =>
@@ -37,6 +50,7 @@ internal static class NpcServicePolicy
         return removed;
     }
     internal static double DispatchTime(double serviceTime, double travelSeconds) => serviceTime - travelSeconds - 300;
+    internal static bool KeepPendingService(double pending, double lastServiced) => lastServiced < pending;
 
     internal static double? WarpBoundary(double now, double requestedEnd, System.Collections.Generic.IEnumerable<double> dispatchTimes)
     {
@@ -58,6 +72,9 @@ internal static class NpcServicePolicy
         start + Math.Max(0, cars) * secondsPerCar;
 
     internal static double TransferRate(bool cabooseNearby) => cabooseNearby ? SecondsPerCar / 2 : SecondsPerCar;
+    internal static double ReturnDeparture(double serviceTime, double arrivalTime, int setouts, int pickups,
+        double secondsPerCar = SecondsPerCar) => Math.Max(serviceTime, arrivalTime) +
+            (Math.Max(0, setouts) + Math.Max(0, pickups)) * secondsPerCar + 300;
 
     internal static double RescaleDeadline(double now, double deadline, double oldRate, double newRate) =>
         deadline <= now ? deadline : now + (deadline - now) * newRate / oldRate;
@@ -68,6 +85,9 @@ internal static class NpcServicePolicy
         if (phase == "Picking up" && pickupsRemaining > 0) return "Picking up";
         return setoutsRemaining > 0 ? "Setting out" : pickupsRemaining > 0 ? "Picking up" : "Departing";
     }
+    internal static string AfterBatch(string phase, int setoutsRemaining, int pickupsRemaining) =>
+        phase == "Setting out" && pickupsRemaining > 0 ? "Picking up" :
+        phase == "Picking up" && setoutsRemaining > 0 ? "Setting out" : phase;
 
     internal static double Horsepower(float forcePounds, float speedMph) =>
         Math.Max(0, forcePounds) * speedMph / 375d;

@@ -18,13 +18,14 @@ internal static class PlacerWindow_RandomConsist_Patch
 
     private static void Postfix(PlacerWindow __instance)
     {
-        if (__instance.placeButton == null) return;
-        var parent = __instance.placeButton.transform.parent;
+        var template = __instance.placeContainer.GetComponentInChildren<Button>();
+        if (template == null) return;
+        var parent = template.transform.parent;
         var existing = parent.Find(ButtonName);
         if (existing != null) { existing.gameObject.SetActive(TweaksAndThingsPlugin.Instance?.IsEnabled == true); return; }
-        var button = UnityEngine.Object.Instantiate(__instance.placeButton, parent, false);
+        var button = UnityEngine.Object.Instantiate(template, parent, false);
         button.name = ButtonName;
-        button.transform.SetSiblingIndex(__instance.placeButton.transform.GetSiblingIndex());
+        button.transform.SetSiblingIndex(template.transform.GetSiblingIndex());
         button.enabled = true;
         button.interactable = true;
         button.onClick = new Button.ButtonClickedEvent();
@@ -38,7 +39,7 @@ internal static class PlacerWindow_RandomConsist_Patch
     {
         if (window == null || TweaksAndThingsPlugin.Instance?.IsEnabled != true) return;
         // Use the same definitions and filter as the visible native library.
-        var pool = window.PrefabStore.AllCarDefinitionInfos.Where(window.FiltersAllow).ToList();
+        var pool = window.Library.AllCarDefinitionInfos.Where(window.FiltersAllow).ToList();
         if (pool.Count == 0)
         {
             ModalAlertController.PresentOkay("Random consist", "No cars match the selected category.");

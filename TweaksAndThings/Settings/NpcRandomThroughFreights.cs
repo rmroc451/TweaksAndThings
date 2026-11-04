@@ -13,7 +13,7 @@ namespace RMROC451.TweaksAndThings;
 internal static class NpcRandomThroughFreights
 {
     internal static (int min, int max) Range(Settings settings) => NpcRandomTrafficPolicy.DailyRange(
-        OpsController.Shared?.Areas.SelectMany(a => a.Industries).Distinct().Where(i => !i.ProgressionDisabled)
+        OpsController.Shared?.Areas.SelectMany(a => a.Industries).Distinct().Where(i => i.IsProgressionEnabled)
             .Sum(i => Math.Max(0, i.Contract?.Tier ?? 0)) ?? 0, settings.RandomThroughFreightMultiplier);
 
     private static List<int> Classes(Settings settings)
@@ -27,13 +27,19 @@ internal static class NpcRandomThroughFreights
 
     internal static void Prepare(Settings settings, double now)
     {
-        if (!settings.ThroughTrafficEnabled || !settings.RandomThroughFreightsEnabled || !StateManager.IsHost || !NpcServiceStore.Load() || TimetableController.Shared == null) return;
+        if (!settings.EnableNpcInterchangeTraffic || !settings.ThroughTrafficEnabled || !settings.RandomThroughFreightsEnabled || !StateManager.IsHost || !NpcServiceStore.Load() || TimetableController.Shared == null) return;
+        if (!NpcIndustryPlanning.Ready(now)) return;
         var state = NpcServiceStore.State;
         int day = (int)Math.Floor(now / 86400);
         if (state.RandomScheduleDay >= day) return;
         var classes = Classes(settings);
-        var stations = TimetableController.Shared.GetAllStations(includeDuplicates: false).Where(ThroughTrafficSpawner.IsInterchange).ToList();
+        var connectivity = TimetableTrackConnectivity.Current;
+        var stations = TimetableController.Shared.GetAllStations(includeDisabled: true, includeDuplicates: false)
+            .Where(ThroughTrafficSpawner.IsInterchange).Where(connectivity.Visible).ToList();
         if (classes.Count == 0 || stations.Count < 2) return;
+        var pairs = stations.SelectMany(from => stations.Where(to => to.code != from.code && connectivity.Connected(from, to))
+            .Select(to => (from, to))).ToList();
+        if (pairs.Count == 0) return;
         var random = new Random();
         var range = Range(settings);
         int count = random.Next(range.min, range.max + 1);
@@ -42,10 +48,10 @@ internal static class NpcRandomThroughFreights
         count = (int)Math.Round(count * (end - now) / 86400);
         foreach (double time in NpcRandomTrafficPolicy.DepartureTimes(random, count, now + 1, end))
         {
-            int from = random.Next(stations.Count), to = random.Next(stations.Count - 1);
-            if (to >= from) to++;
-            var departure = new NpcRandomDeparture { Symbol = NpcTimetableRegistry.NewSymbol("NR"),
-                From = stations[from].code, To = stations[to].code, TrainClass = classes[random.Next(classes.Count)], Scheduled = time };
+            var pair = pairs[random.Next(pairs.Count)];
+            int trainClass = classes[random.Next(classes.Count)];
+            var departure = new NpcRandomDeparture { Symbol = NpcTimetableRegistry.NewFreightSymbol(pair.from.code, pair.to.code, trainClass),
+                From = pair.from.code, To = pair.to.code, TrainClass = trainClass, Scheduled = time };
             PrepareConsist(departure, settings, random);
             state.RandomDepartures.Add(departure);
         }
@@ -56,8 +62,8 @@ internal static class NpcRandomThroughFreights
 
     internal static void PrepareConsist(NpcRandomDeparture departure, Settings settings, Random random)
     {
-        if (departure.FreightDefinitions.Count > 0 || TrainController.Shared?.PrefabStore == null) return;
-        var catalog = TrainController.Shared.PrefabStore.AllCarDefinitionInfos.Where(i => i.Definition.VisibleInPlacer && i.Definition.Archetype.IsFreight()).ToList();
+        if (departure.FreightDefinitions.Count > 0 || TrainController.Shared?.ContentLibrary == null) return;
+        var catalog = TrainController.Shared.ContentLibrary.AllCarDefinitionInfos.Where(i => i.Definition.VisibleInPlacer && i.Definition.CarType.IsFreight).ToList();
         if (catalog.Count == 0) return;
         int minimum = Math.Max(1, Math.Min(50, settings.RandomThroughFreightMinCars));
         int maximum = Math.Max(minimum, Math.Min(50, settings.RandomThroughFreightMaxCars));

@@ -10,15 +10,15 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
-$fileNames = @('Info.json', "$AssemblyName.dll", 'Newtonsoft.Json.dll')
+$fileNames = @('Info.json', "$AssemblyName.dll", '0Harmony.dll', 'Newtonsoft.Json.dll')
 foreach ($fileName in $fileNames) {
     if (-not (Test-Path -LiteralPath (Join-Path $outputPath $fileName) -PathType Leaf)) {
         throw "Missing required mod package file: $fileName"
     }
 }
 $manifest = Get-Content -LiteralPath (Join-Path $outputPath 'Info.json') -Raw | ConvertFrom-Json
-if ($manifest.Version -ne $Version -or $manifest.AssemblyName -ne "$AssemblyName.dll") {
-    throw 'The generated Info.json does not match the built assembly name/version.'
+if ($manifest.version -ne $Version -or $manifest.assemblies -notcontains "$AssemblyName.dll") {
+    throw 'The generated Info.json does not match the native mod assembly/version.'
 }
 
 $zipPath = Join-Path $outputPath "${AssemblyName}_${Version}.zip"

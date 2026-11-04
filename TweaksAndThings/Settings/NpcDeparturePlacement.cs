@@ -64,7 +64,7 @@ internal static class NpcDeparturePlacement
                 candidate = NpcTrainOperations.FacingRoute(candidate, target);
                 if (!Fits(candidate, length + 20, ownCars)) continue;
                 spawn = candidate;
-                ModDiagnosticLog.Write("SPAWN", $"Adjusted departure {Graph.Shared.LocationToString(original)} -> {Graph.Shared.LocationToString(spawn)}; full train {length / 1609.344:N2} mi plus staging clearance.");
+                ModDiagnosticLog.Write("SPAWN", $"Adjusted departure {Graph.LocationToString(original)} -> {Graph.LocationToString(spawn)}; full train {length / 1609.344:N2} mi plus staging clearance.");
                 return true;
             }
             catch (EndOfTrack) { }
@@ -91,14 +91,17 @@ internal static class NpcDeparturePlacement
     {
         var lead = TrainController.Shared.CarForId(service.LeadId);
         var forward = NpcTrainOperations.FacingRoute(lead.LocationF, destination);
-        if (forward.end == lead.LocationF.end) return true;
         var coupled = lead.EnumerateCoupled().ToList();
+        var ordered = NpcServiceCaboose.TravelOrder(service, coupled);
+        if (forward.end == lead.LocationF.end)
+        {
+            if (!ordered.SequenceEqual(coupled)) MoveExisting(lead.LocationA, ordered);
+            return true;
+        }
         var ids = new HashSet<string>(coupled.Select(c => c.id));
         var rear = NpcTrainOperations.FacingRoute(NpcTrainOperations.Tail(service).LocationB.Flipped(), destination);
-        float length = TrainController.ApproximateLength(coupled.Select(c => c.Descriptor()));
+        float length = TrainController.ApproximateLength(coupled.Select(c => c.Descriptor()).ToList());
         if (!Fits(rear, length, ids)) return false;
-        var ordered = service.PowerIds.Select(id => TrainController.Shared.CarForId(id)).Where(c => c != null).ToList();
-        ordered.AddRange(coupled.Where(c => !service.PowerIds.Contains(c.id)));
         MoveExisting(rear, ordered);
         return true;
     }

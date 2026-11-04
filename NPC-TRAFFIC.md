@@ -2,6 +2,8 @@
 
 This guide describes the automated traffic features implemented on the issue-63 branch. A timetable reservation represents a planned service; the physical train is created later, after demand, route, power and placement checks pass. A visible schedule therefore does not guarantee that a train can depart at its planned time.
 
+> **Coming soon:** NPC traffic and simulated interchange setup are currently hidden behind the NPC Traffic settings tab in F10. The tab and its configuration controls will return in a forthcoming update. This guide documents the feature behavior; its setup steps are not currently available from the settings panel.
+
 Related guides: [interchange services and pool power](INTERCHANGE-SERVICES.md), [timetables and fast-forward](TIMETABLE-AND-TIME.md), [freight accounting](FREIGHT-AND-INDUSTRIES.md), and [troubleshooting and bug reports](TROUBLESHOOTING.md).
 
 ## Choose the kind of traffic you want
@@ -18,7 +20,7 @@ The interchange setting and through-traffic toggle serve different purposes. Sim
 
 ## Open the traffic controls
 
-After loading a railroad, use the leftmost added button in the top-right toolbar. It reuses the game's timetable icon and has the tooltip **AI traffic / interchanges**. The same controls are available from the timetable's **AI traffic** tab and the UMM **AI Traffic** page. Keeping both windows is intentional: use whichever fits your dispatching workflow.
+When the NPC Traffic settings tab is available, open **AI traffic / simulated interchange** there to configure the feature. If NPC traffic is already enabled in saved settings, the timetable's **AI traffic** tab opens the traffic window. The **Delinquent pickups** view is nested within AI traffic.
 
 The traffic view contains:
 

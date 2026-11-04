@@ -1,18 +1,34 @@
 # Troubleshooting and reporting bugs or feature requests
 
+## AE waypoint arrow does not appear
+
+Use **Set waypoint** on a player locomotive, then point at the track in the game view. The native arrow and click-to-set behavior are retained. An earlier mod picker loop called the game's Escape callback as though it were a key-state check, canceling immediately; the current build removes that replacement loop. Ctrl+Alt map placement remains available separately. NPC locomotives remain excluded from the interactive picker.
+
+If the arrow is still missing after installing the current ZIP and restarting the game, include the selected locomotive, camera view, other UI mods, and the log around clicking **Set waypoint** in a [bug report](https://github.com/rmroc451/TweaksAndThings/issues).
+
+## NPC timetables missing after new day
+
+If `DAY PLAN` shows a published NPC pair but the window is empty, check the usable-timetable ownership filter and company timetable feature. Native processing strips locked station entries, removes trains with fewer than two remaining entries, and clears usable schedules before the company timetable feature unlocks. Updated builds preserve protected NPC calls through that filter and display saved NPC plans directly on the string chart. Publication diagnostics report stored and native usable train counts separately.
+
+Check `DAY PLAN` diagnostics for industry evaluation, publication and saved-route upgrades. First-day contracts wait for new-day evaluation; **Next interchange AI** falls back to the normal service appointment when tier-zero industries have no demand, then pauses at midnight to evaluate tiers and publish the current operating day's plans before continuing.
+
+A `NullReferenceException` mentioning `TryGetStationLocation` and `Track.Graph.TryGetLocationFromPoint` indicates an older build passed a missing segment from a locked station span into the native lookup. Updated builds resolve cached segments, serialized span endpoints or the span's authoring position safely. The native timetable reader accepts locked station codes; NPC routes include their passing entries without requiring those areas to be unlocked. Install the updated build and restart Railroader to replace the loaded assembly.
+
 Start with the symptom and the affected train/car, then capture the mod's saved state and nearby log entries. A service waiting for safe track can look idle without being broken; a timetable plan can exist before a physical train has spawned. The checks below help distinguish those cases.
 
 Feature guides: [NPC traffic](NPC-TRAFFIC.md), [interchanges and pool power](INTERCHANGE-SERVICES.md), [freight and industries](FREIGHT-AND-INDUSTRIES.md), [timetable and time controls](TIMETABLE-AND-TIME.md), [player tools](PLAYER-TOOLS.md), and [installation/builds](INSTALLATION-AND-RELEASES.md).
+
+> **Coming soon:** NPC traffic and simulated interchange configuration are currently behind the hidden NPC Traffic settings tab in F10. The settings access and setup flow will return in a forthcoming update. Existing saved traffic state may still appear if it was already enabled; use the log-file path below for diagnostics when the traffic window is unavailable.
 
 ## Get the right log
 
 The mod writes **TweaksAndThings-debug.log** inside its installed mod directory, normally:
 
 ~~~text
-Railroader/Mods/RMROC451.TweaksAndThings/TweaksAndThings-debug.log
+Documents/Railroader/Mods/<mod-folder>/TweaksAndThings-debug.log
 ~~~
 
-Open **AI traffic / interchanges → Debug**, then use **Open log file**. **Write debug snapshot** captures the current scheduler and services. **/npcTraffic** in the game's console returns a read-only snapshot and logs it. **/npcPickups** opens the delinquent pickup list.
+When available, open the **AI traffic / simulated interchange** settings or the timetable's **AI traffic** tab to reach the traffic window. In that window, **Debug → Open log file** opens the diagnostics, and **Write debug snapshot** captures the current scheduler and services. If the traffic window is unavailable, open the mod-directory log directly. **/npcTraffic** and **/npcPickups** are available only when NPC traffic is enabled.
 
 Routine scheduler diagnostics go to this file rather than repeatedly echoing into the game console. Departure/approach telegraphs still appear in the native messages. A quiet console therefore does not establish that the scheduler is inactive.
 
@@ -20,7 +36,7 @@ The Debug tab shows the latest 160 lines, bounded to 32 KB. It polls once per re
 
 At approximately 5 MB, the file rotates to **TweaksAndThings-debug.log.previous**; one previous file is retained. Share both files if present. Entries use UTC wall-clock timestamps, while snapshots and telegraphs also identify game time. Make clear which time you mean when reporting “it stopped at 10:00.” A state snapshot is written approximately every two real minutes, and repeated detailed blockers are throttled to avoid log spam.
 
-If neither file nor a new session entry appears, confirm UMM loaded and enabled the mod, verify the actual installed folder and check UMM's log for a startup or file-write failure. A stale railloader.log from before migration is not the current mod log. UMM logs and the game's current Player.log can help with startup, native errors or rendering; include them when relevant rather than relying only on a legacy loader file.
+If neither file nor a new session entry appears, confirm **Allow Unsafe DLL Mods** is enabled and the game was restarted, verify the installed mod folder, and check the game's current Player.log for a loader or file-write failure. A stale railloader.log from an older installation is not the current mod log.
 
 ## No interchange train appears
 
@@ -89,7 +105,7 @@ For suspected duplicate industry orders, capture the industry/destination, pendi
 
 1. Return simulation to **Normal**; higher multipliers deliberately run more physics per real second.
 2. Let initial terrain loading and day-plan/approach generation complete, then compare steady running.
-3. Capture a fresh debug snapshot and inspect UMM output for **Slow mod update** reports identifying the component and elapsed time.
+3. Capture a fresh debug snapshot and inspect `TweaksAndThings-debug.log` for **Slow mod update** reports identifying the component and elapsed time.
 4. Compare with the chart/Debug window closed, noting the difference without changing several settings at once.
 5. On a backed-up test save, compare with the mod disabled to distinguish mod work from the game's terrain/rendering load or another mod.
 
@@ -101,13 +117,13 @@ Record the approximate real-time interval between spikes, train count, graph/cus
 
 Fast-forward needs host authority, at least one selected player controlling engine in ROAD/WAYPOINT mode, a loaded/unpaused railroad and no conflicting wait or active switching block. Destination runs end on a selected train's first stop after moving; NPC activation also returns the simulation to normal. See [Timetable and time](TIMETABLE-AND-TIME.md).
 
-If the toolbar icon is absent or unclickable, try the timetable **AI traffic** tab or UMM entry and record whether that alternative opens. For overlapping buttons, missing tags or unexpected chart layouts, include UI scale/resolution and a screenshot. Host-only grayed settings on clients are expected.
+If the toolbar icon is absent or unclickable, try the timetable **AI traffic** tab or the F10 settings window and record whether that alternative opens. For overlapping buttons, missing tags or unexpected chart layouts, include UI scale/resolution and a screenshot. Host-only grayed settings on clients are expected.
 
 For installation/build errors, use the symptom table in [Installation and releases](INSTALLATION-AND-RELEASES.md). Missing Assembly-CSharp/Ops references, missing dotnet, missing test runtime and failed package restore are separate problems and need their exact error output.
 
 ## Report a bug or propose a feature
 
-Use **Report a bug / feature** in UMM or the traffic Settings tab, or open the [GitHub issues list](https://github.com/rmroc451/TweaksAndThings/issues). Search for an existing report first; use [New issue](https://github.com/rmroc451/TweaksAndThings/issues/new) for a new reproducible problem. Automated traffic work is associated with [issue #63](https://github.com/rmroc451/TweaksAndThings/issues/63), but a separate regression report can make a specific failure easier to track.
+Use **Report a bug / feature** in the F10 settings window or traffic Settings tab, or open the [GitHub issues list](https://github.com/rmroc451/TweaksAndThings/issues). Search for an existing report first; use [New issue](https://github.com/rmroc451/TweaksAndThings/issues/new) for a new reproducible problem. Automated traffic work is associated with [issue #63](https://github.com/rmroc451/TweaksAndThings/issues/63), but a separate regression report can make a specific failure easier to track.
 
 Suggested bug-report template:
 
@@ -134,7 +150,7 @@ Car IDs, waybill destination and pickup span if relevant:
 CTC mode, traffic mode, simulation rate:
 
 Attached: current debug log, .previous log if present,
-snapshot, relevant UMM/native error output, screenshots,
+snapshot, relevant game/native error output, screenshots,
 and a reproducing save if available.
 ~~~
 

@@ -1,10 +1,9 @@
-using UnityModManagerNet;
 using UnityEngine;
 
 namespace RMROC451.TweaksAndThings;
 
 /// <summary>
-/// The game used Alt, Ctrl, and Shift as click modifiers. These UMM bindings
+/// The game used Alt, Ctrl, and Shift as click modifiers. These saved bindings
 /// keep those defaults while allowing each modifier action to be remapped.
 /// </summary>
 internal static class HotkeyBindings
@@ -13,13 +12,13 @@ internal static class HotkeyBindings
     internal static bool ControlDown => IsHeld(TweaksAndThingsPlugin.Instance?.settings?.ClickControlBinding);
     internal static bool ShiftDown => IsHeld(TweaksAndThingsPlugin.Instance?.settings?.ClickShiftBinding);
 
-    internal static bool IsHeld(KeyBinding? binding)
+    internal static bool IsHeld(HotkeyBinding? binding)
     {
         if (binding == null || binding.keyCode == KeyCode.None) return false;
 
-        bool control = KeyBinding.Ctrl();
-        bool shift = KeyBinding.Shift();
-        bool alt = KeyBinding.Alt();
+        bool control = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
         byte actualModifiers = (byte)((control ? 1 : 0) | (shift ? 2 : 0) | (alt ? 4 : 0));
         if ((actualModifiers & binding.modifiers) != binding.modifiers) return false;
 
@@ -32,10 +31,6 @@ internal static class HotkeyBindings
         if (keyIsControl || keyIsShift || keyIsAlt)
             return keyIsControl && control || keyIsShift && shift || keyIsAlt && alt;
 
-        // Pressed() requires an exact modifier match. Probe with the currently
-        // held modifiers so multiple remapped action bindings can be combined.
-        var probe = new KeyBinding();
-        probe.Change(binding.keyCode, actualModifiers);
-        return probe.Pressed();
+        return (actualModifiers & binding.modifiers) == binding.modifiers && Input.GetKey(binding.keyCode);
     }
 }

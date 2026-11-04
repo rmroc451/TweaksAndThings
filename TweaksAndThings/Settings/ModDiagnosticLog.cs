@@ -28,7 +28,7 @@ internal static class ModDiagnosticLog
         Write("SESSION", "Starting TweaksAndThings diagnostics; UTC timestamps. Archives use numbered suffixes and are retained.");
     }
 
-    // Retain the old call shape for existing test and tooling callers; log failures never escape to UMM.
+    // Retain the old call shape for existing test and tooling callers; log failures never escape to the loader.
     internal static void Initialize(string directory, Action<string>? ignoredFailureCallback)
     {
         _ = ignoredFailureCallback;
@@ -69,7 +69,7 @@ internal static class ModDiagnosticLog
             {
                 if (failureReported) return;
                 failureReported = true;
-                // Keep diagnostics self-contained; do not send mod-authored log messages to UMM/Player.log.
+                // Keep diagnostics self-contained; write mod-authored diagnostics to the mod log.
             }
         }
     }

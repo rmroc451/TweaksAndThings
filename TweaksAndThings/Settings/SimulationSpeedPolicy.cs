@@ -4,6 +4,12 @@ namespace RMROC451.TweaksAndThings;
 
 internal static class SimulationSpeedPolicy
 {
+    internal static bool AllAutomatic(System.Collections.Generic.IEnumerable<bool> automaticModes)
+    {
+        foreach (bool automatic in automaticModes) if (!automatic) return false;
+        return true;
+    }
+    internal static bool RequiresAutomatic(bool npc, bool pooled, bool mu, bool inBardo) => !npc && !pooled && !mu && !inBardo;
     internal static int Rate(int value) => value == 2 || value == 4 || value == 8 ? value : 1;
     internal static double? SwitchingBoundary(double now, double arrival, double departure)
     {

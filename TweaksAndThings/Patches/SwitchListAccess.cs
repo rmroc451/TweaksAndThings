@@ -15,7 +15,7 @@ internal static class SwitchListAccess
         selectedCar.EnumerateCoupled().Where(IsEligible).ToList(), out addedCount);
 
     internal static bool IsEligible(Car car) =>
-        (!car.MotivePower() && car.Archetype != Model.Definition.CarArchetype.Tender) ||
+        (!car.MotivePower() && !car.CarType.IsTender) ||
         car.TryGetOverrideDestination(Model.Ops.OverrideDestination.Repair, Model.Ops.OpsController.Shared, out var repair) && repair.HasValue;
 
     internal static bool TryAddCars(IReadOnlyList<Car> cars, out int addedCount)

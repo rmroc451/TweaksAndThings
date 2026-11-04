@@ -14,7 +14,7 @@ internal static class NpcPickupPayment_Patch
     private static bool Prefix(IndustryContext __instance, IOpsCar car, Waybill waybill, out int __state)
     {
         __state = 0;
-        if (!StateManager.IsHost || !NpcServiceStore.Load() ||
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled() || !StateManager.IsHost || !NpcServiceStore.Load() ||
             !OpsController.Shared.AllInterchanges.Any(i => i.Identifier == waybill.Destination.Identifier)) return true;
         if (NpcPickupTracking.PaymentForfeited(car.Id, waybill)) return false;
         int bonus = __instance._industry.HasActiveContract(__instance.Now)

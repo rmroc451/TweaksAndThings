@@ -32,19 +32,21 @@ internal static class NpcRecoveryControls
             if (lead.EnumerateCoupled().Count() != owned.Count || needsRerail)
             {
                 var front = lead.LocationA.Clamped();
-                if (!NpcDeparturePlacement.Fits(front, TrainController.ApproximateLength(owned.Select(c => c.Descriptor())), new HashSet<string>(ids)))
+        if (!NpcDeparturePlacement.Fits(front, TrainController.ApproximateLength(owned.Select(c => c.Descriptor()).ToList()), new HashSet<string>(ids)))
                 { Toast.Present("Clear enough track around this NPC train before reestablishing it."); return; }
-                NpcTrainOperations.Trusted(() =>
+                NpcTrainOperations.Trusted(() => ThroughTrafficGuard.WithNpcRerail(() =>
                 {
                     foreach (var vehicle in owned.Where(c => c.IsDerailed))
                         StateManager.ApplyLocal(new Game.Messages.PropertyChange(vehicle.id, Game.Messages.PropertyChange.Control.Derailment, 0f));
-                });
-                NpcDeparturePlacement.MoveExisting(front, owned);
+                }));
+                NpcDeparturePlacement.MoveExisting(front, NpcServiceCaboose.TravelOrder(service, owned));
             }
             var destination = Graph.Shared.ResolveLocationString(service.Phase == "Departing" ? service.Spawn : service.Target);
-            if ((service.Phase == "Approaching" || service.Phase == "Departing") && !NpcDeparturePlacement.FaceDeparture(service, destination))
+            bool travel = service.Phase == "Approaching" || service.Phase == "Departing" || service.Phase == "Parking power";
+            if (travel && !NpcDeparturePlacement.FaceDeparture(service, destination))
             { Toast.Present("Clear the departure end before reestablishing this NPC train."); return; }
-            NpcTrainOperations.Order(lead, destination, service.Phase == "Approaching" || service.Phase == "Departing");
+            if (travel) NpcTrainOperations.Order(lead, destination);
+            else NpcTrainOperations.Hold(lead);
             NpcTrafficRouting.Recalculate(lead);
             service.Suspended = false;
             NpcServiceStore.Save();
@@ -56,7 +58,7 @@ internal static class NpcRecoveryControls
 
     internal static bool Configure(LocomotiveControlsUIAdapter adapter)
     {
-        var loco = TrainController.Shared?.SelectedLocomotive;
+        var loco = LocomotiveControlsUIAdapter.Locomotive;
         bool generated = ThroughTrafficGuard.IsGenerated(loco);
         adapter.modeDropdown.gameObject.SetActive(!generated);
         if (!generated) return false;

@@ -14,9 +14,23 @@ namespace RMROC451.TweaksAndThings.Patches;
 internal static class InterchangeTimewarp_Patch
 {
     private static readonly NpcTimewarpGate gate = new();
+    private static bool customWaitRunning;
+    private static long activeWaitTicket;
+
+    internal static void CancelForDisable()
+    {
+        if (!customWaitRunning) return;
+        gate.Cancel();
+        NpcInterchangeWarp.ContinueAcrossMidnight = false;
+        var state = StateManager.Shared;
+        if (state != null) state.IsWaiting = false;
+        customWaitRunning = false;
+        ModDiagnosticLog.Write("TIMEWARP", "Canceled NPC-aware clock wait because NPC interchange traffic was disabled.");
+    }
 
     internal static void CancelForSpawn(string service)
     {
+        NpcInterchangeWarp.ContinueAcrossMidnight = false;
         if (StateManager.IsHost) NpcSimulationSpeed.Stop("NPC traffic spawned: " + service);
         var state = StateManager.Shared;
         if (!StateManager.IsHost || state == null || !state.IsWaiting) return;
@@ -28,16 +42,23 @@ internal static class InterchangeTimewarp_Patch
     private static bool Prefix(StateManager __instance, float hours, ref IEnumerator __result)
     {
         var plugin = TweaksAndThingsPlugin.Instance;
-        if (plugin?.IsEnabled != true || plugin.settings == null ||
+        if (!plugin.NpcInterchangeTrafficEnabled() || plugin.settings == null ||
             !StateManager.IsHost || OpsController.Shared == null || TrainController.Shared == null) return true;
         NpcSimulationSpeed.Stop("Clock-only wait requested");
-        __result = Wait(__instance, hours, plugin.settings);
+        // Capture the button's intent when the request is accepted, rather than
+        // later when Unity first advances the returned coroutine.
+        bool nextService = NpcInterchangeWarp.ContinueAcrossMidnight;
+        NpcInterchangeWarp.ContinueAcrossMidnight = false;
+        __result = Wait(__instance, hours, plugin.settings, nextService);
         return false;
     }
 
-    private static IEnumerator Wait(StateManager state, float hours, Settings settings)
+    private static IEnumerator Wait(StateManager state, float hours, Settings settings, bool nextService)
     {
+        if (!settings.EnableNpcInterchangeTraffic) yield break;
         long ticket = gate.Start();
+        activeWaitTicket = ticket;
+        customWaitRunning = true;
         state.IsWaiting = true;
         try
         {
@@ -45,45 +66,94 @@ internal static class InterchangeTimewarp_Patch
             // over a dispatch merely because its approach is still being computed.
             while (settings.InterchangeService == InterchangeServiceMode.Simulated && !SimulatedInterchangeService.PrepareWarp(settings))
             {
-                if (!gate.IsCurrent(ticket)) yield break;
+                if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
                 NpcTrainOperations.AdvancePlanning();
                 yield return null;
             }
-            if (!gate.IsCurrent(ticket)) yield break;
+            if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
             double cursor = TimeWeather.Now.TotalSeconds;
             double requestedEnd = cursor + Mathf.Max(0, hours) * 3600d;
-            double? boundary = settings.InterchangeService == InterchangeServiceMode.Simulated ? SimulatedInterchangeService.WarpBoundary(settings, cursor, requestedEnd) : null;
-            double? randomBoundary = NpcRandomThroughFreights.WarpBoundary(settings, cursor, requestedEnd);
-            if (randomBoundary.HasValue && (!boundary.HasValue || randomBoundary.Value < boundary.Value)) boundary = randomBoundary;
-            var switching = NpcSimulationSpeed.SwitchingBoundary(cursor, out string switchingName);
-            bool switchingStop = switching.HasValue && switching.Value <= requestedEnd && (!boundary.HasValue || switching.Value <= boundary.Value);
-            if (switchingStop) boundary = switching;
-            double end = boundary ?? requestedEnd;
-            float multiplier = TimeWeather.TimeMultiplier;
-            while (cursor < end)
+            while (cursor < requestedEnd)
             {
-                if (!gate.IsCurrent(ticket)) yield break;
-                float step = (float)System.Math.Min(3600d, end - cursor);
-                Industry.TickAll(step / multiplier);
-                // A spawn during native industry processing must not be followed
-                // by another clock jump from this now-canceled wait.
-                if (!gate.IsCurrent(ticket)) yield break;
-                cursor += step;
-                StateManager.ApplyLocal(new SetTimeOfDay((float)cursor));
-                if (!gate.IsCurrent(ticket)) yield break;
-                yield return new WaitForSeconds(0.25f);
-            }
-            if (!gate.IsCurrent(ticket)) yield break;
-            if (boundary.HasValue)
-            {
-                NpcDailyTrafficPlans.Tick(settings, TimeWeather.Now.TotalSeconds, force: true);
-                if (settings.InterchangeService == InterchangeServiceMode.Simulated) SimulatedInterchangeService.DispatchAtWarpBoundary(settings);
-                NpcRandomThroughFreights.Tick(settings, TimeWeather.Now.TotalSeconds, force: true);
-                if (switchingStop) UI.Common.Toast.Present("Wait stopped for scheduled switching: " + switchingName);
-                TweaksAndThingsPlugin.LogDiagnostic(switchingStop ? "Timewarp stopped for switching: " + switchingName :
-                    "Timewarp stopped at NPC interchange dispatch time " + TimeWeather.Now + ". Check /npcTraffic for service or placement blockers.");
+                double? boundary = settings.InterchangeService == InterchangeServiceMode.Simulated ? SimulatedInterchangeService.WarpBoundary(settings, cursor, requestedEnd) : null;
+                double? randomBoundary = NpcRandomThroughFreights.WarpBoundary(settings, cursor, requestedEnd);
+                // Midnight is a planning checkpoint, not a train dispatch.
+                double midnight = NpcWarpBoundaryPolicy.NextMidnight(cursor);
+                if (randomBoundary.HasValue && System.Math.Abs(randomBoundary.Value - midnight) > 0.01 && (!boundary.HasValue || randomBoundary.Value < boundary.Value)) boundary = randomBoundary;
+                var switching = NpcSimulationSpeed.SwitchingBoundary(cursor, out string switchingName);
+                bool switchingStop = switching.HasValue && switching.Value <= requestedEnd && (!boundary.HasValue || switching.Value <= boundary.Value);
+                if (switchingStop) boundary = switching;
+                double end = NpcWarpBoundaryPolicy.SegmentEnd(cursor, requestedEnd, boundary);
+                bool newDay = NpcWarpBoundaryPolicy.MidnightBeforeDispatch(end, midnight, boundary);
+                while (cursor < end)
+                {
+                    if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
+                    float step = (float)System.Math.Min(3600d, end - cursor);
+                    // Industry production is advanced by the game's day-change
+                    // processing in current Railroader builds.
+                    // A spawn during native industry processing must not be followed
+                    // by another clock jump from this now-canceled wait.
+                    if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
+                    cursor += step;
+                    StateManager.ApplyLocal(new SetTimeOfDay((float)cursor));
+                    if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
+                    yield return new WaitForSeconds(0.25f);
+                }
+                if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
+                if (newDay)
+                {
+                    ModDiagnosticLog.Write("TIMEWARP", "Paused at new day for industry tiers and NPC planning: " + TimeWeather.Now);
+                    // Give all new-day handlers a frame to run before consulting
+                    // the industry gate and choosing a replacement dispatch target.
+                    yield return null;
+                    bool dayReady = NpcIndustryPlanning.Ready(TimeWeather.Now.TotalSeconds);
+                    if (dayReady)
+                    {
+                        while (!NpcDailyTrafficPlans.PrepareCurrentDay(settings, TimeWeather.Now.TotalSeconds))
+                        {
+                            if (!gate.IsCurrent(ticket) || StateManager.IsUnloading || !state.IsWaiting) yield break;
+                            NpcTrainOperations.AdvancePlanning(); yield return null;
+                        }
+                        ModDiagnosticLog.Write("DAY PLAN", "New-day timetables ready for the current operating day, through " +
+                            new GameDateTime((float)NpcWarpBoundaryPolicy.NextMidnight(TimeWeather.Now.TotalSeconds)) + "; protected trains=" + NpcServiceStore.State.ProtectedTimetables.Count);
+                    }
+                    else
+                    {
+                        // Industry progression can legitimately remain pending
+                        // in a restored first-day save. It must not hold the
+                        // player's clock wait indefinitely at midnight.
+                        ModDiagnosticLog.Write("TIMEWARP", "New-day industry evaluation is still pending; continuing to the selected wait target.");
+                    }
+                    if (nextService && dayReady)
+                    {
+                        var next = NpcInterchangeWarp.NextTarget(settings, TimeWeather.Now.TotalSeconds, true, out bool simulated);
+                        if (!next.HasValue) { UI.Common.Toast.Present("No enabled interchange has a scheduled service after the new-day evaluation."); yield break; }
+                        requestedEnd = next.Value + 1;
+                        ModDiagnosticLog.Write("TIMEWARP", "New-day evaluation complete; continuing to " + (simulated ? "AI dispatch " : "normal interchange service ") + new GameDateTime((float)next.Value));
+                    }
+                    else if (nextService)
+                    {
+                        ModDiagnosticLog.Write("TIMEWARP", "Keeping the previously selected interchange service time because new-day industry evaluation is pending.");
+                    }
+                    cursor = System.Math.Max(TimeWeather.Now.TotalSeconds, end);
+                    continue;
+                }
+                if (boundary.HasValue)
+                {
+                    NpcDailyTrafficPlans.Tick(settings, TimeWeather.Now.TotalSeconds, force: true);
+                    if (settings.InterchangeService == InterchangeServiceMode.Simulated) SimulatedInterchangeService.DispatchAtWarpBoundary(settings);
+                    NpcRandomThroughFreights.Tick(settings, TimeWeather.Now.TotalSeconds, force: true);
+                    if (switchingStop) UI.Common.Toast.Present("Wait stopped for scheduled switching: " + switchingName);
+                    TweaksAndThingsPlugin.LogDiagnostic(switchingStop ? "Timewarp stopped for switching: " + switchingName :
+                        "Timewarp stopped at NPC interchange dispatch time " + TimeWeather.Now + ". Check /npcTraffic for service or placement blockers.");
+                }
+                yield break;
             }
         }
-        finally { if (gate.IsCurrent(ticket)) state.IsWaiting = false; }
+        finally
+        {
+            if (gate.IsCurrent(ticket)) state.IsWaiting = false;
+            if (activeWaitTicket == ticket) customWaitRunning = false;
+        }
     }
 }

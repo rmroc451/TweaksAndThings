@@ -93,16 +93,14 @@ internal static class DoubleMainlineCtc
 
         var samples = new List<(CTCPanelSchematicFace Face, float Distance, Vector2 Position)>();
         var signalMarkers = UnityEngine.Object.FindObjectsByType<TrackMarker>(FindObjectsSortMode.None)
-            .Where(marker => marker.type == TrackMarkerType.Signal && marker.Signal != null && marker.Location.HasValue)
+            .Where(marker => marker.type == TrackMarkerType.Signal && marker.Location.HasValue)
             .ToArray();
         foreach (var manager in managers)
         foreach (var face in manager.faces ?? new List<CTCPanelSchematicFace>())
         foreach (var label in face.GetComponentsInChildren<CTCPanelSignalLabel>(true))
         {
             var labelId = (label.number ?? string.Empty).Trim();
-            var marker = signalMarkers.FirstOrDefault(candidate =>
-                candidate.Signal.id.Equals(labelId, StringComparison.OrdinalIgnoreCase) ||
-                candidate.Signal.DisplayName.Equals(labelId, StringComparison.OrdinalIgnoreCase));
+            var marker = signalMarkers.FirstOrDefault(candidate => candidate.id.Equals(labelId, StringComparison.OrdinalIgnoreCase));
             if (marker == null || !Graph.Shared.TryGetDistanceBetweenSameRoute(location, marker.Location!.Value, out var distance)) continue;
             var rect = label.GetComponent<RectTransform>();
             if (rect == null) continue;
@@ -165,7 +163,6 @@ internal static class DoubleMainlineCtc
         string interlockingId = Prefix + "Interlocking." + name;
         var interlockingObject = new GameObject(interlockingId);
         interlockingObject.SetActive(false);
-        interlockingObject.transform.SetParent(Graph.Shared.transform, false);
         interlockingObject.AddComponent<DoubleMainlineCtcTag>();
         var interlocking = interlockingObject.AddComponent<CTCInterlocking>();
         interlocking.id = interlockingId;
@@ -252,7 +249,6 @@ internal static class DoubleMainlineCtc
         var blockId = Prefix + "Block." + groupId;
         var blockObject = new GameObject(blockId);
         blockObject.SetActive(false);
-        blockObject.transform.SetParent(Graph.Shared.transform, false);
         blockObject.AddComponent<DoubleMainlineCtcTag>();
         var spans = new List<TrackSpan>();
         foreach (var segment in segments.Distinct())
@@ -303,7 +299,7 @@ internal static class DoubleMainlineCtc
         TrackNode parallelNode, TrackSegment segment, string id)
     {
         var template = templates.OrderBy(signal =>
-            (signal.transform.position - WorldTransformer.GameToWorld(sourceNode.transform.position)).sqrMagnitude).First();
+            (signal.transform.position - WorldTransformer.GameToWorld(sourceNode.Position)).sqrMagnitude).First();
         var copy = UnityEngine.Object.Instantiate(template.gameObject, template.transform.parent);
         copy.name = id;
         copy.AddComponent<DoubleMainlineCtcTag>();
@@ -317,14 +313,14 @@ internal static class DoubleMainlineCtc
         auto.blocks = new List<CTCBlock> { block };
         auto.interlockingRouteMapping = new List<int>();
         signal.id = id;
-        var gamePosition = parallelNode.transform.position;
+        var gamePosition = parallelNode.Position;
         copy.transform.position = WorldTransformer.GameToWorld(gamePosition) + Vector3.up * 2f;
         if (segment != null)
         {
             if (DoubleMainlineSettings.MirrorExistingCtcSignalLocations)
             {
                 var sourceGamePosition = WorldTransformer.WorldToGame(template.transform.position);
-                var offset = parallelNode.transform.position - sourceNode.transform.position;
+                var offset = parallelNode.Position - sourceNode.Position;
                 copy.transform.position = WorldTransformer.GameToWorld(sourceGamePosition + offset);
                 copy.transform.rotation = template.transform.rotation;
             }

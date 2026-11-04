@@ -11,17 +11,22 @@ internal static class NpcServiceStore
     private static IKeyValueObject? loadedObject;
     private static string? loadedJson;
     internal static NpcServiceState State { get; private set; } = new NpcServiceState();
+    internal static int Generation { get; private set; }
 
     internal static bool Load()
     {
         var kv = StateManager.Shared?.KeyValueObjectForId(GameStorage.ObjectId);
         if (kv == null) return false;
         var value = kv[Key];
-        if (ReferenceEquals(kv, loadedObject) && (value.IsNull ? null : value.StringValue) == loadedJson) return true;
+        if (ReferenceEquals(kv, loadedObject) && (value.IsNull ? null : value.StringValue) == loadedJson)
+        {
+            return true;
+        }
         loadedJson = value.IsNull ? null : value.StringValue;
         State = value.IsNull ? new NpcServiceState() :
             JsonConvert.DeserializeObject<NpcServiceState>(value.StringValue) ?? new NpcServiceState();
         loadedObject = kv;
+        Generation++;
         return true;
     }
 

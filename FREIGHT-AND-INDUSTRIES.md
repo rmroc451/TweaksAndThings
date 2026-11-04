@@ -2,6 +2,8 @@
 
 This guide explains the accounting around simulated interchange work. Native waybills and industry demand remain central: the mod schedules physical deliveries, tracks deferred work and adds explicit incentives or missed-pickup consequences.
 
+> **Coming soon:** NPC interchange services and their related delivery/pickup accounting are currently hidden behind the NPC Traffic settings tab in F10. Access to their setup and configuration controls will return in a forthcoming update. This guide describes the feature behavior; it is not currently configurable from the settings panel.
+
 Related guides: [interchange operation](INTERCHANGE-SERVICES.md), [switch-list and car tools](PLAYER-TOOLS.md), [timetable controls](TIMETABLE-AND-TIME.md), and [troubleshooting](TROUBLESHOOTING.md).
 
 ## Held delivery versus delinquent pickup

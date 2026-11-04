@@ -17,13 +17,16 @@ internal sealed class NpcDelinquentPickupWindow : MonoBehaviour
     private bool visible;
     internal static void Show()
     {
+        if (!TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled()) return;
         if (instance == null) instance = new GameObject("TweaksAndThings delinquent pickups").AddComponent<NpcDelinquentPickupWindow>();
         instance.visible = true;
     }
     private void OnGUI()
     {
-        if (!visible || TweaksAndThingsPlugin.Instance?.IsEnabled != true || OpsController.Shared == null || !NpcServiceStore.Load()) return;
-        rect = GUILayout.Window(GetInstanceID(), rect, Draw, "Delinquent interchange pickups");
+        if (!visible || !TweaksAndThingsPlugin.Instance.NpcInterchangeTrafficEnabled() || OpsController.Shared == null || !NpcServiceStore.Load()) return;
+        bool previousWrap = GUI.skin.label.wordWrap;
+        try { GUI.skin.label.wordWrap = true; rect = GUILayout.Window(GetInstanceID(), rect, Draw, "Delinquent interchange pickups"); }
+        finally { GUI.skin.label.wordWrap = previousWrap; }
     }
     private void Draw(int id)
     {

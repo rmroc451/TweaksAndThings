@@ -1,11 +1,9 @@
 {
-  "Id": "RMROC451.TweaksAndThings",
-  "DisplayName": "RMROC451's Tweaks and Things",
-  "Author": "RMROC451",
-  "Version": "__ASSEMBLY_VERSION__",
-  "ManagerVersion": "0.20.0",
-  "AssemblyName": "RMROC451.TweaksAndThings.dll",
-  "EntryMethod": "RMROC451.TweaksAndThings.TweaksAndThingsPlugin.Load",
-  "HomePage": "https://github.com/rmroc451/TweaksAndThings/releases",
-  "Repository": "https://raw.githubusercontent.com/rmroc451/TweaksAndThings/main/Repository.json"
+  "identifier": "rmroc451/tweaks-and-things",
+  "version": "__ASSEMBLY_VERSION__",
+  "name": "RMROC451's Tweaks and Things",
+  "assemblies": ["RMROC451.TweaksAndThings.dll"],
+  "dependencies": {
+    "required": ["rr/game >=0.6.0"]
+  }
 }

@@ -8,11 +8,13 @@ using KeyValue.Runtime;
 using Model;
 using Model.Definition;
 using Model.Ops;
+using Model.Ops.Definition;
 using Track;
 using Track.Search;
 using UI.EngineControls;
 using Model.AI;
 using Model.Definition.Data;
+using Model.Database;
 using Model.Physics;
 using RMROC451.TweaksAndThings.Patches;
 using UnityEngine;
@@ -21,12 +23,49 @@ namespace RMROC451.TweaksAndThings;
 
 internal static class NpcTrainOperations
 {
+    private static readonly Dictionary<string, float> rollingSpawns = new();
+    internal static void ArmRollingSpawn(BaseLocomotive lead) => rollingSpawns[lead.id] = Time.realtimeSinceStartup + 5;
+    internal static void ApplyRollingSpawn(AutoEngineer engineer)
+    {
+        var lead = engineer.Locomotive;
+        if (!rollingSpawns.TryGetValue(lead.id, out var expires)) return;
+        if (Time.realtimeSinceStartup > expires || !ThroughTrafficGuard.IsGenerated(lead) || NpcPoolPower.IsPooled(lead))
+        { rollingSpawns.Remove(lead.id); return; }
+        if (engineer._config == null) return;
+        rollingSpawns.Remove(lead.id);
+        var cars = lead.EnumerateCoupled().ToList();
+        if (cars.Any(c => !ThroughTrafficGuard.IsGenerated(c) || c.IsDerailed || c.air.handbrakeApplied)) return;
+        float trackMph = cars.SelectMany(c => new[] { c.LocationF.segment, c.LocationR.segment })
+            .Min(s => s.EffectiveSpeedLimitMph);
+        // Native AE includes signal, obstruction and braking-distance targets.
+        // Its signed velocity is relative to the locomotive's physical front.
+        float nativeVelocity = engineer.ContextualTargetVelocity();
+        float velocity = Mathf.Sign(nativeVelocity) * Mathf.Min(Mathf.Abs(nativeVelocity), Math.Max(0, trackMph) * 0.44704f);
+        Trusted(() => lead.set.SetVelocity(lead.FrontIsA ? -velocity : velocity, cars));
+        SyncPlacement(cars);
+        ModDiagnosticLog.Write("ROLLING SPAWN", $"{lead.DisplayName}: initial speed={Mathf.Abs(velocity) / 0.44704f:F1} mph; track={trackMph:F0} mph; native AE/signal limits applied.");
+    }
     [ThreadStatic] private static int trackAccessDepth;
     internal static bool HasTrackAccess => trackAccessDepth > 0;
     internal static bool CanPlaceAt(Location location, float length)
     {
         trackAccessDepth++;
-        try { return TrainController.Shared.CanPlaceAt(location, length); }
+        try
+        {
+            // NPC services may use physically enabled but unowned track (for
+            // example, the Sylva approach). Ownership is handled by the
+            // scoped TrainController track-access patch; occupancy and enabled
+            // track checks still apply here.
+            if (!location.IsValid || !location.segment.GroupEnabled) return false;
+            float step = Math.Max(1f, Math.Min(5f, length / 20f));
+            for (float distance = 0; distance <= length; distance += step)
+            {
+                var point = Graph.Shared.LocationByMoving(location, -distance, checkSwitchAgainstMovement: false);
+                if (!point.IsValid || !point.segment.GroupEnabled ||
+                    TrainController.Shared.CheckForCarAtLocation(point) != null) return false;
+            }
+            return true;
+        }
         finally { trackAccessDepth--; }
     }
     private sealed class Approach
@@ -90,7 +129,7 @@ internal static class NpcTrainOperations
         if (!approaches.TryGetValue(id, out var plan)) return "route not requested";
         if (plan.Work != null) return "calculating approach route";
         if (!plan.Found) return "no reachable approach; check enabled tracks and location overrides";
-        return $"route {plan.Meters:N0} m, travel {plan.TravelSeconds / 60:N1} game minutes, spawn={Graph.Shared.LocationToString(plan.Spawn)}, target={Graph.Shared.LocationToString(plan.Target)}";
+        return $"route {plan.Meters:N0} m, travel {plan.TravelSeconds / 60:N1} game minutes, spawn={Graph.LocationToString(plan.Spawn)}, target={Graph.LocationToString(plan.Target)}";
     }
 
     internal static bool IsApproachPlanning(string id) => approaches.TryGetValue(id, out var plan) && plan.Work != null;
@@ -112,7 +151,7 @@ internal static class NpcTrainOperations
     internal static double TravelSeconds(IEnumerable<RouteSearch.Step> steps, bool firstClass)
     {
         int cap = PlanningSpeedLimit(firstClass);
-        return steps.Sum(s => s.Distance / (Math.Max(1, Math.Min(cap, s.Location.segment.GetExpectedSpeedLimit())) * 0.44704));
+        return steps.Sum(s => s.Distance / (Math.Max(1, Math.Min(cap, s.Location.segment.EffectiveSpeedLimitMph)) * 0.44704));
     }
 
     internal static void Trusted(Action action)
@@ -252,7 +291,7 @@ internal static class NpcTrainOperations
             .Select(s => new Location(s, Math.Min(s.GetLength() * 0.8f, 800f),
                 connections[s.a] == 1 ? TrackSegment.End.A : TrackSegment.End.B))
             .Where(p => distances.ContainsKey(p.segment.a) && distances.ContainsKey(p.segment.b));
-        var ordered = settings.InterchangeSpawnMode == NpcSpawnMode.FarthestReachable
+        var ordered = plan.Mode == NpcSpawnMode.FarthestReachable
             ? candidates.OrderByDescending(p => NpcServicePolicy.DistanceToPoint(distances[p.segment.a], distances[p.segment.b],
                 p.segment.GetLength(), p.distance, p.end == TrackSegment.End.A))
             : candidates.OrderBy(p => EdgeDistance(p)).ThenBy(p => Vector3.SqrMagnitude(p.GetPosition() - interchange.CenterPoint));
@@ -305,6 +344,13 @@ internal static class NpcTrainOperations
         }
     }
 
+    internal static double OwnedDieselShare()
+    {
+        var roster = TrainController.Shared.Cars.Where(c => c.IsLocomotive && c.IsOwnedByPlayer && !ThroughTrafficGuard.IsGenerated(c)).ToList();
+        int steam = roster.Count(c => c is SteamLocomotive), diesel = roster.Count(c => c is DieselLocomotive);
+        return steam + diesel == 0 ? 0 : (double)diesel / (steam + diesel);
+    }
+
     internal static bool TryCatalogPower(float weight, List<RouteSearch.Step> route, string? crewId, out List<CarDescriptor> power,
         List<RouteSearch.Step>? returnRoute = null, float returnWeight = 0, IReadOnlyList<Car>? installedPower = null, double utilization = 1, Action<float>? reportCapacity = null,
         float trainLength = 100, float returnTrainLength = 100)
@@ -313,7 +359,7 @@ internal static class NpcTrainOperations
         var requirements = PowerRequirements(route, trainLength).Select(r => (r.speed, r.demand, weight)).ToList();
         if (returnRoute != null) requirements.AddRange(PowerRequirements(returnRoute, returnTrainLength).Select(r => (r.speed, r.demand, weight: returnWeight)));
         var candidates = new List<(List<Model.Definition.TypedContainerItem<CarDefinition>> definitions, double[] capacity)>();
-        var store = TrainController.Shared.PrefabStore;
+        var store = TrainController.Shared.ContentLibrary;
         foreach (var info in store.AllCarDefinitionInfos.Where(i => i.Definition.VisibleInPlacer &&
             (i.Definition is DieselLocomotiveDefinition || i.Definition is SteamLocomotiveDefinition) &&
             (installedPower == null || installedPower.Any(c => c.IsLocomotive && c.DefinitionIdentifier == i.Identifier)))
@@ -327,8 +373,7 @@ internal static class NpcTrainOperations
                 Func<int, float> effort;
                 if (info.Definition is DieselLocomotiveDefinition diesel)
                 {
-                    var mover = calculator.AddComponent<PrimeMover>();
-                    mover.startingTractiveEffort = diesel.StartingTractiveEffort;
+                    var mover = calculator.AddComponent<DieselPrimeMover>();
                     effort = speed => mover.MaxTractiveEffort(speed);
                 }
                 else
@@ -338,7 +383,7 @@ internal static class NpcTrainOperations
                     if (info.Definition.TryGetTenderIdentifier(out var tenderIdentifier))
                     {
                         var tender = store.CarDefinitionInfoForIdentifier(tenderIdentifier);
-                        if (tender.Definition.Archetype != CarArchetype.Tender)
+                        if (!tender.Definition.CarType.IsTender)
                             throw new InvalidOperationException("Steam tender definition is not a tender: " + tenderIdentifier);
                         definitions.Add(tender);
                     }
@@ -350,12 +395,11 @@ internal static class NpcTrainOperations
                     engine.pistonStrokeInches = steam.PistonStrokeInches;
                     engine.pistonDiameterInches = steam.PistonDiameterInches;
                     engine.weightOnDrivers = steam.WeightOnDrivers;
-                    engine.totalHeatingSurface = steam.TotalHeatingSurface;
                     engine.UpdateMaximumTractiveEffort();
                     effort = speed => engine.MaximumTractiveEffortAtVelocity(speed);
                 }
                 double unitWeight = NpcServicePolicy.Tonnes(definitions.Sum(d => d.Definition.WeightEmpty + d.Definition.LoadSlots.Sum(slot =>
-                    string.IsNullOrEmpty(slot.RequiredLoadIdentifier) ? 0 : (CarPrototypeLibrary.instance.LoadForId(slot.RequiredLoadIdentifier)?.Pounds(slot.MaximumCapacity) ?? 0))));
+                    string.IsNullOrEmpty(slot.RequiredLoadIdentifier) ? 0 : (CarLoadLibrary.GetLoad(slot.RequiredLoadIdentifier)?.Pounds(slot.MaximumCapacity) ?? 0))));
                 candidates.Add((definitions, requirements.Select(r => utilization * NpcServicePolicy.Horsepower(effort(r.speed), r.speed) - r.demand * unitWeight).ToArray()));
             }
             catch (Exception ex) { TweaksAndThingsPlugin.LogException("Unable to evaluate NPC locomotive " + info.Identifier, ex); }
@@ -376,6 +420,15 @@ internal static class NpcTrainOperations
             NpcTrafficDiagnostics.Report("power", $"No feasible power combination: {candidates.Count} catalog candidates, {weight / 2000:N0} tons, peak demand {requirements.Max(r => r.demand):N2} HP/tonne");
             return false;
         }
+        // Keep the minimum feasible engine count, then draw a steam/diesel mix
+        // from the company's roster and choose the closest feasible makeup.
+        double dieselShare = OwnedDieselShare();
+        int desiredDiesels = dieselShare <= 0 ? 0 : dieselShare >= 1 ? selected.Count :
+            (int)Math.Floor(selected.Count * dieselShare + UnityEngine.Random.value);
+        selected = NpcPowerSelection.Select(candidates.Select(c => c.capacity).ToList(),
+            requirements.Select(r => r.demand * NpcServicePolicy.Tonnes(r.weight)).ToArray(), selected.Count,
+            candidates.Select(c => c.definitions[0].Definition is DieselLocomotiveDefinition).ToList(), desiredDiesels) ?? selected;
+        ModDiagnosticLog.Write("POWER MIX", $"Owned diesel share={dieselShare:P0}; requested {desiredDiesels}/{selected.Count} diesel units; selected {selected.Count(i => candidates[i].definitions[0].Definition is DieselLocomotiveDefinition)}/{selected.Count}; minimum feasible engine count preserved.", "power-mix", 30);
         foreach (int index in selected)
         {
             bool trailing = power.Count > 0;
@@ -419,7 +472,7 @@ internal static class NpcTrainOperations
         int speedCap = PlanningSpeedLimit(false);
         foreach (var step in steps)
         {
-            int speed = Math.Max(1, Math.Min(speedCap, step.Location.segment.GetExpectedSpeedLimit()));
+            int speed = Math.Max(1, Math.Min(speedCap, step.Location.segment.EffectiveSpeedLimitMph));
             float start = Math.Max(0, step.Location.distance - step.Distance);
             for (float d = start; d < step.Location.distance; d += 10)
             {
@@ -440,11 +493,20 @@ internal static class NpcTrainOperations
         if (run && !forward) throw new InvalidOperationException("NPC departure would push its consist; reposition power before issuing orders");
         Trusted(() => new AutoEngineerOrdersHelper(lead, new AutoEngineerPersistence(lead.KeyValueObject))
             .SetOrdersValue(mode: AutoEngineerMode.Waypoint, forward: forward, maxSpeedMph: run ? SpeedMph : 0,
-                maybeWaypoint: (target, (string)null!)));
+                maybeWaypoint: new OrderWaypoint(Graph.LocationToString(target), string.Empty)));
+    }
+
+    internal static void Hold(BaseLocomotive lead)
+    {
+        // A zero-speed ROAD order brakes in place without creating a new
+        // waypoint relative to a locomotive that is still settling to a stop.
+        Trusted(() => new AutoEngineerOrdersHelper(lead, new AutoEngineerPersistence(lead.KeyValueObject))
+            .SetOrdersValue(mode: AutoEngineerMode.Road, forward: true, maxSpeedMph: 0));
     }
 
     internal static void PlacePower(Location spawn, List<CarDescriptor> descriptors, List<string> ids)
     {
+        NpcEquipmentIdentity.Assign(descriptors);
         try
         {
             Trusted(() => TrainController.Shared.PlaceTrain(spawn, descriptors, ids));
@@ -473,13 +535,13 @@ internal static class NpcTrainOperations
             });
             throw;
         }
-        TweaksAndThingsPlugin.LogDiagnostic($"NPC placement verified: {ids.Count} vehicles, {descriptors.Count(d => d.DefinitionInfo.Definition.Archetype == CarArchetype.Tender)} tenders.");
+        TweaksAndThingsPlugin.LogDiagnostic($"NPC placement verified: {ids.Count} vehicles, {descriptors.Count(d => d.DefinitionInfo.Definition.CarType.IsTender)} tenders.");
         ModDiagnosticLog.Write("CONSIST", "Initial placement: " + string.Join(",", ids.Select((id, index) => id + ":" + descriptors[index].DefinitionInfo.Identifier)));
         var lead = TrainController.Shared.CarForId(ids[0]);
-        ModDiagnosticLog.Write("PLACEMENT", $"lead={lead.id}; physical front={Graph.Shared.LocationToString(lead.LocationF)}; logical front={Graph.Shared.LocationToString(lead.LocationA)}; flipped={descriptors[0].Flipped}; speed={lead.VelocityMphAbs:F2} mph.");
+        ModDiagnosticLog.Write("PLACEMENT", $"lead={lead.id}; physical front={Graph.LocationToString(lead.LocationF)}; logical front={Graph.LocationToString(lead.LocationA)}; flipped={descriptors[0].Flipped}; speed={lead.VelocityMphAbs:F2} mph.");
     }
 
-    private static void ConfigurePower(BaseLocomotive lead)
+    internal static void ConfigurePower(BaseLocomotive lead)
     {
         Trusted(() =>
         {
@@ -500,7 +562,11 @@ internal static class NpcTrainOperations
     internal static bool Arrived(BaseLocomotive lead, Location target) => lead.VelocityMphAbs < 0.5f &&
         Graph.Shared.CheckSameRoute(lead.LocationF, target, 60f);
 
-    internal static void Marker(Car car, bool npc) => Trusted(() => car.KeyValueObject[ThroughTrafficGuard.MarkerKey] = Value.Bool(npc));
+    internal static void Marker(Car car, bool npc)
+    {
+        Trusted(() => car.KeyValueObject[ThroughTrafficGuard.MarkerKey] = Value.Bool(npc));
+        if (npc) NpcMaintenance.ClearHotbox(car);
+    }
 
     internal static Car Tail(NpcServiceRecord service) => TrainController.Shared.CarForId(service.LeadId).EnumerateCoupled().Last();
 
@@ -518,7 +584,7 @@ internal static class NpcTrainOperations
         float length = TrainController.ApproximateLength(descriptors);
         if (!CanPlaceAt(position, length))
         {
-            NpcTrafficDiagnostics.Detail("append-blocked:" + service.Id, $"Append blocked service={service.Id}; tail={tail.id}, position={Graph.Shared.LocationToString(position)}, length={length:F1}m, cars={descriptors.Count}; nearby IDs={string.Join(",", TrainController.Shared.CarIdsInRadius(position.GetPosition(), 50))}");
+            NpcTrafficDiagnostics.Detail("append-blocked:" + service.Id, $"Append blocked service={service.Id}; tail={tail.id}, position={Graph.LocationToString(position)}, length={length:F1}m, cars={descriptors.Count}; nearby IDs={string.Join(",", TrainController.Shared.CarIdsInRadius(position.GetPosition(), 50))}");
             return false;
         }
         var previous = ids.Where(id => TrainController.Shared.TryGetCarForId(id, out _))

@@ -33,5 +33,5 @@ internal static class NpcPassingSidings
         return limit;
     }
 
-    internal static float Length(IEnumerable<Model.CarDescriptor> cars) => TrainController.ApproximateLength(cars);
+    internal static float Length(IEnumerable<Model.CarDescriptor> cars) => TrainController.ApproximateLength(cars.ToList());
 }

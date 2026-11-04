@@ -4,26 +4,28 @@ Start with the installation steps and the detailed feature guides below. The ori
 
 This is a mod for Railroader which is available on Steam.
 
-This version is packaged as a UnityModManager mod.
-
-UnityModManager is the only mod loader required from 2.1.9 onward. Tweaks and Things has no Railloader or Strange Customs dependency and does not use `Definition.json` or Railloader content mixins. If an older Railloader installation remains active, it may warn that this UMM folder lacks `Definition.json`; do not add a dummy manifest or install the mod twice. Remove the legacy loader using its supported uninstall procedure if no other installed mods need it, then verify/reinstall UMM's injection as needed.
+This version is packaged as a native Railroader DLL mod. It uses the game's experimental DLL mod loader; UnityModManager is not required.
 
 ## Detailed feature guides
 
 The expanded traffic and railroad-management features have dedicated Markdown guides beside this README. They describe the current implementation on this branch; development features still require in-game verification before release.
 
+> **Coming soon:** NPC traffic and simulated interchange features are currently hidden behind the NPC Traffic settings tab, which is disabled in the F10 settings panel. Their setup and configuration controls will return in a forthcoming update. The detailed guides below describe those features but their setup steps are not currently available from F10.
+
 | Guide | What it explains |
 | --- | --- |
 | [NPC traffic](NPC-TRAFFIC.md) | Traffic types, daily random freight ranges, catalog power/MU/tenders, track speeds, route authority, telegraphs, NPC restrictions and recovery. |
 | [Interchange services and pool power](INTERCHANGE-SERVICES.md) | Enabling simulated service, dispatch lead time, automatic spawn locations, timed transfers, free caboose assistance, full-yard deferrals, pickups and saved parked power. |
+| [AE Local physical switching](AE-LOCAL.md) | Assign a player consist to selected industries, sort delivery cuts, collect outbound cars, return pickups to its home yard, and park; roster progress and dispatcher signal notices. |
 | [Freight and industries](FREIGHT-AND-INDUSTRIES.md) | Held orders without duplicates, declining delivery premiums, delinquent pickup penalties, purchased coal pickups, pulpwood orders/fees and switch-list accounting. |
 | [Timetable and time controls](TIMETABLE-AND-TIME.md) | String charts, planned meets, current positions, forecasts, actual running/variance, protected daily schedules, dispatch-board markers and 2×/4×/8× simulation. |
 | [Player tools](PLAYER-TOOLS.md) | Expanded load/speed/status tags, compact inspector helpers, waybill summaries, first-waypoint selection, random consist generation, crew-hours migration and Bryson mirrored CTC controls. |
+| [New-game starting areas](NEW-GAME-STARTS.md) | Loaded-map starting-area selection, progression checkboxes, equipment validation and troubleshooting missing locations. |
 | [Second mainline follow-up](SECOND-MAINLINE-FOLLOWUP.md) | Agreed route geometry, scenery, passing siding, crossings, progression, CTC behavior and in-game verification checklist for the code-generated second mainline. |
-| [Installation and releases](INSTALLATION-AND-RELEASES.md) | UMM installation/update checking, multiplayer authority, local assembly references, automatic ZIP output and publishing releases after 2.1.9. |
+| [Installation and releases](INSTALLATION-AND-RELEASES.md) | Native DLL mod installation, multiplayer authority, local assembly references, automatic ZIP output and releases. |
 | [Troubleshooting and bug reports](TROUBLESHOOTING.md) | Missing trains/cars, clearance holds, stalled transfers, pool restrictions, accounting problems, lag, UI/build errors and exactly which logs to attach. |
 
-For a quick start, follow [Simulated interchange setup](INTERCHANGE-SERVICES.md#first-service-setup-checklist). For a train that is not doing what you expect, use [Troubleshooting](TROUBLESHOOTING.md) before changing several settings at once. These guides distinguish implemented behavior from planned estimates and behavior that still needs physical multiplayer validation.
+For a quick start to the features currently available, use the relevant guide below. The [Simulated interchange setup](INTERCHANGE-SERVICES.md#first-service-setup-checklist) is forthcoming while its settings tab is hidden. For a train that is not doing what you expect, use [Troubleshooting](TROUBLESHOOTING.md) before changing several settings at once.
 
 Use the in-game **Report a bug / feature** button or [search/report on GitHub](https://github.com/rmroc451/TweaksAndThings/issues). The [reporting checklist](TROUBLESHOOTING.md#report-a-bug-or-propose-a-feature) includes train/car IDs, game time, host/client details, snapshots and the mod's current and rotated debug logs.
 
@@ -40,10 +42,10 @@ Special thanks to:
 - Zamu
 
 ## Usage
-1. Install UnityModManager and configure it for Railroader.
+1. In Railroader, enable **Preferences → Features → Experimental → Allow Unsafe DLL Mods**, then restart the game.
 2. Download the `RMROC451.TweaksAndThings_<version>.zip` release asset from the [Releases page](https://github.com/rmroc451/TweaksAndThings/releases).
-3. Install the release ZIP from UnityModManager's **Mods** tab, or manually extract its files into `Mods/RMROC451.TweaksAndThings`. The folder must contain `Info.json`, `RMROC451.TweaksAndThings.dll`, and `Newtonsoft.Json.dll`.
-4. Start Railroader, open the UnityModManager menu, and enable **RMROC451's Tweaks and Things**. Its settings and keybindings are available in the mod panel.
+3. Extract the pack into a folder under `Documents\Railroader\Mods`. Keep `Info.json`, `RMROC451.TweaksAndThings.dll`, `0Harmony.dll`, and `Newtonsoft.Json.dll` together at that folder's root.
+4. Start Railroader. Press **F10** to open the mod settings window; settings are saved to `Settings.json` in the mod folder.
 
 
 ## Notes
@@ -75,7 +77,7 @@ Enter Tweaks and Things.
             </li>
             <li><b>A4:</b> Adds a "+" on cabeese tags when on a track span that reloads their crew hours load (see <b>C</b>)</li>
             <li><b>A5 (🟢 NEW v2.0.0):</b> Car Click Hotkey Modifiers 
-               <br/>The original modifier actions default to Alt, Alt+Shift, Ctrl+Shift, and Ctrl+Alt (with Shift optionally held). Rebind the Alt, Control, and Shift action keys from the UnityModManager **Keybindings** tab; combinations remain composable.
+               <br/>The original modifier actions default to Alt, Alt+Shift, Ctrl+Shift, and Ctrl+Alt (with Shift optionally held). The Alt, Control, and Shift action keys are stored in `Settings.json`.
                <ul>
                   <li><b>A5a:</b> `alt left click` : toggle car hand brake and connect glad hands on both ends
                      <ul>
@@ -151,12 +153,12 @@ Enter Tweaks and Things.
             <li><b>D2:</b> Locomotive messages grab the locomotive `Ident.RoadNumber` and check the `CTC Panel Markers` if they exist. If found, they will use the red/green color and embed the locomotive as an image in the message.  If no marker is found, it defaults to blue.</li>
             <li><b>D3:</b> Currently, One person per server should have this per discord webhook, otherwise you will get duplicate messages to the webhook.</li>
             <li><b>D4: Multiple hooks</b>: Allows for many different webhooks per client to be setup, and filtered to the `Ident.ReportingMark` so you can get messages to different hooks based on what save/server you are playing on.</li>
-            <li><b>D5: Customizable</b> from the UnityModManager settings panel, find <b>RMROC451.TweaksAndThings</b> (see <b>S3</b>)</li>
+            <li><b>D5: Customizable</b> from the in-game settings window (F10)</li>
         </ul>
   </li>
   <li><b>M:</b> Miscellaneous
         <ul>
-            <li><b>M1 (🟢 NEW v2.0.0):</b> Repair tracks service cars without a waybill by default, matching stock Railroader. Turn off <b>Allow repair-track service without a waybill</b> in UMM UI settings to require a work order; cars without one report as <b>'No Work Order Assigned'</b>.</li>
+            <li><b>M1 (🟢 NEW v2.0.0):</b> Repair tracks service cars without a waybill by default, matching stock Railroader. Turn off <b>Allow repair-track service without a waybill</b> in the in-game UI settings to require a work order; cars without one report as <b>'No Work Order Assigned'</b>.</li>
             <li><b>M2:</b> Engine Roster Tweaks<br/>
                 <ul>
                     <li><b>M2a  (🟢 NEW v2.0.0):</b> MU'd locomotives will automatically be hidden unless they are <b>SELECTED</b> or <b>FAVORITED</b>.</li>
@@ -175,7 +177,7 @@ Enter Tweaks and Things.
             <li><b>M4 (🟢 NEW v2.0.0):</b> `ctrl alt click` on a track in the map, sets the selected locomotives waypoint there when in waypoint mode.<br/>
                If you have mapenhancer with cars displayed, if you keycombo click on a car icon, it will set the auto couple attempt.
             </li>
-            <li><b>M5:</b> The formatted `/cu` locomotive status message can be sent from the UnityModManager **Crew Update** tab.</li>
+            <li><b>M5:</b> The formatted `/cu` locomotive status message can be sent from the **Crew Update** tab in the F10 settings window.</li>
             <li><b>M6:</b> The car inspector's <b>Add Consist to Switch List</b> button adds the connected cars to the current switch list even when the consist has no locomotive.</li>
             <li><b>M7:</b> Auto Engineer waypoint options include <b>Run around, then ...</b>. Select this while the train is stopped to close the anglecocks, uncouple the motive power using the mod's existing coupler command, run to the saved free tail coupler, recouple, then continue to the selected destination. The consist must have one motive-power-to-car boundary and one free tail coupler.</li>
         </ul>
@@ -245,14 +247,14 @@ Enter Tweaks and Things.
 The display tools include client-side functionality, but automated traffic, interchange accounting and gameplay settings are host-authoritative. The host must run the mod for those features. Use matching versions on participating clients for the traffic UI and interaction protections; host-only settings are disabled on clients. See [Installation and multiplayer](INSTALLATION-AND-RELEASES.md#multiplayer-installation-and-authority).
 
 ### What version of Railroader does this mod work with?
-2024.6 or later. The mod must be built against the Railroader and UnityModManager assemblies installed locally.
+Railroader 0.6.0 or later. Build against the Railroader assemblies installed locally, including `Railroader.Modding.dll`.
 
 ### Building and tests
-Set `GameDir` in `Paths.user` to the Railroader install folder. By default, the build expects UnityModManager assemblies in `Railroader_Data/Managed/UnityModManager`; set `UnityModManagerDir` in `Paths.user` if your installation uses another directory.
+Set `GameDir` in `Paths.user` to the Railroader install folder. The build references the game's `Railroader.Modding.dll` and uses Harmony as a packaged shared library.
 
 Run the focused settings and hotkey tests with `dotnet test Tests/TweaksAndThings.Tests.csproj`. Build the release archive with `dotnet build TweaksAndThings.sln -c Release`.
 
-Both Debug and Release builds create `RMROC451.TweaksAndThings_<version>.zip` alongside the DLL in the actual output directory (including a custom `OutDir`). The Unity Mod Manager archive contains the generated `Info.json`, the mod DLL and `Newtonsoft.Json.dll`. Rebuilding replaces the archive for that version without including old archives, game assemblies or debug symbols. Release builds also retain deployment to `GameModDir`.
+Both Debug and Release builds create `RMROC451.TweaksAndThings_<version>.zip` alongside the DLL in the actual output directory (including a custom `OutDir`). The native mod pack contains the generated `Info.json`, the mod DLL, `0Harmony.dll`, and `Newtonsoft.Json.dll`. Rebuilding replaces the archive for that version without including old archives, game assemblies or debug symbols. Local builds deploy to `Documents\Railroader\ModDev` by default; packaged releases are installed under `Documents\Railroader\Mods`.
 
 *Special thanks to Zamu for the modding tools and guidance that helped make the original project more robust.*
 
@@ -266,7 +268,7 @@ Enable **UI → Enable tag updates for air, handbrake, oil, and hotbox status** 
 
 ### Simulated interchange setup
 
-Open **AI traffic / interchanges** with the leftmost **AI** button in the top-right toolbar, then select **Settings → Simulated delivery / pickup**. The UMM AI Traffic page also opens this window. Run in single player or on the multiplayer host. The interchange must be enabled in the game and its native service time configured. No timetable row, through-traffic toggle, CTC or caboose is required. A nearby caboose only supplies the optional free transfer-speed benefit.
+When the NPC Traffic settings tab is restored, choose **AI traffic / simulated interchange** in mod settings. In the traffic window, select **Settings → Simulated delivery / pickup**. If NPC traffic is already enabled in saved settings, you can also open the window from the timetable's **AI traffic** tab. Run in single player or on the multiplayer host. The interchange must be enabled in the game and its native service time configured. No timetable row, through-traffic toggle, CTC or caboose is required. A nearby caboose only supplies the optional free transfer-speed benefit.
 
 NPC power is randomly selected from the game's visible consist-placer locomotive definitions, including loaded custom definitions. You do not need to own a template locomotive. Steam locomotives include their defined tender. Unsuitable candidates are skipped; power is sized for the route (at most 16 locomotive units). Connected enabled track and room for the service consist are still required. Trains dispatch at service time minus estimated travel time and a five-minute margin, rather than immediately when the setting is selected.
 
@@ -282,21 +284,18 @@ Held deliveries survive saves and are restored to the native pending orders befo
 
 Held delivery settings default to a **4-hour** delivery window and **100%** starting premium: the base waybill payout plus an extra equal amount gives **2× base payout** at the next service time. The extra premium declines linearly with elapsed game time, reaching zero at the deadline. For a $1,000 base payout, the total is $2,000 initially, $1,500 after two hours and $1,000 after four hours. Deliver the car to its industry's waybill destination to collect the premium. Native contract bonuses and damage fines still apply separately. Later delays or repeated missed services do not reset the original bonus clock; an earlier extra service can advance it. The deadline hours and starting premium percentage are configurable under Settings. Timewarp advances the countdown and premium calculation.
 
-Diagnostics are written automatically to **`TweaksAndThings-debug.log` in the installed mod directory** (normally `Railroader/Mods/RMROC451.TweaksAndThings`). The file contains UTC timestamps, game-time snapshots, plans, power/consist checks, loading blockers, service IDs and exception stacks. Repeated detailed blockers are throttled; a snapshot is written every two real minutes. At 5 MB the log rotates to `TweaksAndThings-debug.log.previous`, keeping one previous file. The traffic window's **Debug** tab reads the latest 160 lines (at most 32 KB) from disk, polls once per second only while visible, and avoids reading unchanged files. **Open log file** opens it in your configured text editor; **Write debug snapshot** or `/npcTraffic` records current state before you share both files. Routine mod diagnostics no longer echo into the game console. Telegraph messages remain in the game's message system. Native instantaneous “received no cars” messages are suppressed during remote NPC loading; automatic interchange mode retains its normal messages.
+Diagnostics are written automatically to **`TweaksAndThings-debug.log` in the installed mod directory** (under `Documents/Railroader/Mods` for releases or `Documents/Railroader/ModDev` for local builds). The file contains UTC timestamps, game-time snapshots, plans, power/consist checks, loading blockers, service IDs and exception stacks. Repeated detailed blockers are throttled; a snapshot is written every two real minutes. At 5 MB the log rotates to `TweaksAndThings-debug.log.previous`, keeping one previous file. The traffic window's **Debug** tab reads the latest 160 lines (at most 32 KB) from disk, polls once per second only while visible, and avoids reading unchanged files. **Open log file** opens it in your configured text editor; **Write debug snapshot** or `/npcTraffic` records current state before you share both files. Routine mod diagnostics no longer echo into the game console. Telegraph messages remain in the game's message system. Native instantaneous “received no cars” messages are suppressed during remote NPC loading; automatic interchange mode retains its normal messages.
 
-### Publishing UMM updates (2.1.9 onward)
+### Publishing releases
 
-`Info.json` points UMM to the raw `Repository.json` on `main`. The homepage opens GitHub Releases. Users on older manifests need to install a UMM package with this feed address once. UMM compares the installed version with the feed; enable update checks in UMM's settings. The in-game manager flags newer versions and provides the homepage for downloading them.
+`Info.json` declares the native DLL assembly and a minimum compatible Railroader version. Publish the generated ZIP as a GitHub release asset; users install updates by replacing the mod pack while the game is closed.
 
-For each release after 2.1.9:
+For each release:
 
 1. Increment `Assembly.version` to the new numeric `major.minor.patch` version (for example, 2.1.10).
 2. Build and validate the mod. Both build configurations produce `RMROC451.TweaksAndThings_<version>.zip` beside the built DLL. Check the ZIP's `Info.json` version and run the tests and game checks before release.
 3. Create the matching GitHub release tag (for example, `v2.1.10`) and upload `RMROC451.TweaksAndThings_2.1.10.zip` as a release asset. Do not substitute GitHub's generated source-code archive.
-4. After the asset is publicly downloadable, update the release entry in `Repository.json` on `main`: keep `Id` as `RMROC451.TweaksAndThings`, set `Version` to `2.1.10`, and set `DownloadUrl` to the actual asset URL (`https://github.com/rmroc451/TweaksAndThings/releases/download/v2.1.10/RMROC451.TweaksAndThings_2.1.10.zip`).
-5. Verify the raw feed returns valid JSON and the download URL returns the installable ZIP. Test detection from an older UMM installation.
-
-The feed records the latest public stable release; do not advertise development builds or prereleases there. The initial 2.1.9 entry in this branch is release preparation: publish its asset before exposing that feed entry on `main`. Ordinary local builds do not publish releases or change the public feed.
+4. Verify the release page links to the installable ZIP. Ordinary local builds do not publish releases.
 
 Interchange diagnostics: enter `/npcTraffic` in the game's console to display the current mode, host status, game time, each enabled interchange's next service time, calculated approach and dispatch status, and active trains' transfer progress and waiting reasons. This is a read-only report; on multiplayer clients, scheduling calculations run on the host. Routine diagnostics go to the mod-directory debug file and its Debug tab; repeated blockers are throttled. The requested console snapshot is read-only, and telegraphs remain in the native messages. See [Troubleshooting](TROUBLESHOOTING.md#get-the-right-log).
 
@@ -312,7 +311,7 @@ NPC trains choose a close-fitting combination of catalog locomotives for the rou
 
 Simulated services capture their pickup cars at dispatch. On arrival, they can add cars that reached the pickup tracks while the train was en route, up to 90% of its installed power's capacity on the return route. Original reservations retain priority. A snapshot car missing from its pickup span receives a telegraph warning on its first missed attempt. A second missed attempt forfeits its delivery payout and reclaims an already credited payout. Pickup history and delinquency survive saving and loading.
 
-Open the timetable's **Delinquent pickups** tab to see all delinquent cars across the railroad, regardless of your train crew. Rows show the return interchange, payout status and estimated game time until the next pickup attempt. Click a car or interchange to locate it; **+ List** adds the car to your current crew's switch list. The list refreshes automatically. `/npcPickups` also opens a delinquent pickup listing. Countdown estimates use active service progress or the interchange's next configured service time; blocked services can delay the actual attempt.
+Open **AI traffic → Delinquent pickups** in the timetable or traffic window to see all delinquent cars across the railroad, regardless of your train crew. Rows show the return interchange, payout status and estimated game time until the next pickup attempt. Click a car or interchange to locate it; **+ List** adds the car to your current crew's switch list. The list refreshes automatically. `/npcPickups` also opens a delinquent pickup listing. Countdown estimates use active service progress or the interchange's next configured service time; blocked services can delay the actual attempt.
 
 Selecting a destination from the AE cog assigns the first waypoint directly; no existing waypoint is required. It sends one command in Waypoint mode, preserving a positive configured speed or using the game's default when starting from zero. Freight/repair destinations remain available without a timetable document.
 
@@ -320,7 +319,7 @@ The inspector's consist helpers occupy two compact rows. “To Switch List” in
 
 ### NPC traffic controls and scheduling
 
-The standalone traffic window uses the timetable icon at the left of the top-right toolbar. The timetable also has an **AI traffic** tab; either view can be used. Its header offers Maximize / Restore. Interchange schedules show HH:MM times and miles, with a navigation menu for locating or teleporting to spawn and service targets and one shared warp-to-next-AI-dispatch action. Held delivery estimates show approximately the nearest hour remaining. The Debug tab scrolls to the bottom when the visible log text changes.
+The traffic window's F10 entry point will return with the NPC Traffic settings tab. If NPC traffic is already enabled in saved settings, the timetable's **AI traffic** tab remains an entry point. The window's header offers Maximize / Restore. Interchange schedules show HH:MM times and miles, with a navigation menu for locating or teleporting to spawn and service targets and one shared warp-to-next-AI-dispatch action. Held delivery estimates show approximately the nearest hour remaining. The Debug tab scrolls to the bottom when the visible log text changes.
 
 The main **Timetable** tab uses a string chart instead of a table. Time runs left to right across the day; station rows run vertically, with schematic spacing. Blue paths travel east, amber paths west, horizontal portions show station dwell, and white diamonds mark explicitly scheduled meets. A red line tracks the current game time. Click a path or train symbol to see arrival/departure times and meet partners; expand the time scale for more detail and scroll horizontally. Midnight trips wrap at the day edges instead of crossing the entire chart. Separate branch charts share the same clock scale. The native **Edit Timetable** action remains available, with existing NPC schedule protection intact.
 
@@ -332,7 +331,7 @@ The chart overlays live train positions and dashed forecasts on the solid timeta
 
 Open the clock's **Time** window for **Fast-forward simulation**. Select player locomotives currently in ROAD/WAYPOINT mode, then choose **2× / 4× / 8× to destination**, or enter a **HH:mm** stop time and use **4× until stop time**. The clock and all world movement accelerate together using normal fixed physics steps; selection determines the stop triggers rather than which trains move. A destination run returns to normal when any selected train stops, including at a signal or other AE wait. Both simulation fast-forward and clock-only waiting stop at scheduled freight switching windows (a freight stop with distinct arrival/departure times). NPC spawning also returns simulation to normal. Simulation rate is host-controlled and synchronized through game state; it resets on load, unload or mod disable. Higher multipliers perform more physics work per real second and may achieve a lower effective rate on a busy railroad. Existing company clock settings are preserved.
 
-**Report a bug / feature** in the UMM mod settings or AI traffic Settings tab opens the [GitHub issues list](https://github.com/rmroc451/TweaksAndThings/issues).
+**Report a bug / feature** in the F10 mod settings window or AI traffic Settings tab opens the [GitHub issues list](https://github.com/rmroc451/TweaksAndThings/issues).
 
 The caboose inspector's compact **Waybill summary** button opens a separate resizable window with **Caboose consist** and **Current switch list** tabs. Each shows car counts, loaded/empty counts, tonnage and length grouped by destination and current location, with locate actions. The switch list's tools menu also opens this summary. The switch list tab follows the current crew and includes repair bills and unwaybilled cars; summaries refresh every three seconds while open.
 

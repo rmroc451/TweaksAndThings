@@ -4,7 +4,6 @@ using NUnit.Framework;
 using RMROC451.TweaksAndThings;
 using RMROC451.TweaksAndThings.Patches;
 using UnityEngine;
-using UnityModManagerNet;
 
 namespace RMROC451.TweaksAndThings.Tests;
 
@@ -31,7 +30,7 @@ public sealed class SettingsBehaviorTests
     public void SwitchListAccess_IncludesLocomotiveAndTenderWithRepairBills()
     {
         var loco = new Model.Car { id = "repair-loco", IsMotivePower = true, HasRepairBill = true };
-        var tender = new Model.Car { id = "repair-tender", Archetype = Model.Definition.CarArchetype.Tender, HasRepairBill = true };
+        var tender = new Model.Car { id = "repair-tender", CarType = Model.CarType.Tender, HasRepairBill = true };
         loco.Consist = new[] { loco, tender };
         Assert.That(SwitchListAccess.TryAddConsist(loco, out var count), Is.True);
         Assert.That(count, Is.EqualTo(2));
@@ -224,7 +223,7 @@ public sealed class SettingsBehaviorTests
     {
         SwitchListTestController.Shared.AddedIds.Clear();
         var locomotive = new Model.Car { id = "LOCO", IsMotivePower = true };
-        var tender = new Model.Car { id = "TENDER", Archetype = Model.Definition.CarArchetype.Tender };
+        var tender = new Model.Car { id = "TENDER", CarType = Model.CarType.Tender };
         var firstCar = new Model.Car { id = "A" };
         var duplicate = new Model.Car { id = "A" };
         locomotive.Consist = new[] { locomotive, tender, firstCar, duplicate };
@@ -254,54 +253,54 @@ public sealed class SettingsBehaviorTests
     [Test]
     public void HotkeyBindings_KeepModifierCombinationsComposable()
     {
-        KeyBinding.ControlHeld = true;
-        KeyBinding.AltHeld = true;
-        KeyBinding.ShiftHeld = false;
+        Input.SetKey(KeyCode.LeftControl, true);
+        Input.SetKey(KeyCode.LeftAlt, true);
+        Input.SetKey(KeyCode.LeftShift, false);
         try
         {
-            Assert.That(HotkeyBindings.IsHeld(new KeyBinding { keyCode = KeyCode.LeftAlt }), Is.True);
-            Assert.That(HotkeyBindings.IsHeld(new KeyBinding { keyCode = KeyCode.LeftControl }), Is.True);
-            Assert.That(HotkeyBindings.IsHeld(new KeyBinding { keyCode = KeyCode.LeftShift }), Is.False);
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.LeftAlt }), Is.True);
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.LeftControl }), Is.True);
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.LeftShift }), Is.False);
         }
         finally
         {
-            KeyBinding.ControlHeld = false;
-            KeyBinding.AltHeld = false;
-            KeyBinding.ShiftHeld = false;
-            KeyBinding.KeyHeld = false;
+            Input.SetKey(KeyCode.LeftControl, false);
+            Input.SetKey(KeyCode.LeftAlt, false);
+            Input.SetKey(KeyCode.LeftShift, false);
+            Input.SetKey(KeyCode.A, false);
         }
     }
 
     [Test]
     public void HotkeyBindings_SupportsRemappingAnActionToAnotherKey()
     {
-        KeyBinding.KeyHeld = true;
+        Input.SetKey(KeyCode.A, true);
         try
         {
-            Assert.That(HotkeyBindings.IsHeld(new KeyBinding { keyCode = KeyCode.A }), Is.True);
+            Assert.That(HotkeyBindings.IsHeld(new HotkeyBinding { keyCode = KeyCode.A }), Is.True);
         }
         finally
         {
-            KeyBinding.KeyHeld = false;
+            Input.SetKey(KeyCode.A, false);
         }
     }
 
     [Test]
     public void HotkeyBindings_RequiresConfiguredModifiers()
     {
-        var binding = new KeyBinding { keyCode = KeyCode.A, modifiers = 1 };
-        KeyBinding.KeyHeld = true;
-        KeyBinding.ControlHeld = false;
+        var binding = new HotkeyBinding { keyCode = KeyCode.A, modifiers = 1 };
+        Input.SetKey(KeyCode.A, true);
+        Input.SetKey(KeyCode.LeftControl, false);
         try
         {
             Assert.That(HotkeyBindings.IsHeld(binding), Is.False);
-            KeyBinding.ControlHeld = true;
+            Input.SetKey(KeyCode.LeftControl, true);
             Assert.That(HotkeyBindings.IsHeld(binding), Is.True);
         }
         finally
         {
-            KeyBinding.KeyHeld = false;
-            KeyBinding.ControlHeld = false;
+            Input.SetKey(KeyCode.A, false);
+            Input.SetKey(KeyCode.LeftControl, false);
         }
     }
 }

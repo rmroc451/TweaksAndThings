@@ -164,7 +164,7 @@ internal class CarInspector_PopulateCarPanel_Patch
     private static UIPanelBuilder AddCarConsistRebuildObservers(UIPanelBuilder builder, IEnumerable<Model.Car> consist, bool all = true)
     {
         TagController tagController = UnityEngine.Object.FindFirstObjectByType<TagController>();
-        foreach (Model.Car car in consist.Where(c => c.Archetype != Model.Definition.CarArchetype.Tender))
+        foreach (Model.Car car in consist.Where(c => !c.CarType.IsTender))
         {
             builder = AddObserver(builder, car, PropertyChange.KeyForControl(PropertyChange.Control.Handbrake), tagController);
             foreach (LogicalEnd logicalEnd in ends)
@@ -233,7 +233,7 @@ internal class CarInspector_PopulateCarPanel_Patch
                 }
                 else
                 {
-                    consist = consist.Where(c => c is not BaseLocomotive && c.Archetype != Model.Definition.CarArchetype.Tender);
+                    consist = consist.Where(c => c is not BaseLocomotive && !c.CarType.IsTender);
                     //when ApplyHandbrakesAsNeeded is called, and the consist contains an engine, it stops applying brakes.
                     tc.ApplyHandbrakesAsNeeded(consist.ToList(), PlaceTrainHandbrakes.Automatic);
                 }
