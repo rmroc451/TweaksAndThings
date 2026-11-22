@@ -1,9 +1,14 @@
 {
   "identifier": "rmroc451/tweaks-and-things",
   "version": "__ASSEMBLY_VERSION__",
-  "name": "RMROC451's Tweaks and Things",
-  "assemblies": ["RMROC451.TweaksAndThings.dll"],
+  "name": "Tweaks and Things",
+  "Author": "RMROC451/Reaper8f",
+  "license": "MIT",
+  "assemblies": [ "RMROC451.TweaksAndThings.dll" ],
+  "url": "https://github.com/rmroc451/TweaksAndThings/releases",
+  "Repository": "https://github.com/rmroc451/TweaksAndThings",
   "dependencies": {
-    "required": ["rr/game >=0.6.0"]
-  }
+    "required": [ "rr/game >=0.6.3" ]
+  },
+  "scope": "optional"
 }

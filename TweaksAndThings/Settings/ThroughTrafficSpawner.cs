@@ -328,7 +328,7 @@ internal static class ThroughTrafficSpawner
     {
         string Normalize(string? name) => new string((name ?? "").ToUpperInvariant().Replace("INTERCHANGE", "").Where(char.IsLetterOrDigit).ToArray());
         var names = new[] { interchange.name, interchange.Industry.name, interchange.Industry.identifier }.Select(Normalize).Where(n => n.Length > 0).ToHashSet();
-        return new[] { station.code, station.name, station.mapFeature?.name, station.mapFeature?.DisplayName }.Select(Normalize).Any(n => n.Length > 0 && names.Contains(n));
+        return new[] { station.code, station.name, station.passengerStop?.name, station.passengerStop?.DisplayName }.Select(Normalize).Any(n => n.Length > 0 && names.Contains(n));
     }
 
     internal static bool IsInterchange(TimetableStation station) => OpsController.Shared?.AllInterchanges.Any(i => MatchesInterchange(station, i)) == true;
@@ -359,11 +359,10 @@ internal static class ThroughTrafficSpawner
         var interchange = OpsController.Shared?.AllInterchanges.FirstOrDefault(i => MatchesInterchange(station, i));
         span = interchange?.TrackSpans.FirstOrDefault();
         if (TryGetSpanLocation(span, out location)) return true;
-        var feature = station.mapFeature;
-        if (feature == null) return false;
-        if (feature.GetType().GetProperty("CenterPoint")?.GetValue(feature, null) is UnityEngine.Vector3 point)
-            if (Graph.Shared.TryGetLocationFromGamePoint(point, 200f, out location)) return true;
-        return Graph.Shared.TryGetLocationFromGamePoint(Helpers.WorldTransformer.WorldToGame(feature.transform.position), 200f, out location);
+        var stop = station.passengerStop;
+        if (stop == null) return false;
+        if (Graph.Shared.TryGetLocationFromGamePoint(stop.CenterPoint, 200f, out location)) return true;
+        return Graph.Shared.TryGetLocationFromGamePoint(Helpers.WorldTransformer.WorldToGame(stop.Position), 200f, out location);
     }
 
     private static bool TryGetSpanLocation(TrackSpan? span, out Location location)

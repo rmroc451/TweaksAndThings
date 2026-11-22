@@ -164,8 +164,6 @@ internal static class TimetableStringChart
                 else if (ThroughTrafficSpawner.TryGetStationLocation(a, out var from) &&
                     ThroughTrafficSpawner.TryGetStationLocation(b, out var to) &&
                     NpcTrainOperations.Route(from, to, out _, out float length)) meters = length;
-                else if (a.mapFeature != null && b.mapFeature != null)
-                    meters = Vector3.Distance(a.mapFeature.transform.position, b.mapFeature.transform.position);
                 else return null;
                 view.Distances[key] = meters;
             }
